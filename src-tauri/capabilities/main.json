@@ -19,6 +19,11 @@
     "allow-delete-model",
     "allow-refresh-models",
     "allow-select-model",
-    "allow-test-connection"
+    "allow-test-connection",
+    "allow-chatgpt-login",
+    "allow-chatgpt-cancel-login",
+    "allow-chatgpt-logout",
+    "allow-chatgpt-welcome-seen",
+    "allow-open-chatgpt-usage"
   ]
 }

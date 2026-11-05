@@ -17,6 +17,11 @@ fn main() {
         "refresh_models",
         "select_model",
         "test_connection",
+        "chatgpt_login",
+        "chatgpt_cancel_login",
+        "chatgpt_logout",
+        "chatgpt_welcome_seen",
+        "open_chatgpt_usage",
     ])))
     .expect("tauri-build mislukte");
 }

@@ -44,10 +44,38 @@ export function pickerGroups(file: ProvidersFile): PickerGroup[] {
     .map((p) => ({
       label: p.name,
       options: p.models
-        .filter((m) => m.enabled || (active?.providerId === p.id && active.modelId === m.id))
+        .filter((m) => (m.enabled && (p.kind !== "chatgpt_plan" || chatgptState(p) === "ready")) || (active?.providerId === p.id && active.modelId === m.id))
         .map((m) => ({ value: refValue({ providerId: p.id, modelId: m.id }), label: modelLabel(m) })),
     }))
     .filter((g) => g.options.length > 0);
+}
+
+export type ChatgptState = "ready" | "plan_disabled" | "session_lost" | "signed_out";
+
+export function chatgptState(p: Provider): ChatgptState {
+  if (!p.hasKey) return p.chatgpt?.sessionLost ? "session_lost" : "signed_out";
+  return p.chatgpt?.planEnabled ? "ready" : "plan_disabled";
+}
+
+/** De regel in het providerscherm: met welk account je bent ingelogd en wat er eventueel moet gebeuren. */
+export function chatgptStatus(p: Provider): string {
+  const who = p.chatgpt?.email ?? "dit ChatGPT-account";
+  switch (chatgptState(p)) {
+    case "ready":
+      return `Ingelogd als ${who}. Verzoeken met deze modellen gebruiken je ChatGPT-abonnement.`;
+    case "plan_disabled":
+      return `Ingelogd als ${who}, maar Deepdive mag je ChatGPT-abonnement niet gebruiken. Schakel het in, of gebruik een andere provider met een eigen API-sleutel.`;
+    case "session_lost":
+      return `De sessie van ${who} is ingetrokken of verlopen. Log opnieuw in om deze modellen te gebruiken.`;
+    case "signed_out":
+      return `Uitgelogd (${who}). Log opnieuw in om deze modellen te gebruiken.`;
+  }
+}
+
+/** Of het gekozen model het ChatGPT-abonnement gebruikt, want dat moet zichtbaar zijn bij de modelkiezer. */
+export function usesChatgptPlan(file: ProvidersFile): boolean {
+  const active = file.selection.active;
+  return !!active && file.providers.some((p) => p.id === active.providerId && p.kind === "chatgpt_plan");
 }
 
 /** Het model voor de verbindingstest: de actieve keuze, anders het eerste dat aan staat. */

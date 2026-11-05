@@ -1,10 +1,12 @@
 //! Providers en modellen. De gegevens staan in `providers.json`, de sleutels alleen in de sleutelhanger.
 //! In het bestand staat per provider enkel `hasKey`, zodat de app zonder sleutelhanger weet wat ze kan tonen.
+//! Een ChatGPT-koppeling werkt net zo: `hasKey` betekent ingelogd, de tokens staan alleen in de sleutelhanger.
 
 pub mod commands;
 pub mod secrets;
 
 use crate::ai::{self, ApiKey, ApiKind, Endpoint, FetchedModel, Target};
+use crate::chatgpt::{self, AccountChange, AccountSink, Hub, LoginRequest, LoginResult, Returning, Session};
 use crate::error::AppError;
 use secrets::SecretStore;
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,22 @@ pub struct Provider {
     pub base_url: String,
     pub has_key: bool,
     pub models: Vec<Model>,
+    /// Alleen bij een ChatGPT-koppeling.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chatgpt: Option<ChatgptAccount>,
+}
+
+/// Wat de app over een koppeling weet zonder de sleutelhanger. Hier staat geen token in. De client-ID blijft
+/// na uitloggen bewaard, zodat opnieuw inloggen geen nieuwe registratie maakt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatgptAccount {
+    pub client_id: String,
+    pub subject: String,
+    pub email: Option<String>,
+    pub plan_enabled: bool,
+    /// De sessie bleek ingetrokken of verlopen; de gebruiker logde niet zelf uit.
+    pub session_lost: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,11 +85,14 @@ pub struct ProvidersFile {
     pub schema_version: u32,
     pub providers: Vec<Provider>,
     pub selection: Selection,
+    /// De bevestiging "You're using your ChatGPT plan" verschijnt maar één keer.
+    #[serde(default)]
+    pub chatgpt_welcome_seen: bool,
 }
 
 impl Default for ProvidersFile {
     fn default() -> Self {
-        Self { schema_version: SCHEMA_VERSION, providers: vec![], selection: Selection::default() }
+        Self { schema_version: SCHEMA_VERSION, providers: vec![], selection: Selection::default(), chatgpt_welcome_seen: false }
     }
 }
 
@@ -136,12 +157,24 @@ fn account(provider_id: &str) -> String {
 
 pub struct ProviderStore {
     path: PathBuf,
-    state: Mutex<ProvidersFile>,
+    state: Arc<Mutex<ProvidersFile>>,
     secrets: Arc<dyn SecretStore>,
+    hub: Arc<Hub>,
+    sink: AccountSink,
+}
+
+fn write_file(path: &std::path::Path, state: &ProvidersFile) -> Result<(), AppError> {
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, serde_json::to_vec_pretty(state).map_err(AppError::storage)?).map_err(AppError::storage)?;
+    std::fs::rename(tmp, path).map_err(AppError::storage)
 }
 
 impl ProviderStore {
     pub fn open(root: PathBuf, secrets: Arc<dyn SecretStore>) -> Result<Self, AppError> {
+        Self::open_with(root, secrets, chatgpt::Config::for_app())
+    }
+
+    pub fn open_with(root: PathBuf, secrets: Arc<dyn SecretStore>, config: chatgpt::Config) -> Result<Self, AppError> {
         std::fs::create_dir_all(&root).map_err(AppError::storage)?;
         let path = root.join("providers.json");
         let state = match std::fs::read(&path) {
@@ -152,13 +185,30 @@ impl ProviderStore {
             }),
             Err(_) => ProvidersFile::default(),
         };
-        Ok(Self { path, state: Mutex::new(state), secrets })
+        let state = Arc::new(Mutex::new(state));
+        let hub = Arc::new(Hub::new(config, secrets.clone(), root));
+        // Wat tijdens gebruik blijkt, zoals een ingetrokken sessie, moet ook in de opgeslagen gegevens komen.
+        let sink: AccountSink = {
+            let (state, path) = (state.clone(), path.clone());
+            Arc::new(move |provider_id: &str, change: AccountChange| {
+                let mut guard = state.lock().unwrap();
+                let Some(provider) = guard.providers.iter_mut().find(|p| p.id == provider_id) else { return };
+                let Some(account) = provider.chatgpt.as_mut() else { return };
+                match change {
+                    AccountChange::SessionLost => {
+                        account.session_lost = true;
+                        provider.has_key = false;
+                    }
+                    AccountChange::PlanDisabled => account.plan_enabled = false,
+                }
+                let _ = write_file(&path, &guard);
+            })
+        };
+        Ok(Self { path, state, secrets, hub, sink })
     }
 
     fn persist(&self, state: &ProvidersFile) -> Result<(), AppError> {
-        let tmp = self.path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(state).map_err(AppError::storage)?).map_err(AppError::storage)?;
-        std::fs::rename(tmp, &self.path).map_err(AppError::storage)
+        write_file(&self.path, state)
     }
 
     /// Voert een wijziging uit en bewaart die. Mislukt de wijziging of het opslaan, dan blijft alles zoals het was.
@@ -193,6 +243,16 @@ impl ProviderStore {
             if input.id.is_some() && existing.is_none() {
                 return Err(not_found());
             }
+            // Een ChatGPT-koppeling ontstaat alleen door in te loggen. Daarna is alleen de naam te wijzigen.
+            let was_chatgpt = existing.is_some_and(|p| p.kind == ApiKind::ChatgptPlan);
+            if was_chatgpt != (input.kind == ApiKind::ChatgptPlan) || (was_chatgpt && !matches!(key, KeyChange::Keep)) {
+                return Err(AppError::new("chatgpt_only_login", "Een ChatGPT-koppeling maak je met de knop Continue with ChatGPT en heeft geen API-sleutel."));
+            }
+            if was_chatgpt {
+                let slot = provider_mut(state, &id)?;
+                slot.name = name;
+                return Ok(slot.clone());
+            }
             let had_key = existing.is_some_and(|p| p.has_key);
             let has_key = match &key {
                 KeyChange::Keep => had_key,
@@ -209,7 +269,7 @@ impl ProviderStore {
                     return Err(AppError::new("key_host_changed", "Het adres wijst nu naar een andere server. Vul de sleutel opnieuw in, of haal hem weg, zodat je oude sleutel daar niet terechtkomt."));
                 }
             }
-            let mut provider = existing.cloned().unwrap_or(Provider { id: id.clone(), name: String::new(), kind: input.kind, base_url: String::new(), has_key: false, models: vec![] });
+            let mut provider = existing.cloned().unwrap_or(Provider { id: id.clone(), name: String::new(), kind: input.kind, base_url: String::new(), has_key: false, models: vec![], chatgpt: None });
             provider.name = name;
             provider.kind = input.kind;
             provider.base_url = url.to_string().trim_end_matches('/').to_string();
@@ -232,12 +292,17 @@ impl ProviderStore {
     pub fn delete_provider(&self, id: &str) -> Result<(), AppError> {
         self.change(|state| {
             let before = state.providers.len();
+            let was_chatgpt = state.providers.iter().any(|p| p.id == id && p.kind == ApiKind::ChatgptPlan);
             state.providers.retain(|p| p.id != id);
             if state.providers.len() == before {
                 return Err(not_found());
             }
             // Eerst de sleutel: mislukt dat, dan blijft de provider staan en is de sleutel niet onvindbaar.
-            self.secrets.delete(&account(id))
+            self.secrets.delete(&account(id))?;
+            if was_chatgpt {
+                self.hub.delete_credentials(id)?;
+            }
+            Ok(())
         })
     }
 
@@ -280,6 +345,7 @@ impl ProviderStore {
         self.change(|state| {
             let provider = provider_mut(state, provider_id)?;
             let enable_new = fetched.len() <= AUTO_ENABLE_LIMIT;
+            let order: Vec<String> = fetched.iter().map(|f| f.id.clone()).collect();
             provider.models.retain(|m| m.manual || m.user_edited || fetched.iter().any(|f| f.id == m.id));
             for f in fetched {
                 match provider.models.iter_mut().find(|m| m.id == f.id) {
@@ -292,6 +358,10 @@ impl ProviderStore {
                     }
                     None => provider.models.push(Model { id: f.id, display_name: f.display_name, supports_images: f.supports_images, context_tokens: f.context_tokens, enabled: enable_new, manual: false, user_edited: false }),
                 }
+            }
+            if provider.kind == ApiKind::ChatgptPlan {
+                // De volgorde van de server blijft staan; eigen modellen komen erachter.
+                provider.models.sort_by_key(|m| order.iter().position(|id| *id == m.id).unwrap_or(usize::MAX));
             }
             sort_models(provider);
             Ok(provider.clone())
@@ -320,11 +390,23 @@ impl ProviderStore {
 
     /// Alleen hier komt een sleutel de sleutelhanger uit, en alleen om in een `Endpoint` naar de AI-laag te gaan.
     pub fn endpoint(&self, provider_id: &str) -> Result<Endpoint, AppError> {
-        let (kind, base_url, has_key) = {
+        let (kind, base_url, has_key, chatgpt_account) = {
             let state = self.state.lock().unwrap();
             let p = state.providers.iter().find(|p| p.id == provider_id).ok_or_else(not_found)?;
-            (p.kind, p.base_url.clone(), p.has_key)
+            (p.kind, p.base_url.clone(), p.has_key, p.chatgpt.clone())
         };
+        if kind == ApiKind::ChatgptPlan {
+            let account = chatgpt_account.ok_or_else(chatgpt::signed_out)?;
+            if !has_key {
+                return Err(if account.session_lost { chatgpt::session_revoked() } else { chatgpt::signed_out() });
+            }
+            if !account.plan_enabled {
+                return Err(chatgpt::plan_disabled());
+            }
+            // Altijd het vaste adres, niet wat in het bestand staat: de tokens gaan alleen naar OpenAI.
+            let session = Session::new(self.hub.clone(), provider_id.to_string(), account.client_id, self.sink.clone());
+            return Ok(Endpoint::chatgpt(self.hub.api_base(), Arc::new(session)));
+        }
         let url = normalize_base_url(&base_url, kind)?;
         let key = if has_key {
             ai::check_key_transport(&url)?;
@@ -346,6 +428,73 @@ impl ProviderStore {
         .ok_or_else(|| AppError::new("unknown_model", "Dit model staat niet (meer) in de lijst."))?;
         Ok(Target { endpoint: self.endpoint(&chosen.provider_id)?, model: model.id, supports_images: model.supports_images, context_tokens: model.context_tokens })
     }
+
+    pub fn hub(&self) -> &Arc<Hub> {
+        &self.hub
+    }
+
+    /// Wat de login moet weten over een bestaande koppeling. Zonder ID gaat het om een nieuwe registratie.
+    pub fn login_request(&self, provider_id: Option<&str>, ask_consent: bool) -> Result<LoginRequest, AppError> {
+        let Some(id) = provider_id else { return Ok(LoginRequest { returning: None, ask_consent }) };
+        let state = self.state.lock().unwrap();
+        let provider = state.providers.iter().find(|p| p.id == id).ok_or_else(not_found)?;
+        let account = provider.chatgpt.as_ref().ok_or_else(not_found)?;
+        Ok(LoginRequest { returning: Some(Returning { client_id: account.client_id.clone(), subject: account.subject.clone(), email: account.email.clone() }), ask_consent })
+    }
+
+    /// Bewaart een gecontroleerde login. Pas hier raakt die een bestaande koppeling. Geeft ook terug of de
+    /// bevestiging over het abonnement nog getoond moet worden.
+    pub fn finish_login(&self, provider_id: Option<&str>, result: LoginResult) -> Result<(Provider, bool), AppError> {
+        let id = provider_id.map(String::from).unwrap_or_else(crate::store::new_id);
+        let plan_enabled = result.credentials.plan_enabled();
+        let api_base = self.hub.api_base().to_string().trim_end_matches('/').to_string();
+        self.change(|state| {
+            let account = ChatgptAccount { client_id: result.client_id, subject: result.subject, email: result.email, plan_enabled, session_lost: false };
+            if !state.providers.iter().any(|p| p.id == id) {
+                let name = unique_chatgpt_name(state, account.email.as_deref());
+                state.providers.push(Provider { id: id.clone(), name, kind: ApiKind::ChatgptPlan, base_url: api_base, has_key: true, models: vec![], chatgpt: None });
+            }
+            let provider = provider_mut(state, &id)?;
+            provider.has_key = true;
+            provider.chatgpt = Some(account);
+            let provider = provider.clone();
+            self.hub.store_credentials(&id, &result.credentials)?;
+            Ok((provider, plan_enabled && !state.chatgpt_welcome_seen))
+        })
+    }
+
+    /// Na uitloggen: de tokens zijn weg, de koppeling met de client-ID blijft voor een volgende login.
+    pub fn finish_logout(&self, provider_id: &str) -> Result<Provider, AppError> {
+        self.change(|state| {
+            let provider = provider_mut(state, provider_id)?;
+            provider.has_key = false;
+            if let Some(account) = provider.chatgpt.as_mut() {
+                account.session_lost = false;
+            }
+            Ok(provider.clone())
+        })
+    }
+
+    pub fn is_chatgpt(&self, provider_id: &str) -> bool {
+        self.state.lock().unwrap().providers.iter().any(|p| p.id == provider_id && p.kind == ApiKind::ChatgptPlan)
+    }
+
+    pub fn mark_welcome_seen(&self) -> Result<(), AppError> {
+        self.change(|state| {
+            state.chatgpt_welcome_seen = true;
+            Ok(())
+        })
+    }
+}
+
+/// Een herkenbare naam, ook als iemand twee koppelingen met hetzelfde e-mailadres heeft.
+fn unique_chatgpt_name(state: &ProvidersFile, email: Option<&str>) -> String {
+    let base = email.map_or("ChatGPT".to_string(), |e| format!("ChatGPT ({e})"));
+    let taken = |name: &str| state.providers.iter().any(|p| p.name == name);
+    if !taken(&base) {
+        return base;
+    }
+    (2..).map(|n| format!("{base} {n}")).find(|name| !taken(name)).expect("oneindige reeks")
 }
 
 fn not_found() -> AppError {
@@ -357,6 +506,9 @@ fn provider_mut<'a>(state: &'a mut ProvidersFile, id: &str) -> Result<&'a mut Pr
 }
 
 fn sort_models(provider: &mut Provider) {
+    if provider.kind == ApiKind::ChatgptPlan {
+        return;
+    }
     provider.models.sort_by_key(|m| m.id.to_lowercase());
 }
 

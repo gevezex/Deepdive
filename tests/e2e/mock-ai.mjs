@@ -50,6 +50,7 @@ async function streamAnthropic(res, words) {
 
 export function startMock(expectedKey) {
   const log = [];
+  let extraPage = "";
   const server = createServer((req, res) => {
     const chunks = [];
     req.on("data", (c) => chunks.push(c));
@@ -61,6 +62,10 @@ export function startMock(expectedKey) {
       if (p === "/hostile.html") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         return res.end(HOSTILE);
+      }
+      if (p === "/extra.html") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        return res.end(extraPage);
       }
       if (p === "/beacon") {
         res.writeHead(204);
@@ -88,5 +93,5 @@ export function startMock(expectedKey) {
       res.end("404 page not found");
     });
   });
-  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ port: server.address().port, log, close: () => { server.closeAllConnections(); server.close(); } })));
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ port: server.address().port, log, serveHtml: (html) => { extraPage = html; return `http://127.0.0.1:${server.address().port}/extra.html`; }, close: () => { server.closeAllConnections(); server.close(); } })));
 }

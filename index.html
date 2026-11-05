@@ -50,6 +50,7 @@
         <div class="model-bar">
           <label for="model-picker">Model</label>
           <select id="model-picker"></select>
+          <p id="chatgpt-plan-badge" class="chatgpt-badge" hidden>Using ChatGPT plan <button id="chatgpt-plan-manage" type="button" class="link">Manage usage</button></p>
         </div>
         <div class="professor-body">
           <p>Hier komen straks de samenvatting en de blauwdruk van het stuk.</p>
@@ -73,6 +74,12 @@
       </form>
     </dialog>
 
+    <dialog id="chatgpt-welcome" aria-labelledby="chatgpt-welcome-title">
+      <h2 id="chatgpt-welcome-title">You're using your ChatGPT plan</h2>
+      <p>Geschikte AI-verzoeken in Deepdive gebruiken nu je ChatGPT-abonnement. Je gebruik bekijk en beheer je in je ChatGPT-instellingen.</p>
+      <div class="dialog-buttons"><button id="chatgpt-welcome-ok" type="button" class="primary">Got it</button></div>
+    </dialog>
+
     <dialog id="providers-dialog" class="providers-dialog" aria-labelledby="providers-title">
       <header class="providers-head">
         <h2 id="providers-title">Providers en modellen</h2>
@@ -84,18 +91,41 @@
           <button id="provider-new" type="button">Nieuwe provider</button>
         </nav>
         <div class="providers-main">
+          <section id="chatgpt-offer" class="chatgpt-card" aria-labelledby="chatgpt-offer-title">
+            <h3 id="chatgpt-offer-title">Use your ChatGPT plan</h3>
+            <p class="hint">Laat AI-verzoeken in Deepdive meetellen in je eigen ChatGPT-abonnement of tegoed. Je logt in bij OpenAI in je browser; Deepdive rekent hier zelf niets voor en krijgt geen toegang tot je gesprekken.</p>
+            <div class="provider-actions">
+              <button id="chatgpt-continue" type="button" class="chatgpt-button">Continue with ChatGPT</button>
+              <button id="chatgpt-cancel" type="button" hidden>Stoppen met wachten</button>
+            </div>
+          </section>
+          <section id="chatgpt-account" class="chatgpt-card" aria-labelledby="chatgpt-account-title" hidden>
+            <h3 id="chatgpt-account-title">ChatGPT-account</h3>
+            <p id="chatgpt-account-status"></p>
+            <div class="provider-actions">
+              <button id="chatgpt-signin" type="button" class="chatgpt-button">Continue with ChatGPT</button>
+              <button id="chatgpt-enable" type="button" class="primary" hidden>Abonnement inschakelen</button>
+              <button id="chatgpt-signout" type="button">Uitloggen</button>
+              <button id="chatgpt-account-cancel" type="button" hidden>Stoppen met wachten</button>
+              <span class="spacer"></span>
+              <button id="chatgpt-manage" type="button" class="link">Manage usage</button>
+            </div>
+          </section>
           <form id="provider-form" autocomplete="off">
             <label id="provider-preset-row">Voorinstelling<select id="provider-preset"></select></label>
             <label>Naam<input id="provider-name" type="text" required /></label>
+            <div id="provider-api-fields">
             <label>Soort
               <select id="provider-kind">
                 <option value="anthropic">Anthropic-API</option>
                 <option value="openai_compatible">OpenAI-compatibele API</option>
+                <option value="chatgpt_plan" hidden>ChatGPT-abonnement</option>
               </select>
             </label>
             <label>Adres<input id="provider-url" type="text" spellcheck="false" required /></label>
             <label>API-sleutel (optioneel)<input id="provider-key" type="password" spellcheck="false" autocomplete="new-password" /></label>
             <p class="hint"><span id="provider-key-state"></span> <button id="provider-key-clear" type="button" class="link" hidden>Sleutel weghalen</button></p>
+            </div>
             <div class="provider-actions">
               <button id="provider-save" type="submit" class="primary">Opslaan</button>
               <button id="provider-test" type="button">Test verbinding</button>

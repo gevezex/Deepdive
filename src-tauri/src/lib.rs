@@ -1,4 +1,5 @@
 mod ai;
+mod chatgpt;
 mod engine;
 mod error;
 mod import;
@@ -123,6 +124,11 @@ pub fn run() {
             providers::commands::refresh_models,
             providers::commands::select_model,
             providers::commands::test_connection,
+            providers::commands::chatgpt_login,
+            providers::commands::chatgpt_cancel_login,
+            providers::commands::chatgpt_logout,
+            providers::commands::chatgpt_welcome_seen,
+            providers::commands::open_chatgpt_usage,
         ])
         .run(tauri::generate_context!())
         .expect("Deepdive kon niet starten");

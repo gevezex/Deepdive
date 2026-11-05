@@ -1,5 +1,6 @@
 //! Van wat er misgaat naar een melding die de lezer begrijpt. Alles wat van buiten komt gaat eerst door
 //! `redact`, want sommige providers herhalen de sleutel in hun foutmelding.
+//! Bij een ChatGPT-abonnement houden we status, foutcode en verzoek-ID vast in de details, zoals OpenAI vraagt.
 
 use super::{ApiKind, Endpoint};
 use crate::error::AppError;
@@ -16,7 +17,7 @@ pub struct ErrorContext<'a> {
     pub model: Option<&'a str>,
 }
 
-static KEY_LIKE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bsk-[a-z0-9_*.\-]{6,}|\bbearer\s+\S+|\b(x-api-key|api[_-]?key|authorization)(\W{1,3})[^\s,}]+").unwrap());
+static KEY_LIKE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bsk-[a-z0-9_*.\-]{6,}|\beyJ[a-z0-9_\-]{8,}(\.[a-z0-9_\-]*)*|\bbearer\s+\S+|\b(x-api-key|api[_-]?key|authorization)(\W{1,3})[^\s,}]+").unwrap());
 static MODEL_PROBLEM: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)model_not_found|(unknown|invalid|no such|unsupported) model|not a valid model|model\b.*\b(not found|does not exist|doesn't exist|not exist|unknown|invalid|not available|try pulling)").unwrap()
 });
@@ -99,6 +100,7 @@ pub async fn from_response(response: reqwest::Response, ctx: &ErrorContext<'_>) 
         let target = response.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok()).unwrap_or("onbekend").to_string();
         return AppError::new("redirect", "Dit adres stuurt door naar een ander adres. Deepdive volgt dat niet, zodat je sleutel niet ergens anders terechtkomt. Vul het juiste adres in.").with_detail(clean(&format!("{status} naar {target}"), ctx));
     }
+    let request_id = response.headers().get("x-request-id").and_then(|v| v.to_str().ok()).map(String::from);
     let mut body = response.text().await.unwrap_or_default();
     if body.len() > MAX_ERROR_BODY {
         let mut end = MAX_ERROR_BODY;
@@ -107,7 +109,14 @@ pub async fn from_response(response: reqwest::Response, ctx: &ErrorContext<'_>) 
         }
         body.truncate(end);
     }
-    from_status(status, &body, ctx)
+    let error = from_status(status, &body, ctx);
+    match (ctx.endpoint.kind, request_id) {
+        (ApiKind::ChatgptPlan, Some(id)) => {
+            let detail = format!("{} (verzoek-ID: {})", error.detail.clone().unwrap_or_default(), clean(&id, ctx));
+            error.with_detail(detail)
+        }
+        _ => error,
+    }
 }
 
 pub fn from_status(status: u16, body: &str, ctx: &ErrorContext) -> AppError {
@@ -118,6 +127,23 @@ pub fn from_status(status: u16, body: &str, ctx: &ErrorContext) -> AppError {
     let model = ctx.model.unwrap_or("dit model");
     let unknown_model = || AppError::new("unknown_model", format!("De provider kent model \"{model}\" niet. Controleer de naam, haal de modellen opnieuw op of installeer het model.")).with_detail(detail.clone());
     let about_model = ctx.model.is_some() && MODEL_PROBLEM.is_match(body);
+
+    if ctx.endpoint.kind == ApiKind::ChatgptPlan {
+        let code = json.pointer("/error/code").and_then(Value::as_str);
+        let param = json.pointer("/error/param").and_then(Value::as_str);
+        if let Some(error) = code.and_then(|c| chatgpt_code(c, param)) {
+            return error.with_detail(detail);
+        }
+        let error = match status {
+            401 => Some(AppError::new("chatgpt_rejected", "ChatGPT accepteert deze aanmelding niet. Controleer of je met het juiste account bent ingelogd en log zo nodig opnieuw in.")),
+            403 if !about_model => Some(AppError::new("chatgpt_forbidden", "ChatGPT staat dit verzoek niet toe, bijvoorbeeld door je regio of door beleid.")),
+            503 if !about_model => Some(AppError::new("chatgpt_unavailable", "Het gebruik van je ChatGPT-abonnement is tijdelijk niet beschikbaar. Je blijft ingelogd; probeer het later opnieuw.")),
+            _ => None,
+        };
+        if let Some(error) = error {
+            return error.with_detail(detail);
+        }
+    }
 
     let error = match status {
         401 => {
@@ -136,7 +162,7 @@ pub fn from_status(status: u16, body: &str, ctx: &ErrorContext) -> AppError {
         404 => {
             let hint = match ctx.endpoint.kind {
                 ApiKind::OpenaiCompatible => " Bij een OpenAI-compatibele API eindigt het adres meestal op /v1.",
-                ApiKind::Anthropic => "",
+                ApiKind::Anthropic | ApiKind::ChatgptPlan => "",
             };
             AppError::new("bad_address", format!("Op dit adres staat niet de verwachte API.{hint}"))
         }
@@ -149,6 +175,39 @@ pub fn from_status(status: u16, body: &str, ctx: &ErrorContext) -> AppError {
         _ => AppError::new("rejected", format!("De provider weigerde het verzoek (foutcode {status}).")),
     };
     error.with_detail(detail)
+}
+
+/// De foutcodes waarvoor OpenAI een eigen herstelstap voorschrijft.
+fn chatgpt_code(code: &str, param: Option<&str>) -> Option<AppError> {
+    Some(match code {
+        "subscription_sharing_user_not_eligible" => AppError::new("chatgpt_not_eligible", "Je ChatGPT-abonnement kan niet in deze app worden gebruikt, bijvoorbeeld door je abonnement, je werkruimte of beleid. Gebruik een andere provider, zoals een eigen API-sleutel."),
+        "subscription_sharing_usage_limit_exceeded" => AppError::new("chatgpt_usage_limit", "Je hebt de gebruikslimiet bereikt: van je ChatGPT-abonnement of specifiek voor Deepdive. Bekijk de limiet bij Manage usage."),
+        "subscription_sharing_usage_unavailable" => AppError::new("chatgpt_usage_unavailable", "ChatGPT kon je gebruik nu niet controleren. Je blijft ingelogd; probeer het later opnieuw."),
+        "subscription_sharing_unsupported_capability" => {
+            let what = param.map(|p| format!(" (onderdeel: {p})")).unwrap_or_default();
+            AppError::new("chatgpt_unsupported", format!("Dit wordt niet ondersteund bij gebruik van je ChatGPT-abonnement{what}. Kies een ander model of haal de bijlage weg."))
+        }
+        "subscription_sharing_route_not_supported" => AppError::new("chatgpt_route", "Deepdive gebruikt hier een route die ChatGPT niet ondersteunt. Dit is een fout in de app; meld hem gerust."),
+        "subscription_sharing_invalid_user" => AppError::new("chatgpt_invalid_user", "ChatGPT kon je account niet controleren. Log opnieuw in als dit blijft gebeuren."),
+        "chatpass_v2_scope_not_authorized" | "chatpass_v2_invalid_authorization_context" => AppError::new("chatgpt_not_authorized", "Deze koppeling heeft geen toestemming voor dit verzoek. Controleer bij deze provider of het gebruik van je abonnement aan staat."),
+        "subscription_sharing_user_unavailable" => AppError::new("chatgpt_user_unavailable", "Je accountgegevens zijn tijdelijk niet beschikbaar. Je blijft ingelogd; probeer het later opnieuw."),
+        _ => return None,
+    })
+}
+
+/// Een fout die pas tijdens de stream komt, zoals een limiet nadat het antwoord al begonnen is.
+pub fn chatgpt_stream_error(code: Option<&str>, param: Option<&str>, message: Option<&str>, raw: &str, ctx: &ErrorContext) -> AppError {
+    let detail = clean(raw, ctx);
+    if let Some(error) = code.and_then(|c| chatgpt_code(c, param)) {
+        return error.with_detail(detail);
+    }
+    let shown = message.map(|m| clean(m, ctx)).filter(|m| !m.is_empty());
+    AppError::new("chatgpt_failed", shown.map_or("Het model kon geen antwoord geven. Probeer het opnieuw.".to_string(), |m| format!("Het model kon geen antwoord geven: {m}"))).with_detail(detail)
+}
+
+/// Fouten waarbij een nieuw toegangstoken kan helpen.
+pub fn is_chatgpt_rejection(error: &AppError) -> bool {
+    matches!(error.kind, "chatgpt_rejected" | "chatgpt_invalid_user")
 }
 
 /// Een geslaagde HTTP-status, maar geen stream: een fout in JSON, of bijvoorbeeld een webpagina.

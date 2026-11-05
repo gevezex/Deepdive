@@ -1,8 +1,8 @@
 // Het providerscherm en de modelkiezer. Een sleutel gaat alleen de richting van Rust op: het veld wordt na
 // opslaan geleegd en de app krijgt alleen `hasKey` terug.
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { countSummary, describeReport, filterModels, imagesToValue, modelCount, modelLabel, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, valueToImages } from "./providerLogic";
-import type { ApiKind, AppError, ConnectionReport, KeyChange, Model, Provider, ProvidersFile, StreamEvent } from "./types";
+import { chatgptState, chatgptStatus, countSummary, describeReport, filterModels, imagesToValue, modelCount, modelLabel, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, usesChatgptPlan, valueToImages } from "./providerLogic";
+import type { ApiKind, AppError, ConnectionReport, KeyChange, LoginOutcome, LogoutOutcome, Model, Provider, ProvidersFile, StreamEvent } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const dialog = $<HTMLDialogElement>("providers-dialog");
@@ -26,6 +26,18 @@ const modelsFilter = $<HTMLInputElement>("models-filter");
 const modelsCount = $("models-count");
 const refreshButton = $<HTMLButtonElement>("models-refresh");
 const modelsResult = $("models-result");
+const apiFields = $("provider-api-fields");
+const chatgptOffer = $("chatgpt-offer");
+const chatgptContinue = $<HTMLButtonElement>("chatgpt-continue");
+const chatgptCancel = $<HTMLButtonElement>("chatgpt-cancel");
+const chatgptAccount = $("chatgpt-account");
+const chatgptAccountStatus = $("chatgpt-account-status");
+const chatgptSignin = $<HTMLButtonElement>("chatgpt-signin");
+const chatgptEnable = $<HTMLButtonElement>("chatgpt-enable");
+const chatgptSignout = $<HTMLButtonElement>("chatgpt-signout");
+const chatgptAccountCancel = $<HTMLButtonElement>("chatgpt-account-cancel");
+const planBadge = $("chatgpt-plan-badge");
+const welcome = $<HTMLDialogElement>("chatgpt-welcome");
 
 let data: ProvidersFile = { schemaVersion: 1, providers: [], selection: { active: null, perAction: {} } };
 let selectedId: string | null = null;
@@ -54,9 +66,21 @@ function showMessage(target: HTMLElement, tone: "ok" | "error" | "busy", message
   }
 }
 
+function openUsage() {
+  invoke("open_chatgpt_usage").catch((err) => showError(result, err));
+}
+
 function showError(target: HTMLElement, err: unknown) {
   const e = toError(err);
   showMessage(target, "error", e.message, e.detail);
+  if (e.kind === "chatgpt_usage_limit") {
+    const manage = document.createElement("button");
+    manage.type = "button";
+    manage.className = "primary notice-action";
+    manage.textContent = "Manage usage";
+    manage.addEventListener("click", openUsage);
+    target.append(manage);
+  }
 }
 
 function clearMessage(target: HTMLElement) {
@@ -90,6 +114,7 @@ function renderPicker() {
   }
   picker.value = data.selection.active ? refValue(data.selection.active) : "";
   picker.disabled = groups.length === 0;
+  planBadge.hidden = !usesChatgptPlan(data);
 }
 
 picker.addEventListener("change", async () => {
@@ -133,7 +158,10 @@ function resetDeleteButton() {
 function select(id: string | null) {
   selectedId = id;
   const provider = selected();
+  const isChatgpt = provider?.kind === "chatgpt_plan";
   presetRow.hidden = provider !== null;
+  apiFields.hidden = isChatgpt;
+  chatgptOffer.hidden = provider !== null;
   removeButton.hidden = provider === null;
   resetDeleteButton();
   modelsSection.hidden = provider === null;
@@ -151,6 +179,7 @@ function select(id: string | null) {
     applyPreset();
   }
   renderKeyState(provider);
+  renderChatgptAccount(provider);
   renderList();
 }
 
@@ -222,6 +251,81 @@ removeButton.addEventListener("click", async () => {
   }
 });
 
+// ---------- ChatGPT ----------
+
+let loginBusy = false;
+
+function renderChatgptAccount(provider: Provider | null) {
+  chatgptAccount.hidden = provider?.kind !== "chatgpt_plan";
+  chatgptContinue.disabled = loginBusy;
+  chatgptCancel.hidden = !loginBusy;
+  chatgptAccountCancel.hidden = !loginBusy;
+  if (provider?.kind !== "chatgpt_plan") return;
+  const state = chatgptState(provider);
+  chatgptAccountStatus.textContent = chatgptStatus(provider);
+  chatgptSignin.hidden = state === "ready" || state === "plan_disabled";
+  chatgptEnable.hidden = state !== "plan_disabled";
+  chatgptSignout.hidden = !provider.hasKey;
+  chatgptSignin.disabled = loginBusy;
+  chatgptEnable.disabled = loginBusy;
+}
+
+/** Een geweigerde of mislukte login geeft alleen een melding; de rest van de app blijft werken. */
+async function chatgptLogin(providerId: string | null, askConsent: boolean) {
+  loginBusy = true;
+  renderChatgptAccount(selected());
+  showMessage(result, "busy", "Ga verder in je browser. Deepdive wacht op OpenAI…");
+  try {
+    const outcome = await invoke<LoginOutcome>("chatgpt_login", { providerId, askConsent });
+    loginBusy = false;
+    await reload();
+    select(outcome.provider.id);
+    if (outcome.modelsError) showMessage(result, "error", `Je bent ingelogd, maar de modellen konden niet worden opgehaald. ${outcome.modelsError.message}`, outcome.modelsError.detail);
+    else showMessage(result, "ok", chatgptStatus(outcome.provider));
+    if (outcome.showWelcome) welcome.showModal();
+  } catch (err) {
+    loginBusy = false;
+    renderChatgptAccount(selected());
+    if (toError(err).kind === "chatgpt_login_cancelled") clearMessage(result);
+    else showError(result, err);
+  }
+}
+
+/** Rust kan tijdens een verzoek ontdekken dat de sessie is ingetrokken; dan moet het scherm dat ook weten. */
+async function syncAfterChatgptError(err: unknown) {
+  if (!toError(err).kind.startsWith("chatgpt_")) return;
+  await reload();
+  renderChatgptAccount(selected());
+}
+
+chatgptContinue.addEventListener("click", () => chatgptLogin(null, false));
+chatgptSignin.addEventListener("click", () => chatgptLogin(selectedId, false));
+// Alleen hier vraagt de app expliciet opnieuw om toestemming, omdat de gebruiker dat zelf kiest.
+chatgptEnable.addEventListener("click", () => chatgptLogin(selectedId, true));
+for (const button of [chatgptCancel, chatgptAccountCancel]) button.addEventListener("click", () => invoke("chatgpt_cancel_login"));
+
+chatgptSignout.addEventListener("click", async () => {
+  if (!selectedId) return;
+  try {
+    const outcome = await invoke<LogoutOutcome>("chatgpt_logout", { providerId: selectedId });
+    await reload();
+    select(outcome.provider.id);
+    if (outcome.revoked) showMessage(result, "ok", "Je bent uitgelogd. De tokens zijn gewist en de sessie is ingetrokken.");
+    else showMessage(result, "error", "Je bent hier uitgelogd en de tokens zijn gewist, maar OpenAI heeft het intrekken van de sessie niet bevestigd. Je kunt de koppeling verbreken in je ChatGPT-instellingen.");
+  } catch (err) {
+    showError(result, err);
+  }
+});
+
+$("chatgpt-manage").addEventListener("click", openUsage);
+$("chatgpt-plan-manage").addEventListener("click", openUsage);
+
+$("chatgpt-welcome-ok").addEventListener("click", async () => {
+  welcome.close();
+  await invoke("chatgpt_welcome_seen");
+  await reload();
+});
+
 // ---------- verbindingstest ----------
 
 testButton.addEventListener("click", async () => {
@@ -240,6 +344,7 @@ testButton.addEventListener("click", async () => {
     const report = await invoke<ConnectionReport>("test_connection", { providerId: provider.id, modelId: testModel(provider, data.selection.active), onEvent });
     showMessage(result, "ok", describeReport(report));
   } catch (err) {
+    await syncAfterChatgptError(err);
     showError(result, err);
   } finally {
     testButton.disabled = false;
@@ -343,6 +448,7 @@ refreshButton.addEventListener("click", async () => {
     const note = hidden ? ` ${hidden} staan niet in de kiezer; vink aan welke je wilt gebruiken.` : "";
     showMessage(modelsResult, "ok", `${modelCount(updated.models.length)} gevonden.${note}`);
   } catch (err) {
+    await syncAfterChatgptError(err);
     const e = toError(err);
     showMessage(modelsResult, "error", `${e.message} Je kunt een model ook hieronder zelf toevoegen.`, e.detail);
   } finally {

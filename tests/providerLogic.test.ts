@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countSummary, describeReport, filterModels, imagesToValue, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, valueToImages } from "../src/providerLogic";
+import { chatgptState, chatgptStatus, countSummary, describeReport, filterModels, imagesToValue, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, usesChatgptPlan, valueToImages } from "../src/providerLogic";
 import type { Model, Provider, ProvidersFile } from "../src/types";
 
 const model = (id: string, enabled = true): Model => ({ id, displayName: null, supportsImages: null, contextTokens: null, enabled, manual: false, userEdited: false });
@@ -75,5 +75,34 @@ describe("uitslag", () => {
     expect(countSummary([model("a"), model("b", false)])).toBe("2 modellen, 1 in de kiezer");
     expect(countSummary([model("a")])).toBe("1 model, 1 in de kiezer");
     expect(describeReport({ model: null, sample: "", firstTokenMs: null })).toContain("nog geen model");
+  });
+});
+
+describe("ChatGPT-koppeling", () => {
+  const model = (id: string): Model => ({ id, displayName: null, supportsImages: null, contextTokens: null, enabled: true, manual: false, userEdited: false });
+  const account = (over: Partial<Provider["chatgpt"]> = {}) => ({ clientId: "oaiapp_x", subject: "s", email: "a@b.nl", planEnabled: true, sessionLost: false, ...over });
+  const provider = (over: Partial<Provider> = {}): Provider => ({ id: "c", name: "ChatGPT", kind: "chatgpt_plan", baseUrl: "https://api.openai.com/v1", hasKey: true, models: [model("m")], chatgpt: account(), ...over });
+  const file = (p: Provider, active: ProvidersFile["selection"]["active"] = null): ProvidersFile => ({ schemaVersion: 1, providers: [p], selection: { active, perAction: {} } });
+
+  it("onderscheidt de toestanden en noemt het account", () => {
+    expect(chatgptState(provider())).toBe("ready");
+    expect(chatgptStatus(provider())).toContain("Ingelogd als a@b.nl");
+    expect(chatgptState(provider({ chatgpt: account({ planEnabled: false }) }))).toBe("plan_disabled");
+    expect(chatgptState(provider({ hasKey: false }))).toBe("signed_out");
+    expect(chatgptState(provider({ hasKey: false, chatgpt: account({ sessionLost: true }) }))).toBe("session_lost");
+    expect(chatgptStatus(provider({ hasKey: false, chatgpt: account({ sessionLost: true }) }))).toContain("ingetrokken");
+  });
+
+  it("toont modellen alleen als het abonnement bruikbaar is, maar houdt de actieve keuze zichtbaar", () => {
+    expect(pickerGroups(file(provider()))[0].options).toHaveLength(1);
+    expect(pickerGroups(file(provider({ hasKey: false })))).toHaveLength(0);
+    expect(pickerGroups(file(provider({ chatgpt: account({ planEnabled: false }) })))).toHaveLength(0);
+    expect(pickerGroups(file(provider({ hasKey: false }), { providerId: "c", modelId: "m" }))[0].options).toHaveLength(1);
+  });
+
+  it("weet wanneer het abonnement in gebruik is", () => {
+    expect(usesChatgptPlan(file(provider()))).toBe(false);
+    expect(usesChatgptPlan(file(provider(), { providerId: "c", modelId: "m" }))).toBe(true);
+    expect(usesChatgptPlan(file(provider({ kind: "openai_compatible" }), { providerId: "c", modelId: "m" }))).toBe(false);
   });
 });

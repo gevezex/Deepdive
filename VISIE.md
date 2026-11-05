@@ -28,7 +28,7 @@ Loop je ergens vast, dan selecteer je het stuk dat je niet snapt en vraag je het
 
 - **Links** staat het originele stuk. Websites en pdf's werken op dezelfde manier: selecteren, markeren en vragen stellen.
 - **Rechts** staat de professor, in een rustige eigen leesstijl.
-- **Bovenaan** kies je het model: een dienst met API-sleutel, of een lokaal model op je eigen computer.
+- **Bovenaan** kies je het model: een dienst met API-sleutel, je eigen ChatGPT-abonnement, of een lokaal model op je eigen computer.
 
 **Het doel is begrip, nu, terwijl je leest:** snappen wat er staat, waarom het er staat en of het klopt.
 
@@ -38,7 +38,7 @@ Deepdive is geen leer- of toetstool. Er is geen overhoring, geen score, geen fla
 
 ## Voor wie
 
-Iedereen die moeilijke of belangrijke teksten echt wil begrijpen en niet zomaar wil geloven. De eerste versie is voor jezelf: zonder accounts en zonder server, met je eigen sleutels of lokale modellen. Andere nieuwsgierige lezers komen later.
+Iedereen die moeilijke of belangrijke teksten echt wil begrijpen en niet zomaar wil geloven. De eerste versie is voor jezelf: zonder eigen accounts en zonder server, met je eigen sleutels, je eigen ChatGPT-abonnement of lokale modellen. Andere nieuwsgierige lezers komen later.
 
 ---
 
@@ -259,7 +259,8 @@ Deepdive zit niet vast aan één AI-dienst. Dit is een kernonderdeel van de app.
 - **Providers aanmaken:** bijvoorbeeld Anthropic, OpenAI of OpenRouter, en lokaal Ollama of LM Studio. Per provider stel je het adres en de API-sleutel in, en daarbij kies je de modellen.
 - **Model per actie:** bijvoorbeeld een sterk model voor de blauwdruk en een snel of lokaal model voor korte uitleg. Bovenaan het rechterpaneel kun je altijd wisselen.
 - **Mogelijkheden per model:** de app houdt bij of een model afbeeldingen kan lezen en hoeveel tekst het aankan. Een actie die een model niet kan uitvoeren, wordt duidelijk gemeld.
-- **Veilige opslag:** API-sleutels staan in de sleutelhanger van het besturingssysteem, niet in een los configuratiebestand.
+- **Inloggen met ChatGPT:** in plaats van een API-sleutel kun je je eigen ChatGPT-account koppelen, zodat verzoeken meetellen in je eigen abonnement. Elke gebruiker logt zelf in. Er zit geen gedeelde sleutel in de app en er is geen server. Dit gebruikt OpenAI's Sign in with ChatGPT voor open-source apps, daarom heeft Deepdive een MIT-licentie. **Die route is nog in preview:** de voorwaarden en mogelijkheden kunnen veranderen, en OpenAI bepaalt welke modellen en limieten gelden.
+- **Veilige opslag:** API-sleutels en ChatGPT-tokens staan in de sleutelhanger van het besturingssysteem, niet in een los configuratiebestand.
 
 ---
 

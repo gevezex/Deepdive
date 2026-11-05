@@ -3,20 +3,24 @@
 //! Latere stappen bouwen hierop met één ingang: `stream_chat(&target, request, callback)`. Een `Target` komt
 //! uit `providers::ProviderStore::target`. Deze laag kent geen bronnen en geen opslag: wat in een verzoek
 //! staat, bepaalt de aanroeper. De sleutel zit in `ApiKey` en verlaat deze laag alleen als HTTP-header.
+//! Bij een ChatGPT-abonnement haalt deze laag per verzoek een geldig toegangstoken op bij de `Session`.
 
 mod anthropic;
 pub mod errors;
 mod openai;
+mod responses;
 mod sse;
 #[cfg(test)]
 mod tests;
 
+use crate::chatgpt::Session;
 use crate::error::AppError;
 use errors::ErrorContext;
 use futures_util::StreamExt;
 use reqwest::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
 use std::ops::ControlFlow;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use url::{Host, Url};
 
@@ -27,12 +31,19 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 const CHECK_PROMPT: &str = "Antwoord met precies één woord: werkt";
 const CHECK_MAX_TOKENS: u32 = 32;
 const CHECK_SAMPLE_CHARS: usize = 40;
+/// Een ChatGPT-abonnement kan tijdelijk niet beschikbaar zijn; daarna krijgt de lezer een melding.
+#[cfg(not(test))]
+const UNAVAILABLE_RETRIES: [Duration; 2] = [Duration::from_secs(1), Duration::from_secs(3)];
+#[cfg(test)]
+const UNAVAILABLE_RETRIES: [Duration; 2] = [Duration::from_millis(5), Duration::from_millis(5)];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiKind {
     Anthropic,
     OpenaiCompatible,
+    /// De Responses API met het ChatGPT-abonnement van de gebruiker, na "Inloggen met ChatGPT".
+    ChatgptPlan,
 }
 
 /// Een API-sleutel. Heeft bewust geen `Serialize` en een afgeschermde `Debug`, zodat hij niet per ongeluk
@@ -62,11 +73,26 @@ pub struct Endpoint {
     pub base_url: Url,
     pub api_key: Option<ApiKey>,
     pub idle_timeout: Duration,
+    /// Alleen bij ChatGPT: levert en vernieuwt het toegangstoken, dat pas vlak voor het verzoek in `api_key` komt.
+    pub session: Option<Arc<Session>>,
 }
 
 impl Endpoint {
     pub fn new(kind: ApiKind, base_url: Url, api_key: Option<ApiKey>) -> Self {
-        Self { kind, base_url, api_key, idle_timeout: IDLE_TIMEOUT }
+        Self { kind, base_url, api_key, idle_timeout: IDLE_TIMEOUT, session: None }
+    }
+
+    pub fn chatgpt(base_url: Url, session: Arc<Session>) -> Self {
+        Self { session: Some(session), ..Self::new(ApiKind::ChatgptPlan, base_url, None) }
+    }
+
+    /// Dit eindpunt met een geldig toegangstoken, als het er een nodig heeft.
+    async fn authorized(&self) -> Result<Endpoint, AppError> {
+        let mut ep = self.clone();
+        if let Some(session) = &self.session {
+            ep.api_key = Some(session.access_token().await?);
+        }
+        Ok(ep)
     }
 
     pub fn is_local(&self) -> bool {
@@ -167,6 +193,7 @@ pub enum StreamEvent {
 enum Decoder {
     Anthropic(anthropic::Decoder),
     Openai(openai::Decoder),
+    Responses(responses::Decoder),
 }
 
 impl Decoder {
@@ -174,12 +201,14 @@ impl Decoder {
         match kind {
             ApiKind::Anthropic => Self::Anthropic(Default::default()),
             ApiKind::OpenaiCompatible => Self::Openai(Default::default()),
+            ApiKind::ChatgptPlan => Self::Responses(Default::default()),
         }
     }
     fn handle(&mut self, event: &sse::Event, ctx: &ErrorContext) -> Result<Vec<StreamEvent>, AppError> {
         match self {
             Self::Anthropic(d) => d.handle(event, ctx),
             Self::Openai(d) => d.handle(event, ctx),
+            Self::Responses(d) => d.handle(event, ctx),
         }
     }
     /// Sluit af als de verbinding dichtgaat. `None` betekent dat het antwoord niet af was.
@@ -187,6 +216,7 @@ impl Decoder {
         match self {
             Self::Anthropic(d) => d.finish(),
             Self::Openai(d) => d.finish(),
+            Self::Responses(d) => d.finish(),
         }
     }
 }
@@ -212,22 +242,46 @@ pub fn check_capabilities(target: &Target, request: &ChatRequest) -> Result<(), 
 /// `ControlFlow::Break`; dan wordt de verbinding verbroken.
 pub async fn stream_chat(target: &Target, request: &ChatRequest, mut on_event: impl FnMut(StreamEvent) -> ControlFlow<()>) -> Result<(), AppError> {
     check_capabilities(target, request)?;
-    let ep = &target.endpoint;
-    let ctx = ErrorContext { endpoint: ep, model: Some(&target.model) };
-    let client = ep.client()?;
-    let http = match ep.kind {
-        ApiKind::Anthropic => anthropic::chat_request(&client, ep, &target.model, request)?,
-        ApiKind::OpenaiCompatible => openai::chat_request(&client, ep, &target.model, request),
-    };
-    let wait = async { http.send().await };
-    let response = match tokio::time::timeout(ep.idle_timeout, wait).await {
-        Ok(result) => result.map_err(|e| errors::from_send(&e, &ctx))?,
-        Err(_) => return Err(errors::timed_out(&ctx)),
-    };
-    let status = response.status();
-    if !status.is_success() {
+    let mut authorized = target.endpoint.authorized().await?;
+    let mut token_renewed = false;
+    let mut retries = UNAVAILABLE_RETRIES.iter();
+    let response = loop {
+        let ep = &authorized;
+        let ctx = ErrorContext { endpoint: ep, model: Some(&target.model) };
+        let client = ep.client()?;
+        let http = match ep.kind {
+            ApiKind::Anthropic => anthropic::chat_request(&client, ep, &target.model, request)?,
+            ApiKind::OpenaiCompatible => openai::chat_request(&client, ep, &target.model, request),
+            ApiKind::ChatgptPlan => responses::chat_request(&client, ep, &target.model, request),
+        };
+        let wait = async { http.send().await };
+        let response = match tokio::time::timeout(ep.idle_timeout, wait).await {
+            Ok(result) => result.map_err(|e| errors::from_send(&e, &ctx))?,
+            Err(_) => return Err(errors::timed_out(&ctx)),
+        };
+        let status = response.status();
+        if status.is_success() {
+            break response;
+        }
+        if let Some(session) = &ep.session {
+            if status == reqwest::StatusCode::UNAUTHORIZED && !token_renewed {
+                // Eén keer vernieuwen. Lukt dat niet omdat de sessie is ingetrokken, dan meldt de sessie dat.
+                let renewed = session.renew_rejected(ep.api_key.as_ref()).await?;
+                authorized.api_key = Some(renewed);
+                token_renewed = true;
+                continue;
+            }
+            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                if let Some(delay) = retries.next() {
+                    tokio::time::sleep(*delay).await;
+                    continue;
+                }
+            }
+        }
         return Err(errors::from_response(response, &ctx).await);
-    }
+    };
+    let ep = &authorized;
+    let ctx = ErrorContext { endpoint: ep, model: Some(&target.model) };
     // Een server die de streaming negeert of een foutpagina geeft, antwoordt met iets anders dan SSE.
     let content_type = response.headers().get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
     if !content_type.is_empty() && !content_type.contains("event-stream") {
@@ -285,12 +339,25 @@ pub struct FetchedModel {
 }
 
 pub async fn list_models(ep: &Endpoint) -> Result<Vec<FetchedModel>, AppError> {
+    let mut authorized = ep.authorized().await?;
+    match list_models_once(&authorized).await {
+        Err(e) if authorized.session.is_some() && errors::is_chatgpt_rejection(&e) => {
+            let session = authorized.session.clone().expect("zojuist gecontroleerd");
+            authorized.api_key = Some(session.renew_rejected(authorized.api_key.as_ref()).await?);
+            list_models_once(&authorized).await
+        }
+        other => other,
+    }
+}
+
+async fn list_models_once(ep: &Endpoint) -> Result<Vec<FetchedModel>, AppError> {
     let ctx = ErrorContext { endpoint: ep, model: None };
     let client = ep.client()?;
     let list = async {
         match ep.kind {
             ApiKind::Anthropic => anthropic::list_models(&client, ep, &ctx).await,
             ApiKind::OpenaiCompatible => openai::list_models(&client, ep, &ctx).await,
+            ApiKind::ChatgptPlan => responses::list_models(&client, ep, &ctx).await,
         }
     };
     tokio::time::timeout(LIST_TIMEOUT, list).await.map_err(|_| errors::timed_out(&ctx))?

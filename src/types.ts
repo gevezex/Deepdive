@@ -47,7 +47,7 @@ export interface AppError {
 }
 
 // Spiegel van src-tauri/src/providers/mod.rs. Er bestaat bewust geen veld met de sleutel zelf.
-export type ApiKind = "anthropic" | "openai_compatible";
+export type ApiKind = "anthropic" | "openai_compatible" | "chatgpt_plan";
 
 export interface Model {
   id: string;
@@ -64,8 +64,29 @@ export interface Provider {
   name: string;
   kind: ApiKind;
   baseUrl: string;
+  /** Bij ChatGPT: ingelogd. De tokens komen nooit in de frontend. */
   hasKey: boolean;
   models: Model[];
+  chatgpt?: ChatgptAccount | null;
+}
+
+export interface ChatgptAccount {
+  clientId: string;
+  subject: string;
+  email: string | null;
+  planEnabled: boolean;
+  sessionLost: boolean;
+}
+
+export interface LoginOutcome {
+  provider: Provider;
+  showWelcome: boolean;
+  modelsError: AppError | null;
+}
+
+export interface LogoutOutcome {
+  provider: Provider;
+  revoked: boolean;
 }
 
 export interface ModelRef {
@@ -77,6 +98,7 @@ export interface ProvidersFile {
   schemaVersion: number;
   providers: Provider[];
   selection: { active: ModelRef | null; perAction: Record<string, ModelRef> };
+  chatgptWelcomeSeen?: boolean;
 }
 
 export type KeyChange = { action: "keep" } | { action: "set"; value: string } | { action: "clear" };
