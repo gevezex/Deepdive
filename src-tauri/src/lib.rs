@@ -1,10 +1,12 @@
 mod ai;
 mod chatgpt;
+mod completeness;
 mod engine;
 mod error;
 mod import;
 mod model;
 mod providers;
+mod sessions;
 mod snapshot;
 mod store;
 #[cfg(debug_assertions)]
@@ -13,6 +15,7 @@ mod testhook;
 use error::AppError;
 use model::{Block, Source, SourceSummary};
 use providers::{secrets::Keychain, ProviderStore};
+use sessions::SiteSessions;
 use std::sync::Arc;
 use store::Store;
 use tauri::http::{header, Response, StatusCode};
@@ -22,6 +25,26 @@ use tauri::{AppHandle, Manager, State};
 #[tauri::command]
 async fn open_url(app: AppHandle, store: State<'_, Store>, url: String, refresh: Option<bool>) -> Result<Source, AppError> {
     import::open_url(&app, &store, &url, refresh.unwrap_or(false)).await
+}
+
+#[tauri::command]
+async fn refetch_source(app: AppHandle, store: State<'_, Store>, id: String) -> Result<import::RefetchOutcome, AppError> {
+    import::refetch(&app, &store, &id).await
+}
+
+#[tauri::command]
+async fn adopt_candidate(store: State<'_, Store>, id: String, candidate_id: String) -> Result<Source, AppError> {
+    import::adopt_candidate(&store, &id, &candidate_id)
+}
+
+#[tauri::command]
+async fn discard_candidate(store: State<'_, Store>, id: String, candidate_id: String) -> Result<(), AppError> {
+    import::discard_candidate(&store, &id, &candidate_id)
+}
+
+#[tauri::command]
+async fn accept_incomplete(store: State<'_, Store>, id: String) -> Result<Source, AppError> {
+    import::accept_incomplete(&store, &id)
 }
 
 #[tauri::command]
@@ -84,6 +107,11 @@ fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Re
 pub fn run() {
     tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol("deepdive-snapshot", |ctx, request, responder| {
+            // Alleen het hoofdvenster: een pagina in een inlog- of ophaalvenster komt niet bij opgeslagen kopieën.
+            if ctx.webview_label() != "main" {
+                responder.respond(Response::builder().status(StatusCode::FORBIDDEN).body(Vec::new()).unwrap());
+                return;
+            }
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || responder.respond(serve_snapshot(&app, request)));
         })
@@ -103,7 +131,9 @@ pub fn run() {
                 keychain_service = service;
             }
             app.manage(ProviderStore::open(root.clone(), Arc::new(Keychain::new(keychain_service)))?);
+            app.manage(SiteSessions::open(root.clone()));
             app.manage(Store::new(root)?);
+            sessions::finish_pending_wipes(app.handle().clone());
             #[cfg(debug_assertions)]
             testhook::start(app.handle().clone());
             Ok(())
@@ -116,6 +146,14 @@ pub fn run() {
             import_text,
             list_sources,
             get_source,
+            refetch_source,
+            adopt_candidate,
+            discard_candidate,
+            accept_incomplete,
+            sessions::site_login_open,
+            sessions::site_login_close,
+            sessions::list_site_sessions,
+            sessions::wipe_site_session,
             providers::commands::list_providers,
             providers::commands::save_provider,
             providers::commands::delete_provider,

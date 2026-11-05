@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-accept-incomplete"
+description = "Enables the accept_incomplete command without any pre-configured scope."
+commands.allow = ["accept_incomplete"]
+
+[[permission]]
+identifier = "deny-accept-incomplete"
+description = "Denies the accept_incomplete command without any pre-configured scope."
+commands.deny = ["accept_incomplete"]

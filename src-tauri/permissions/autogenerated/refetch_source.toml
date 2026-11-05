@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-refetch-source"
+description = "Enables the refetch_source command without any pre-configured scope."
+commands.allow = ["refetch_source"]
+
+[[permission]]
+identifier = "deny-refetch-source"
+description = "Denies the refetch_source command without any pre-configured scope."
+commands.deny = ["refetch_source"]

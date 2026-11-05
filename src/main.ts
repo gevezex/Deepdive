@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { initProviders } from "./providers";
-import type { AppError, Source, SourceSummary } from "./types";
+import { initSites, refreshSites } from "./sites";
+import type { AppError, LoginClosed, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const urlInput = $<HTMLInputElement>("url-input");
@@ -36,6 +38,13 @@ function showError(err: unknown, pasteUrl?: string) {
   const paste = $("error-paste");
   paste.hidden = !canPaste;
   paste.onclick = () => openPasteDialog(pasteUrl);
+  // Bij een cookiemuur of een site die eerst een account vraagt, kan de lezer dat zelf oplossen in het venster.
+  const login = $("error-login");
+  login.hidden = !pasteUrl || !["blocked", "consent", "empty"].includes(e.kind);
+  login.onclick = () => {
+    clearError();
+    if (pasteUrl) void beginLogin(pasteUrl, null);
+  };
   $("error").hidden = false;
 }
 
@@ -71,6 +80,151 @@ function renderStatus(source: Source | null) {
   $("refresh").hidden = !source.url || source.kind === "text";
 }
 
+// ---------- melding boven de kopie ----------
+
+interface NoticeAction {
+  label: string;
+  primary?: boolean;
+  run: () => void;
+}
+
+function setNotice(title: string, text: string, actions: NoticeAction[] = []) {
+  $("source-notice-title").textContent = title;
+  $("source-notice-text").textContent = text;
+  $("source-notice-actions").replaceChildren(
+    ...actions.map((a) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = a.label;
+      if (a.primary) button.className = "primary";
+      button.onclick = a.run;
+      return button;
+    }),
+  );
+  $("source-notice").hidden = false;
+}
+
+function clearNotice() {
+  $("source-notice").hidden = true;
+}
+
+/** De melding die bij de bron hoort als er verder niets aan de hand is. */
+function renderSourceNotice(source: Source) {
+  clearNotice();
+  if (source.supersededBy) {
+    const newest = source.supersededBy;
+    setNotice("Dit is een oudere kopie.", "Er is een nieuwere kopie van dit stuk.", [{ label: "Naar de nieuwste", primary: true, run: () => void openById(newest) }]);
+    return;
+  }
+  const c = source.completeness;
+  if (c.verdict !== "likely_incomplete" || c.acceptedByUser) return;
+  const url = source.url ?? source.finalUrl;
+  setNotice("Dit stuk is waarschijnlijk onvolledig.", c.reason, [
+    ...(url ? [{ label: "Inloggen", primary: true, run: () => void beginLogin(url, source) }] : []),
+    {
+      label: "Toch gebruiken",
+      run: async () => {
+        try {
+          const saved = await invoke<Source>("accept_incomplete", { id: source.id });
+          if (current?.id === saved.id) current = saved;
+          clearNotice();
+        } catch (err) {
+          showError(err);
+        }
+      },
+    },
+  ]);
+}
+
+async function openById(id: string) {
+  try {
+    await show(await invoke<Source>("get_source", { id }));
+  } catch (err) {
+    showError(err);
+  }
+}
+
+// ---------- inloggen op een site en opnieuw ophalen ----------
+
+let loginSite: string | null = null;
+let loginAfter: (() => void) | null = null;
+
+async function beginLogin(url: string, source: Source | null) {
+  clearError();
+  const again = () => {
+    if (source) void refetch(source);
+    else void openUrl(url, true);
+  };
+  try {
+    const session = await invoke<SiteSession>("site_login_open", { url });
+    loginSite = session.site;
+    loginAfter = again;
+    setNotice(`Log in bij ${session.site} in het venster dat net is geopend.`, "De app ziet je wachtwoord niet. Ben je klaar, dan haalt de app het stuk opnieuw op.", [{ label: "Opnieuw ophalen", primary: true, run: again }]);
+    refreshSites();
+  } catch (err) {
+    showError(err);
+  }
+}
+
+function words(n: number) {
+  return n.toLocaleString("nl-NL");
+}
+
+async function refetch(source: Source) {
+  clearError();
+  clearNotice();
+  if (loginSite) {
+    await invoke("site_login_close", { site: loginSite }).catch(() => {});
+    loginSite = null;
+    loginAfter = null;
+  }
+  setBusy("Er wordt een nieuwe kopie gemaakt. De huidige kopie blijft bewaard tot dat is gelukt…");
+  try {
+    const result = await invoke<RefetchOutcome>("refetch_source", { id: source.id });
+    if (result.status === "replaced") {
+      await show(result.current);
+      const previous = result.current.previousId;
+      const c = result.current.completeness;
+      const title = c.verdict === "likely_incomplete" ? "Nieuwe kopie gemaakt, maar het stuk lijkt nog steeds onvolledig." : "Nieuwe kopie gemaakt.";
+      const detail = `${words(result.oldWords)} → ${words(result.newWords)} woorden. De vorige kopie blijft bewaard.`;
+      setNotice(title, c.verdict === "likely_incomplete" ? `${c.reason} ${detail}` : detail, [
+        ...(previous ? [{ label: "Vorige kopie", run: () => void openById(previous) }] : []),
+        ...(c.verdict === "likely_incomplete" && result.current.url ? [{ label: "Inloggen", primary: true, run: () => void beginLogin(result.current.url!, result.current) }] : []),
+      ]);
+    } else if (result.status === "kept_old" && result.candidateId) {
+      const candidate = result.candidateId;
+      setNotice(
+        "Je kopie is niet gewijzigd.",
+        `De nieuwe poging lijkt minder volledig (${words(result.oldWords)} → ${words(result.newWords)} woorden). Misschien is je sessie verlopen.`,
+        [
+          { label: "Oude houden", primary: true, run: () => void invoke("discard_candidate", { id: source.id, candidateId: candidate }).then(clearNotice, showError) },
+          { label: "Toch de nieuwe", run: () => void invoke<Source>("adopt_candidate", { id: source.id, candidateId: candidate }).then(show, showError) },
+        ],
+      );
+    } else {
+      setNotice("Geen verschil.", "Het opgehaalde bestand is hetzelfde als je kopie.");
+    }
+  } catch (err) {
+    showError(err, source.url ?? undefined);
+    renderSourceNotice(source);
+  } finally {
+    setBusy(null);
+  }
+}
+
+void listen<LoginClosed>("site-login-closed", ({ payload }) => {
+  refreshSites();
+  if (payload.site !== loginSite) return;
+  const again = loginAfter;
+  loginSite = null;
+  loginAfter = null;
+  if (!payload.hasSession) {
+    setNotice("Er is geen sessie bewaard.", "Het inlogvenster is gesloten en de site heeft niets opgeslagen.");
+    return;
+  }
+  setNotice("Het inlogvenster is gesloten.", "Haal het stuk opnieuw op om een kopie te maken met je sessie. De huidige kopie blijft bewaard tot dat is gelukt.", again ? [{ label: "Opnieuw ophalen", primary: true, run: again }] : []);
+});
+
 async function refreshList() {
   const sources = await invoke<SourceSummary[]>("list_sources");
   sourceList.replaceChildren(new Option(sources.length ? `Eerder geopend (${sources.length})` : "Nog geen bronnen", ""));
@@ -99,6 +253,7 @@ async function show(source: Source) {
   $("empty").hidden = true;
   urlInput.value = source.url ?? "";
   renderStatus(source);
+  renderSourceNotice(source);
 
   if (source.kind === "pdf") {
     pdfView.hidden = false;
@@ -194,7 +349,7 @@ $("url-form").addEventListener("submit", (e) => {
   void openUrl(urlInput.value);
 });
 $("refresh").addEventListener("click", () => {
-  if (current?.url) void openUrl(current.url, true);
+  if (current?.url) void refetch(current);
 });
 $<HTMLInputElement>("pdf-input").addEventListener("change", (e) => {
   const input = e.target as HTMLInputElement;
@@ -274,6 +429,7 @@ for (const type of ["mousemove", "mousedown", "wheel"]) {
 // ---------- start ----------
 
 async function start() {
+  initSites();
   await Promise.all([refreshList(), initProviders()]);
   const last = remembered();
   if (!last) return;

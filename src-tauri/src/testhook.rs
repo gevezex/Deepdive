@@ -1,8 +1,11 @@
 //! Alleen in debug-builds: bedient de echte app vanaf de opdrachtregel voor end-to-endtests.
 //!   DEEPDIVE_SITE_TEST=lijst.txt  legt elk adres vast en schrijft de uitslag naar DEEPDIVE_SITE_TEST_OUT
 //!   DEEPDIVE_E2E_DIR=map          voert map/cmd.js uit in het hoofdvenster en schrijft het antwoord naar map/out.json
+//!                                 "win:login\n<js>" voert het uit in het eerste venster waarvan de naam zo begint,
+//!                                 zodat de test de rol van de gebruiker kan spelen op de lokale testsite
+//!   DEEPDIVE_SIGNALS_OUT=map      schrijft de signalen en tekstblokken van elke opgehaalde pagina naar die map
 
-use crate::{import, store::Store};
+use crate::{engine::RenderedPage, import, store::Store};
 use serde_json::json;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
@@ -15,6 +18,15 @@ pub fn start(app: AppHandle) {
     if let Ok(dir) = std::env::var("DEEPDIVE_E2E_DIR") {
         tauri::async_runtime::spawn(run_e2e(app, dir));
     }
+}
+
+pub fn dump_signals(url: &url::Url, page: &RenderedPage) {
+    let Ok(dir) = std::env::var("DEEPDIVE_SIGNALS_OUT") else { return };
+    let name = hex::encode(url.as_str().as_bytes());
+    let name = &name[..name.len().min(120)];
+    let blocks: Vec<_> = page.blocks.iter().map(|b| json!({"kind": b.kind, "text": b.text})).collect();
+    let value = json!({ "url": url.as_str(), "finalUrl": page.final_url, "signals": page.signals, "blocks": blocks });
+    let _ = std::fs::write(std::path::Path::new(&dir).join(format!("{name}.json")), value.to_string());
 }
 
 async fn run_site_test(app: AppHandle, list: String, out: String) {
@@ -36,7 +48,7 @@ async fn run_site_test(app: AppHandle, list: String, out: String) {
                 "finalUrl": s.final_url, "blocks": s.blocks.len(), "words": s.word_count,
                 "assetsSaved": s.assets.saved, "assetsFailed": s.assets.failed, "assetBytes": s.assets.bytes,
                 "failedUrls": s.assets.failed_urls.iter().take(5).collect::<Vec<_>>(),
-                "warnings": s.warnings, "textReady": s.text_ready,
+                "warnings": s.warnings, "textReady": s.text_ready, "completeness": s.completeness,
                 "first": s.blocks.iter().take(4).map(|b| b.text.chars().take(120).collect::<String>()).collect::<Vec<_>>(),
                 "last": s.blocks.iter().rev().take(2).map(|b| b.text.chars().take(120).collect::<String>()).collect::<Vec<_>>(),
             }),
@@ -56,7 +68,35 @@ async fn run_e2e(app: AppHandle, dir: String) {
         tokio::time::sleep(Duration::from_millis(200)).await;
         let Ok(js) = std::fs::read_to_string(&cmd) else { continue };
         let _ = std::fs::remove_file(&cmd);
-        let Some(window) = app.get_webview_window("main") else { continue };
+        // Hetzelfde als de sluitknop van het venster.
+        if let Some(prefix) = js.strip_prefix("closewin:") {
+            if let Some((_, window)) = app.webview_windows().into_iter().find(|(label, _)| label.starts_with(prefix.trim())) {
+                let _ = window.close();
+            }
+            let _ = std::fs::write(&out, "\"ok\"");
+            continue;
+        }
+        #[cfg(feature = "screenshots")]
+        if let Some((prefix, path)) = js.strip_prefix("shotwin:").and_then(|r| r.split_once(' ')) {
+            if let Some((_, window)) = app.webview_windows().into_iter().find(|(label, _)| label.starts_with(prefix)) {
+                shot(&window, path.trim().to_string(), out.clone());
+            }
+            continue;
+        }
+        let (js, window) = match js.strip_prefix("win:").and_then(|r| r.split_once('\n')) {
+            Some((prefix, body)) => {
+                let found = app.webview_windows().into_iter().find(|(label, _)| label.starts_with(prefix)).map(|(_, w)| w);
+                let Some(window) = found else {
+                    let _ = std::fs::write(&out, "\"geen venster\"");
+                    continue;
+                };
+                (body.to_string(), window)
+            }
+            None => {
+                let Some(window) = app.get_webview_window("main") else { continue };
+                (js, window)
+            }
+        };
         #[cfg(feature = "screenshots")]
         if let Some(path) = js.strip_prefix("shot:") {
             shot(&window, path.trim().to_string(), out.clone());

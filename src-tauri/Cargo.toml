@@ -29,6 +29,7 @@ time = { version = "0.3", features = ["formatting"] }
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
 jsonwebtoken = "9"
 base64 = "0.22"
+psl = "2.1.247"
 
 [features]
 # Alleen voor tests op macOS: schermafdruk van het hoofdvenster via de testhaak.

@@ -1,14 +1,16 @@
 //! Van invoer naar opgeslagen bron: website, pdf of geplakte tekst.
 
-use crate::engine::{webview::WebviewEngine, PageEngine, RenderedPage};
+use crate::completeness;
+use crate::engine::{webview::{self, WebviewEngine}, PageEngine, RenderedPage};
 use crate::error::AppError;
-use crate::model::{word_count, AssetStats, Block, Source, SourceKind, SCHEMA_VERSION};
+use crate::model::{word_count, AssetStats, Block, Completeness, CompletenessVerdict, Source, SourceKind, SCHEMA_VERSION};
+use crate::sessions::{cookie_header, ActiveSession, SessionCookie, SiteSessions};
 use crate::snapshot;
 use crate::store::{new_id, Store};
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use url::Url;
 
 const MAX_PDF: usize = 500 * 1024 * 1024;
@@ -54,6 +56,10 @@ fn base_source(id: String, kind: SourceKind, title: String) -> Source {
         word_count: 0,
         assets: AssetStats::default(),
         warnings: vec![],
+        completeness: Completeness::default(),
+        fetched_with_session: false,
+        superseded_by: None,
+        previous_id: None,
     }
 }
 
@@ -78,8 +84,12 @@ fn lower_join(page: &RenderedPage) -> String {
     text.to_lowercase()
 }
 
-/// Bepaalt of dit een bruikbare kopie is. Geeft waarschuwingen terug, of een fout die de lezer naar plakken leidt.
-pub fn classify(page: &RenderedPage, http_status: Option<u16>) -> Result<Vec<String>, AppError> {
+/// Bepaalt of dit een bruikbare kopie is. Zo niet, dan volgt een fout die de lezer naar plakken of inloggen leidt.
+/// Of het hele stuk er staat, is een aparte vraag: zie `completeness`.
+pub fn classify(page: &RenderedPage, http_status: Option<u16>, judged: &Completeness) -> Result<(), AppError> {
+    let verdict = judged.verdict;
+    // De status komt van een los verzoek. Sites als de FT weigeren dat, maar tonen de webview gewoon hun betaalmuur.
+    let shows_paywall = verdict == CompletenessVerdict::LikelyIncomplete && judged.signals.iter().any(|s| s.key == "gate_text");
     let words: u32 = page.blocks.iter().map(|b| b.text.split_whitespace().count() as u32).sum();
     let text = lower_join(page);
     let host = Url::parse(&page.final_url).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
@@ -98,18 +108,15 @@ pub fn classify(page: &RenderedPage, http_status: Option<u16>) -> Result<Vec<Str
         if words < SUSPECT_WORDS && (status == 404 || status == 410) {
             return Err(AppError::new("not_found_page", "Deze pagina bestaat niet (fout 404). Controleer het adres.").with_detail(detail));
         }
-        if words < SUSPECT_WORDS && (status == 401 || status == 403 || status == 429 || status == 451 || status == 503) {
+        if words < SUSPECT_WORDS && !shows_paywall && (status == 401 || status == 403 || status == 429 || status == 451 || status == 503) {
             return Err(AppError::new("blocked", format!("De site weigert het ophalen (fout {status}). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.")).with_detail(detail));
         }
     }
-    if words < EMPTY_WORDS {
+    // Een betaalmuur met bijna geen tekst is geen lege pagina: die kopie geeft de keuze om in te loggen.
+    if words < EMPTY_WORDS && verdict != CompletenessVerdict::LikelyIncomplete {
         return Err(AppError::new("empty", "Op deze pagina is geen leesbare tekst gevonden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail));
     }
-    let mut warnings = vec![];
-    if words < SUSPECT_WORDS {
-        warnings.push(format!("Er zijn maar {words} woorden gevonden. Het stuk is misschien onvolledig, bijvoorbeeld door een betaalmuur."));
-    }
-    Ok(warnings)
+    Ok(())
 }
 
 fn to_blocks(page: &RenderedPage) -> Vec<Block> {
@@ -138,8 +145,13 @@ fn client(user_agent: &str) -> Result<reqwest::Client, AppError> {
 
 /// Kijkt of het adres een pdf is, en vangt onbereikbare sites meteen af.
 /// Andere fouten zijn niet beslissend: sommige sites weigeren dit verzoek en laten de webview wel door.
-async fn preflight(url: &Url, user_agent: &str) -> Result<Preflight, AppError> {
-    let resp = match client(user_agent)?.get(url.clone()).send().await {
+async fn preflight(url: &Url, user_agent: &str, cookies: &[SessionCookie]) -> Result<Preflight, AppError> {
+    let mut request = client(user_agent)?.get(url.clone());
+    // De client haalt deze kop zelf weg bij een doorverwijzing naar een andere host.
+    if let Some(cookie) = cookie_header(cookies, url) {
+        request = request.header(reqwest::header::COOKIE, cookie);
+    }
+    let resp = match request.send().await {
         Ok(r) => r,
         Err(e) => {
             let mut chain = format!("{e}");
@@ -182,22 +194,48 @@ pub async fn open_url(app: &AppHandle, store: &Store, raw: &str, refresh: bool) 
             return Ok(existing);
         }
     }
+    fetch(app, store, &url).await
+}
+
+/// Haalt het adres op en slaat het op als nieuwe bron. Met een bewaarde sessie voor deze site gebruikt het die.
+async fn fetch(app: &AppHandle, store: &Store, url: &Url) -> Result<Source, AppError> {
     let engine = WebviewEngine::new(app.clone());
-    match preflight(&url, engine.user_agent()).await? {
-        Preflight::Pdf { bytes, name } => save_pdf(store, &bytes, &name, Some(url.as_str())),
-        Preflight::Page { status } => capture_page(store, &engine, &url, status).await,
+    let sessions = app.state::<SiteSessions>();
+    let session = sessions.active(url);
+    let _in_use = session.as_ref().map(|s| sessions.begin_use(&s.site));
+    let cookies = match &session {
+        Some(s) => {
+            sessions.touch(&s.site);
+            webview::read_cookies(app, s.store).await?
+        }
+        None => vec![],
+    };
+    match preflight(url, engine.user_agent(), &cookies).await? {
+        Preflight::Pdf { bytes, name } => {
+            let mut source = save_pdf(store, &bytes, &name, Some(url.as_str()))?;
+            if session.is_some() && !source.fetched_with_session {
+                source.fetched_with_session = true;
+                store.update(&source)?;
+            }
+            Ok(source)
+        }
+        Preflight::Page { status } => capture_page(store, &engine, url, status, session.as_ref()).await,
     }
 }
 
-async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status: Option<u16>) -> Result<Source, AppError> {
-    let page = engine.render(url).await?;
-    let warnings = classify(&page, status)?;
+async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status: Option<u16>, session: Option<&ActiveSession>) -> Result<Source, AppError> {
+    let page = engine.render(url, session.map(|s| s.store)).await?;
+    #[cfg(debug_assertions)]
+    crate::testhook::dump_signals(url, &page);
+    let judged = completeness::judge(&page, session.is_some());
+    classify(&page, status, &judged)?;
     let final_url = Url::parse(&page.final_url).unwrap_or_else(|_| url.clone());
 
     let id = new_id();
     let dir = store.begin(&id)?;
     let result = async {
-        let assets = snapshot::build(&page.html, &final_url, &dir, engine.user_agent()).await?;
+        let login = session.map(|s| snapshot::Login { site: &s.site, cookies: &page.session_cookies });
+        let assets = snapshot::build(&page.html, &final_url, &dir, engine.user_agent(), login).await?;
         let title = page.title.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| final_url.host_str().unwrap_or("Pagina").to_string());
         let mut source = base_source(id.clone(), SourceKind::Web, title);
         source.url = Some(url.to_string());
@@ -208,7 +246,8 @@ async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status
         source.lang = page.lang.clone();
         source.blocks = to_blocks(&page);
         source.word_count = word_count(&source.blocks);
-        source.warnings = warnings;
+        source.completeness = judged;
+        source.fetched_with_session = session.is_some();
         if assets.failed > 0 {
             source.warnings.push(format!("{} afbeeldingen of stijlbestanden konden niet worden opgeslagen.", assets.failed));
         }
@@ -221,6 +260,97 @@ async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status
         store.discard(&dir);
     }
     result
+}
+
+// ---------- opnieuw ophalen ----------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RefetchStatus {
+    /// De nieuwe kopie is nu de bron. De vorige blijft bewaard.
+    Replaced,
+    /// De nieuwe kopie lijkt slechter. De oude blijft de bron tot de lezer anders kiest.
+    KeptOld,
+    /// Hetzelfde bestand als eerst (pdf).
+    Unchanged,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefetchOutcome {
+    pub status: RefetchStatus,
+    pub current: Source,
+    pub old_words: u32,
+    pub new_words: u32,
+    /// Bij `KeptOld`: de nieuwe kopie die klaarstaat.
+    pub candidate_id: Option<String>,
+}
+
+/// Zou deze nieuwe kopie iets wegnemen dat de oude wel heeft? Dan wisselt de app niet uit zichzelf.
+fn is_worse(old: &Source, new: &Source) -> bool {
+    use CompletenessVerdict::*;
+    match new.completeness.verdict {
+        Complete => false,
+        LikelyIncomplete => old.completeness.verdict != LikelyIncomplete || new.word_count < old.word_count,
+        Unknown => old.completeness.verdict == Complete && new.word_count * 2 < old.word_count,
+    }
+}
+
+/// Maakt een nieuwe vaste kopie naast de oude. De oude wordt nooit aangeraakt behalve de verwijzing naar
+/// haar opvolger, en die komt pas als de nieuwe kopie veilig op schijf staat.
+pub async fn refetch(app: &AppHandle, store: &Store, id: &str) -> Result<RefetchOutcome, AppError> {
+    let mut old = store.get(id)?;
+    if old.kind == SourceKind::Text {
+        return Err(AppError::new("refetch", "Geplakte tekst heeft geen site om opnieuw van op te halen."));
+    }
+    let raw = old.url.clone().or_else(|| old.final_url.clone()).ok_or_else(|| AppError::new("refetch", "Van deze bron is geen webadres bekend."))?;
+    let url = parse_url(&raw)?;
+    let mut new = fetch(app, store, &url).await?;
+    let (old_words, new_words) = (old.word_count, new.word_count);
+    if new.id == old.id {
+        return Ok(RefetchOutcome { status: RefetchStatus::Unchanged, current: old, old_words, new_words, candidate_id: None });
+    }
+    new.previous_id = Some(old.id.clone());
+    if is_worse(&old, &new) {
+        new.superseded_by = Some(old.id.clone());
+        store.update(&new)?;
+        return Ok(RefetchOutcome { status: RefetchStatus::KeptOld, current: old, old_words, new_words, candidate_id: Some(new.id) });
+    }
+    store.update(&new)?;
+    old.superseded_by = Some(new.id.clone());
+    store.update(&old)?;
+    Ok(RefetchOutcome { status: RefetchStatus::Replaced, current: new, old_words, new_words, candidate_id: None })
+}
+
+/// De lezer kiest toch de nieuwe kopie die klaarstond.
+pub fn adopt_candidate(store: &Store, old_id: &str, candidate_id: &str) -> Result<Source, AppError> {
+    let mut old = store.get(old_id)?;
+    let mut new = store.get(candidate_id)?;
+    if new.superseded_by.as_deref() != Some(old_id) || new.previous_id.as_deref() != Some(old_id) {
+        return Err(AppError::not_found(candidate_id));
+    }
+    new.superseded_by = None;
+    store.update(&new)?;
+    old.superseded_by = Some(new.id.clone());
+    store.update(&old)?;
+    Ok(new)
+}
+
+/// De lezer houdt de oude kopie: de nieuwe die klaarstond verdwijnt.
+pub fn discard_candidate(store: &Store, old_id: &str, candidate_id: &str) -> Result<(), AppError> {
+    let new = store.get(candidate_id)?;
+    if new.superseded_by.as_deref() != Some(old_id) || new.previous_id.as_deref() != Some(old_id) {
+        return Err(AppError::not_found(candidate_id));
+    }
+    store.remove(candidate_id)
+}
+
+/// "Toch gebruiken": legt alleen de keuze van de lezer vast, de kopie zelf verandert niet.
+pub fn accept_incomplete(store: &Store, id: &str) -> Result<Source, AppError> {
+    let mut source = store.get(id)?;
+    source.completeness.accepted_by_user = true;
+    store.update(&source)?;
+    Ok(source)
 }
 
 // ---------- pdf ----------
@@ -244,6 +374,7 @@ pub fn save_pdf(store: &Store, bytes: &[u8], name: &str, url: Option<&str>) -> R
     source.final_url = url.map(String::from);
     source.content_hash = Some(hash);
     source.text_ready = false;
+    source.completeness = Completeness::plain(CompletenessVerdict::Complete, "Het hele pdf-bestand is opgeslagen.");
     let result = std::fs::write(dir.join("original.pdf"), bytes).map_err(AppError::storage).and_then(|_| store.commit(&dir, &source));
     if result.is_err() {
         store.discard(&dir);
@@ -340,6 +471,7 @@ pub fn import_text(store: &Store, title: Option<String>, url: Option<String>, te
     let id = new_id();
     let dir = store.begin(&id)?;
     let mut source = base_source(id, SourceKind::Text, title);
+    source.completeness = Completeness::plain(CompletenessVerdict::Unknown, "Geplakte tekst: de app kan niet zien of dit het hele stuk is.");
     source.url = url.map(|u| u.trim().to_string()).filter(|u| !u.is_empty());
     source.word_count = word_count(&blocks);
     source.blocks = blocks;
@@ -367,7 +499,13 @@ mod tests {
             published: None,
             lang: None,
             blocks: vec![RawBlock { kind: "paragraph".into(), level: None, text: format!("{text} {filler}") }],
+            signals: Default::default(),
+            session_cookies: vec![],
         }
+    }
+
+    fn classify(page: &RenderedPage, status: Option<u16>) -> Result<(), AppError> {
+        super::classify(page, status, &Completeness::plain(CompletenessVerdict::Complete, ""))
     }
 
     #[test]
@@ -378,7 +516,7 @@ mod tests {
 
     #[test]
     fn long_article_about_captchas_is_fine() {
-        assert!(classify(&page("Waarom captcha's falen", "captcha", 800, "https://a.nl/"), Some(200)).unwrap().is_empty());
+        assert!(classify(&page("Waarom captcha's falen", "captcha", 800, "https://a.nl/"), Some(200)).is_ok());
     }
 
     #[test]
@@ -388,16 +526,46 @@ mod tests {
     }
 
     #[test]
-    fn little_text_is_a_warning_and_nothing_is_an_error() {
-        assert_eq!(classify(&page("Stuk", "Begin", 100, "https://a.nl/"), Some(200)).unwrap().len(), 1);
+    fn short_text_is_fine_and_nothing_is_an_error_unless_it_is_a_paywall() {
+        assert!(classify(&page("Stuk", "Begin", 100, "https://a.nl/"), Some(200)).is_ok());
         assert_eq!(classify(&page("Stuk", "", 3, "https://a.nl/"), Some(200)).unwrap_err().kind, "empty");
+        assert!(super::classify(&page("Stuk", "", 3, "https://a.nl/"), Some(200), &Completeness::plain(CompletenessVerdict::LikelyIncomplete, "")).is_ok());
+    }
+
+    #[test]
+    fn refused_request_with_visible_paywall_is_a_paywall_not_a_block() {
+        let mut paywall = Completeness::plain(CompletenessVerdict::LikelyIncomplete, "");
+        assert_eq!(super::classify(&page("Stuk", "", 60, "https://a.nl/"), Some(403), &paywall).unwrap_err().kind, "blocked");
+        paywall.signals.push(crate::model::CompletenessSignal { key: "gate_text".into(), weight: 4, detail: String::new() });
+        assert!(super::classify(&page("Stuk", "", 60, "https://a.nl/"), Some(403), &paywall).is_ok());
+    }
+
+    fn source(words: u32, verdict: CompletenessVerdict) -> Source {
+        let mut s = base_source(new_id(), SourceKind::Web, "Stuk".into());
+        s.word_count = words;
+        s.completeness = Completeness::plain(verdict, "");
+        s
+    }
+
+    #[test]
+    fn worse_copy_never_replaces_silently() {
+        use CompletenessVerdict::*;
+        // Sessie verlopen: de volledige kopie mag niet wijken voor de betaalmuur.
+        assert!(is_worse(&source(1500, Complete), &source(80, LikelyIncomplete)));
+        assert!(is_worse(&source(1500, Unknown), &source(80, LikelyIncomplete)));
+        assert!(is_worse(&source(100, LikelyIncomplete), &source(80, LikelyIncomplete)));
+        assert!(is_worse(&source(1500, Complete), &source(300, Unknown)));
+        // Na inloggen.
+        assert!(!is_worse(&source(80, LikelyIncomplete), &source(1500, Complete)));
+        assert!(!is_worse(&source(80, LikelyIncomplete), &source(120, LikelyIncomplete)));
+        assert!(!is_worse(&source(1500, Complete), &source(1400, Complete)));
     }
 
     #[test]
     fn http_error_with_little_text_is_an_error() {
         assert_eq!(classify(&page("Oeps", "Niet gevonden", 40, "https://a.nl/x"), Some(404)).unwrap_err().kind, "not_found_page");
         assert_eq!(classify(&page("Oeps", "Geen toegang", 40, "https://a.nl/x"), Some(403)).unwrap_err().kind, "blocked");
-        assert!(classify(&page("Stuk", "lang", 900, "https://a.nl/x"), Some(403)).unwrap().is_empty());
+        assert!(classify(&page("Stuk", "lang", 900, "https://a.nl/x"), Some(403)).is_ok());
     }
 
     #[test]

@@ -3,6 +3,7 @@
 
 use crate::error::AppError;
 use crate::model::AssetStats;
+use crate::sessions::{cookie_header, site_key, SessionCookie};
 use futures_util::{stream, StreamExt};
 use lol_html::html_content::ContentType;
 use lol_html::{element, rewrite_str, text, RewriteStrSettings};
@@ -26,6 +27,25 @@ const MAX_ASSET: u64 = 40 * 1024 * 1024;
 const MAX_TOTAL: u64 = 500 * 1024 * 1024;
 const MAX_CSS_DEPTH: usize = 5;
 const MAX_FAILED_LISTED: usize = 20;
+
+/// Sessie van de site waarvan de pagina komt. Alleen bestanden op diezelfde site krijgen de cookies.
+#[derive(Clone, Copy)]
+pub struct Login<'a> {
+    pub site: &'a str,
+    pub cookies: &'a [SessionCookie],
+}
+
+impl Login<'_> {
+    /// De kop voor dit bestand. Een pagina die op een andere site uitkwam, stuurt nooit cookies mee.
+    fn header_for(&self, page: &Url, asset: &Url) -> Option<String> {
+        let same_site = |u: &Url| site_key(u).as_deref() == Some(self.site);
+        if same_site(page) && same_site(asset) {
+            cookie_header(self.cookies, asset)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AssetKind {
@@ -272,6 +292,11 @@ padding:1em;background:#f4efe6;border:1px dashed #b9ad98;color:#5d5546;font:14px
                     }
                     Ok(())
                 }),
+                // Op een ingelogde pagina kunnen hier inlogtokens in staan. Die horen niet in de kopie.
+                element!("input[type=password i], input[type=hidden i]", |el| {
+                    el.remove();
+                    Ok(())
+                }),
                 element!("form", |el| {
                     el.remove_attribute("action");
                     el.remove_attribute("method");
@@ -356,10 +381,27 @@ struct Fetched {
     bytes: Vec<u8>,
 }
 
-async fn fetch_asset(client: &reqwest::Client, url: Url, kind: AssetKind, referer: &str) -> Result<Fetched, Url> {
+/// Eerst zonder cookies: de meeste bestanden staan openbaar op een cdn. Alleen wat dan mislukt, en op
+/// dezelfde site staat, wordt nog eens met de sessie gevraagd.
+async fn fetch_asset(client: &reqwest::Client, url: Url, kind: AssetKind, referer: &str, cookie: Option<String>) -> Result<Fetched, Url> {
+    match fetch_once(client, url.clone(), kind, referer, None).await {
+        Ok(f) => Ok(f),
+        Err(u) => match cookie {
+            Some(cookie) => fetch_once(client, url, kind, referer, Some(cookie)).await,
+            None => Err(u),
+        },
+    }
+}
+
+async fn fetch_once(client: &reqwest::Client, url: Url, kind: AssetKind, referer: &str, cookie: Option<String>) -> Result<Fetched, Url> {
     let accept = if kind == AssetKind::Css { "text/css,*/*;q=0.1" } else { "image/avif,image/webp,image/*,font/*,*/*;q=0.8" };
     let fail = |u: &Url| u.clone();
-    let resp = client.get(url.clone()).header("Referer", referer).header("Accept", accept).send().await.map_err(|_| fail(&url))?;
+    let mut request = client.get(url.clone()).header("Referer", referer).header("Accept", accept);
+    // De client haalt deze kop zelf weg bij een doorverwijzing naar een andere host of poort.
+    if let Some(cookie) = cookie {
+        request = request.header(reqwest::header::COOKIE, cookie);
+    }
+    let resp = request.send().await.map_err(|_| fail(&url))?;
     if !resp.status().is_success() || resp.content_length().is_some_and(|l| l > MAX_ASSET) {
         return Err(url);
     }
@@ -379,7 +421,7 @@ async fn fetch_asset(client: &reqwest::Client, url: Url, kind: AssetKind, refere
 }
 
 /// Legt de pagina vast in `dir`: `index.html` en de map `assets`. Wat niet lukt, wordt geteld in de statistiek.
-pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str) -> Result<AssetStats, AppError> {
+pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str, login: Option<Login<'_>>) -> Result<AssetStats, AppError> {
     let page_is_private = is_private(page_url);
     let client = reqwest::Client::builder()
         .user_agent(user_agent)
@@ -421,7 +463,10 @@ pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str) -> 
             break;
         }
         let batch = std::mem::take(&mut pending);
-        let results: Vec<_> = stream::iter(batch.into_iter().map(|(u, k)| fetch_asset(&client, u, k, &referer)))
+        let results: Vec<_> = stream::iter(batch.into_iter().map(|(u, k)| {
+            let cookie = login.and_then(|l| l.header_for(page_url, &u));
+            fetch_asset(&client, u, k, &referer, cookie)
+        }))
             .buffer_unordered(8)
             .collect()
             .await;
@@ -483,6 +528,24 @@ mod tests {
     fn clean(html: &str) -> String {
         let page = Url::parse("https://example.com/a/b.html").unwrap();
         sanitize(html, &page, |raw, _| Some(format!("assets/{}", raw.rsplit('/').next().unwrap()))).unwrap()
+    }
+
+    #[test]
+    fn login_tokens_stay_out_of_the_copy() {
+        let out = clean(r#"<body><form action="/x"><input type="hidden" name="csrf" value="geheim1"><INPUT TYPE="PASSWORD" value="geheim2"><input name="q"></form></body>"#);
+        assert!(!out.contains("geheim"), "{out}");
+        assert!(out.contains(r#"name="q""#));
+    }
+
+    #[test]
+    fn asset_cookies_stay_on_the_same_site() {
+        let cookies = [SessionCookie { name: "s".into(), value: "w".into(), domain: "krant.nl".into(), path: "/".into(), secure: false }];
+        let login = Login { site: "krant.nl", cookies: &cookies };
+        let u = |s: &str| Url::parse(s).unwrap();
+        assert_eq!(login.header_for(&u("https://www.krant.nl/a"), &u("https://img.krant.nl/b.jpg")).unwrap(), "s=w");
+        assert!(login.header_for(&u("https://www.krant.nl/a"), &u("https://evil.example/b.jpg")).is_none());
+        // Pagina kwam na een doorverwijzing op een andere site uit: die bepaalt niet wat de sessie ophaalt.
+        assert!(login.header_for(&u("https://evil.example/a"), &u("https://img.krant.nl/b.jpg")).is_none());
     }
 
     #[test]

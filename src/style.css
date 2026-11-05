@@ -37,6 +37,15 @@ button:disabled { opacity: 0.5; }
 .error details { margin-top: 4px; font-size: 13px; color: var(--ink-soft); }
 .error code { display: block; overflow-wrap: anywhere; }
 
+.source-notice { display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #d3b06a; background: #f8ecc9; font-size: 14px; line-height: 1.4; }
+.source-notice-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.source-notice-text strong { font-weight: 600; }
+.source-notice-actions { display: flex; flex: none; gap: 8px; }
+.sites-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.site-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.site-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.site-text .hint { margin: 0; }
+
 .panels { flex: 1; display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); min-height: 0; }
 .source-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--line); }
 .source-view { position: relative; flex: 1; min-height: 0; background: #fff; }

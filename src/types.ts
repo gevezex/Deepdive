@@ -29,6 +29,40 @@ export interface Source {
   wordCount: number;
   assets: { saved: number; failed: number; bytes: number; failedUrls: string[] };
   warnings: string[];
+  completeness: Completeness;
+  fetchedWithSession: boolean;
+  supersededBy: string | null;
+  previousId: string | null;
+}
+
+export type CompletenessVerdict = "complete" | "likely_incomplete" | "unknown";
+
+export interface Completeness {
+  verdict: CompletenessVerdict;
+  reason: string;
+  signals: { key: string; weight: number; detail: string }[];
+  acceptedByUser: boolean;
+}
+
+export interface RefetchOutcome {
+  status: "replaced" | "kept_old" | "unchanged";
+  current: Source;
+  oldWords: number;
+  newWords: number;
+  candidateId: string | null;
+}
+
+export interface SiteSession {
+  site: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  wipePending: boolean;
+  loginOpen: boolean;
+}
+
+export interface LoginClosed {
+  site: string;
+  hasSession: boolean;
 }
 
 export interface SourceSummary {

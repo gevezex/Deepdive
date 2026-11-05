@@ -346,7 +346,8 @@
       const r = el.getBoundingClientRect();
       // Ook een grote zwevende reclame of donatievraag blijft anders voorgoed over de tekst liggen.
       // Smalle balken en zijkolommen met navigatie blijven staan.
-      const covers = pos === "fixed" && r.width >= vw * 0.4 && r.height >= vh * 0.2 && !el.querySelector("h1");
+      // Een betaalmuur blijft staan: de kopie laat zien wat de site de lezer liet zien en omzeilt niets.
+      const covers = pos === "fixed" && r.width >= vw * 0.4 && r.height >= vh * 0.2 && !el.querySelector("h1") && !isPaywallLayer(el);
       if (covers || OVERLAY_NAME.test(nameOf(el)) || (isDialog && CONSENT_TEXT.test(el.textContent))) {
         const root = el.getRootNode();
         doomed.add(root instanceof ShadowRoot ? root.host : el);
@@ -363,6 +364,131 @@
       }
     }
     return doomed.size;
+  }
+
+  // ---------- aanwijzingen voor het oordeel over de volledigheid ----------
+  // Het oordeel zelf valt in Rust (completeness.rs). Hier verzamelen we alleen wat er te zien is.
+
+  const GATE_HINT = /abonn|subscri|member|leden|log ?in|inlog|sign ?in|regist|verder (te )?lezen|lees verder|continue|keep reading|read the|lees het|premium|plus-?artikel|access|toegang|buy|purchase|rent or|unlock|free trial|limit|free article|reserved|paywall/i;
+  const GATE_NAME = /(^|[-_\s])(pay-?wall\w*|reg-?wall\w*|piano|tp-modal|tp-container|subscribe-?wall|subscription-?(gate|wall|required)|meter-?(wall|gate)|premium-?(gate|wall|lock)|locked-?content|content-?(gate|locked)|article-?gate|access-?wall)([-_\s]|$)/i;
+  const PAYWALL_LAYER = /(abonn|subscri|log ?in|inlog|sign ?in|paywall)/i;
+
+  function isPaywallLayer(el) {
+    return !OVERLAY_NAME.test(nameOf(el)) && (GATE_NAME.test(nameOf(el)) || PAYWALL_LAYER.test(norm(el.textContent).slice(0, 600))) && !CONSENT_TEXT.test(norm(el.textContent).slice(0, 600));
+  }
+
+  function visibleBox(el) {
+    const r = el.getBoundingClientRect();
+    return r.width > 1 && r.height > 1 && !isHidden(el);
+  }
+
+  function placeOf(el, root) {
+    let floating = false;
+    for (let a = el; a && a !== document.documentElement; a = parentOf(a)) {
+      if (a.matches("nav, header, [role=navigation], [role=banner]")) return "chrome";
+      if (getComputedStyle(a).position === "fixed" || getComputedStyle(a).position === "sticky" || a.matches("dialog, [role=dialog], [role=alertdialog]")) floating = true;
+    }
+    if (floating) return "overlay";
+    for (let a = el; a && a !== document.documentElement; a = parentOf(a)) {
+      if (a.matches("footer, aside, [role=contentinfo], [role=complementary]")) return "chrome";
+    }
+    if (root.contains(el)) return "in";
+    const pos = root.compareDocumentPosition(el);
+    return pos & Node.DOCUMENT_POSITION_FOLLOWING ? "after" : "before";
+  }
+
+  // De grootste elementen met korte tekst: zo blijft een zin met een koppeling erin in zijn geheel.
+  function shortTexts(start, out) {
+    const walk = (el) => {
+      if (out.length >= 200) return;
+      if (/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|SVG|IFRAME)$/i.test(el.tagName) || isHidden(el)) return;
+      if (el.shadowRoot) for (const k of el.shadowRoot.children) walk(k);
+      const text = norm(el.textContent);
+      if (!text) return;
+      if (text.length <= 240 && !el.shadowRoot) {
+        if (text.length >= 6 && GATE_HINT.test(text) && visibleBox(el)) out.push({ el, text: textOf(el) || text });
+        return;
+      }
+      for (const k of el.children) walk(k);
+    };
+    walk(start);
+  }
+
+  function readStructuredData(sig) {
+    const visit = (v, depth) => {
+      if (!v || typeof v !== "object" || depth > 5) return;
+      if (Array.isArray(v)) return v.forEach((x) => visit(x, depth + 1));
+      if (v["@graph"]) visit(v["@graph"], depth + 1);
+      const type = String(v["@type"] || "");
+      const free = v.isAccessibleForFree;
+      if (free !== undefined) sig.ldFree.push(free === true || /^true$/i.test(String(free)));
+      if (v.hasPart) visit(v.hasPart, depth + 1);
+      if (!/Article|Posting|Report/i.test(type)) {
+        if (v.mainEntity) visit(v.mainEntity, depth + 1);
+        return;
+      }
+      const count = parseInt(v.wordCount, 10);
+      if (count > 0) sig.ldWordCount = Math.max(sig.ldWordCount || 0, count);
+      if (typeof v.articleBody === "string") {
+        const n = norm(v.articleBody).split(" ").length;
+        sig.ldBodyWords = Math.max(sig.ldBodyWords || 0, n);
+      }
+    };
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try { visit(JSON.parse(s.textContent), 0); } catch (_) {}
+    }
+    const micro = document.querySelector('[itemprop="isAccessibleForFree"]');
+    if (micro) sig.ldFree.push(/^true$/i.test(micro.getAttribute("content") || micro.textContent || ""));
+  }
+
+  function readClipping(root, sig) {
+    for (let a = root, i = 0; a && a !== document.body && i < 4; a = a.parentElement, i++) {
+      if (getComputedStyle(a).overflowY === "hidden" && a.scrollHeight > a.clientHeight + 200 && a.clientHeight > 100) sig.clipped = true;
+    }
+    const nearEnd = [root, ...[...root.querySelectorAll("*")].slice(-12), root.nextElementSibling].filter(Boolean);
+    for (const el of nearEnd) {
+      const hasGradient = (s) => /gradient/.test(s.backgroundImage) && s.position === "absolute";
+      if (hasGradient(getComputedStyle(el)) || hasGradient(getComputedStyle(el, "::after")) || hasGradient(getComputedStyle(el, "::before"))) sig.fade = true;
+    }
+  }
+
+  // Vóór het weghalen van overlays: een betaalmuur zit daar vaak in.
+  function collectSignals() {
+    const sig = { ldFree: [], ldWordCount: null, ldBodyWords: null, contentTier: meta("article:content_tier", "og:article:content_tier"), gateCandidates: [], gateElements: [], passwordField: false, clipped: false, fade: false, pageWords: 0 };
+    const root = pickRoot();
+    readStructuredData(sig);
+    readClipping(root, sig);
+    sig.pageWords = norm(document.body.innerText).split(" ").length;
+    const found = [];
+    shortTexts(document.body, found);
+    const candidates = found.map((c) => ({ el: c.el, text: c.text, place: placeOf(c.el, root) }));
+    const all = deepAll(document, []);
+    for (const el of all) {
+      if (el.matches("input[type=password]") && visibleBox(el)) sig.passwordField = true;
+      if (sig.gateElements.length < 5 && GATE_NAME.test(nameOf(el)) && visibleBox(el) && norm(el.textContent).length < 1500) {
+        const place = placeOf(el, root);
+        if (place !== "chrome" && place !== "before") sig.gateElements.push(nameOf(el).trim().slice(0, 80));
+      }
+    }
+    return { sig, candidates };
+  }
+
+  // Hoeveel tekst volgt er nog na een blok? Na een echte betaalmuur bijna niets.
+  function finishSignals(sig, candidates, blocks) {
+    const numbered = [...document.querySelectorAll("[data-dd-n]")];
+    sig.gateCandidates = candidates.map((c) => {
+      let after = 0;
+      if (c.el.isConnected) {
+        for (const b of numbered) {
+          if (c.el.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING && !c.el.contains(b)) {
+            const block = blocks[Number(b.getAttribute("data-dd-n")) - 1];
+            if (block) after += block.text.split(" ").length;
+          }
+        }
+      }
+      return { text: c.text, place: c.place, wordsAfter: after };
+    });
+    return sig;
   }
 
   function extract() {
@@ -476,6 +602,8 @@
       return "<iframe" + attrs(el, over, new Set(["srcdoc"])) + "></iframe>";
     }
     if (lower === "input") {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      if (type === "password" || type === "hidden") return "";
       const over = {};
       if (el.value) over.value = el.value;
       if (el.checked) over.checked = "";
@@ -516,8 +644,10 @@
     await waitQuiet(800, 4000);
     await waitImages(3000);
     state.phase = "vastleggen";
+    const { sig, candidates } = collectSignals();
     removeOverlays();
     const blocks = extract();
+    const signals = finishSignals(sig, candidates, blocks);
     const h1 = document.querySelector("h1");
     state.payload = JSON.stringify({
       html: serializeDocument(),
@@ -529,6 +659,7 @@
       published: meta("article:published_time", "date", "datePublished", "pubdate"),
       lang: document.documentElement.lang || null,
       blocks,
+      signals,
     });
     state.phase = "klaar";
     state.done = true;

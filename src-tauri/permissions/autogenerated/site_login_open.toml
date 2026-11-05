@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-site-login-open"
+description = "Enables the site_login_open command without any pre-configured scope."
+commands.allow = ["site_login_open"]
+
+[[permission]]
+identifier = "deny-site-login-open"
+description = "Denies the site_login_open command without any pre-configured scope."
+commands.deny = ["site_login_open"]

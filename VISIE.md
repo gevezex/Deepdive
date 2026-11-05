@@ -248,7 +248,7 @@ Elke bron wordt bij het openen vastgelegd, zodat die niet meer verandert. Je lee
 
 **Beperkingen:** video's en interactieve grafieken werken in de kopie vaak niet meer, en sommige sites blokkeren het ophalen. Kopieën kunnen ook persoonlijke gegevens bevatten als je bent ingelogd; ze blijven daarom lokaal.
 
-**Betaalmuren:** je browserlogin werkt niet in de app. Je kunt wel in een venster in de app inloggen, zodat de app die sessie onthoudt.
+**Betaalmuren:** je browserlogin werkt niet in de app. Je kunt wel in een venster in de app inloggen, zodat de app die sessie onthoudt. Elke site krijgt daarvoor een eigen opslag in de webview. De app ziet of bewaart geen wachtwoorden, en je kunt een sessie per site weer wissen. De app omzeilt geen betaalmuur: je gebruikt je eigen abonnement, en herkent de app een onvolledig stuk, dan meldt ze dat.
 
 ---
 
@@ -324,6 +324,7 @@ Aandachtspunten:
 
 1. **Bronnen openen**: URL of pdf plakken of slepen, tonen in het linkerpaneel en vastleggen als vaste kopie. Vroeg testen op 20 echte sites op macOS.
 2. **Providers en modellen**: providers aanmaken, sleutels veilig opslaan en lokale modellen koppelen.
+   **2b. Onvolledige stukken en inloggen**: per bron een oordeel (volledig, waarschijnlijk onvolledig, onbekend) op meerdere signalen, een melding met "Inloggen" en "Toch gebruiken", zelf inloggen in een venster in de app, een scherm met sites waar je bent ingelogd en "Opnieuw ophalen" die de oude kopie bewaart. Komt vóór de blauwdruk, omdat een blauwdruk van een half artikel misleidend is.
 3. **Blauwdruk**: de knop, de samenvatting, het doel, de levensloop en de kritische laag in het rechterpaneel.
 4. **Selecteren en vragen**: selecteren, kader, selectiemenu, markeren, antwoorden, "je bent hier" en terugverwijzen.
 

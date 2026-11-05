@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-discard-candidate"
+description = "Enables the discard_candidate command without any pre-configured scope."
+commands.allow = ["discard_candidate"]
+
+[[permission]]
+identifier = "deny-discard-candidate"
+description = "Denies the discard_candidate command without any pre-configured scope."
+commands.deny = ["discard_candidate"]

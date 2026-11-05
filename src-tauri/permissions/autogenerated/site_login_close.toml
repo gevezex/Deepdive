@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-site-login-close"
+description = "Enables the site_login_close command without any pre-configured scope."
+commands.allow = ["site_login_close"]
+
+[[permission]]
+identifier = "deny-site-login-close"
+description = "Denies the site_login_close command without any pre-configured scope."
+commands.deny = ["site_login_close"]

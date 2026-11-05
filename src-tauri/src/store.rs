@@ -78,6 +78,11 @@ impl Store {
         std::fs::rename(tmp, dir.join("source.json")).map_err(AppError::storage)
     }
 
+    /// Verwijdert een hele bronmap. Alleen voor een nieuwe kopie die de lezer niet wil.
+    pub fn remove(&self, id: &str) -> Result<(), AppError> {
+        std::fs::remove_dir_all(self.source_dir(id)?).map_err(AppError::storage)
+    }
+
     pub fn all(&self) -> Vec<Source> {
         let Ok(entries) = std::fs::read_dir(self.root.join("sources")) else { return vec![] };
         let mut out: Vec<Source> = entries
@@ -92,12 +97,13 @@ impl Store {
     pub fn summaries(&self) -> Vec<SourceSummary> {
         self.all()
             .into_iter()
+            .filter(|s| s.superseded_by.is_none())
             .map(|s| SourceSummary { id: s.id, kind: s.kind, title: s.title, url: s.url, captured_at: s.captured_at, word_count: s.word_count })
             .collect()
     }
 
     pub fn find_by_url(&self, url: &str) -> Option<Source> {
-        self.all().into_iter().find(|s| s.url.as_deref() == Some(url) || s.final_url.as_deref() == Some(url))
+        self.all().into_iter().find(|s| s.superseded_by.is_none() && (s.url.as_deref() == Some(url) || s.final_url.as_deref() == Some(url)))
     }
 
     pub fn find_by_hash(&self, hash: &str) -> Option<Source> {

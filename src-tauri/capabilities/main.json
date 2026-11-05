@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Alleen het hoofdvenster, met lokale inhoud. Verborgen vensters en pagina's van internet krijgen niets.",
+  "description": "Alleen het hoofdvenster, met lokale inhoud. Verborgen vensters, inlogvensters en pagina's van internet krijgen niets.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -12,6 +12,14 @@
     "allow-import-text",
     "allow-list-sources",
     "allow-get-source",
+    "allow-refetch-source",
+    "allow-adopt-candidate",
+    "allow-discard-candidate",
+    "allow-accept-incomplete",
+    "allow-site-login-open",
+    "allow-site-login-close",
+    "allow-list-site-sessions",
+    "allow-wipe-site-session",
     "allow-list-providers",
     "allow-save-provider",
     "allow-delete-provider",

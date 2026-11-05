@@ -2,6 +2,7 @@
 //! De pagina draait in een eigen verborgen venster zonder rechten op de commando's van de app.
 
 use super::{PageEngine, RenderedPage};
+use crate::sessions::SessionCookie;
 use crate::error::AppError;
 use std::time::{Duration, Instant};
 use tauri::{webview::NewWindowResponse, AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -17,9 +18,9 @@ const TOTAL_TIMEOUT: Duration = Duration::from_secs(90);
 const MAX_PAYLOAD: usize = 200 * 1024 * 1024;
 
 #[cfg(target_os = "windows")]
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
+pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 #[cfg(not(target_os = "windows"))]
-const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
+pub const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
 
 pub struct WebviewEngine {
     app: AppHandle,
@@ -39,6 +40,39 @@ impl Drop for CloseOnDrop {
     }
 }
 
+/// Sluit het venster pas als de opslag is uitgelezen. `cookies()` wacht op de hoofdthread en mag die dus niet blokkeren.
+async fn cookies_of(window: WebviewWindow) -> Result<Vec<SessionCookie>, AppError> {
+    tauri::async_runtime::spawn_blocking(move || window.cookies())
+        .await
+        .map_err(|e| AppError::engine(e.to_string()))?
+        .map(|list| {
+            list.into_iter()
+                .map(|c| SessionCookie {
+                    name: c.name().to_string(),
+                    value: c.value().to_string(),
+                    domain: c.domain().unwrap_or("").to_string(),
+                    path: c.path().unwrap_or("/").to_string(),
+                    secure: c.secure().unwrap_or(false),
+                })
+                .collect()
+        })
+        .map_err(|e| AppError::engine(e.to_string()))
+}
+
+/// Leest de cookies van een site-opslag via een leeg verborgen venster. Er wordt geen pagina geladen.
+pub async fn read_cookies(app: &AppHandle, store: [u8; 16]) -> Result<Vec<SessionCookie>, AppError> {
+    let label = format!("cookies-{}", uuid::Uuid::new_v4().simple());
+    let blank = Url::parse("about:blank").map_err(|e| AppError::engine(e.to_string()))?;
+    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(blank)).visible(false).focused(false);
+    #[cfg(target_os = "macos")]
+    let builder = builder.data_store_identifier(store);
+    #[cfg(not(target_os = "macos"))]
+    let _ = store;
+    let window = builder.build().map_err(|e| AppError::engine(e.to_string()))?;
+    let _guard = CloseOnDrop(window.clone());
+    cookies_of(window).await
+}
+
 async fn eval(window: &WebviewWindow, js: String) -> Result<String, AppError> {
     let (tx, rx) = oneshot::channel();
     let tx = std::sync::Mutex::new(Some(tx));
@@ -56,13 +90,13 @@ async fn eval(window: &WebviewWindow, js: String) -> Result<String, AppError> {
 }
 
 impl PageEngine for WebviewEngine {
-    async fn render(&self, url: &Url) -> Result<RenderedPage, AppError> {
+    async fn render(&self, url: &Url, session: Option<[u8; 16]>) -> Result<RenderedPage, AppError> {
         let id = uuid::Uuid::new_v4().simple().to_string();
         let label = format!("capture-{id}");
         let ns = format!("__dd_{id}");
         let (loaded_tx, mut loaded_rx) = watch::channel(false);
 
-        let window = WebviewWindowBuilder::new(&self.app, &label, WebviewUrl::External(url.clone()))
+        let builder = WebviewWindowBuilder::new(&self.app, &label, WebviewUrl::External(url.clone()))
             .title("Deepdive – vastleggen")
             .visible(false)
             .focused(false)
@@ -76,9 +110,13 @@ impl PageEngine for WebviewEngine {
                 if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                     let _ = loaded_tx.send(true);
                 }
-            })
-            .build()
-            .map_err(|e| AppError::engine(e.to_string()))?;
+            });
+        #[cfg(target_os = "macos")]
+        let builder = match session {
+            Some(store) => builder.data_store_identifier(store),
+            None => builder,
+        };
+        let window = builder.build().map_err(|e| AppError::engine(e.to_string()))?;
         let _guard = CloseOnDrop(window.clone());
         debug_assert!(self.app.get_webview_window(&label).is_some());
 
@@ -117,7 +155,12 @@ impl PageEngine for WebviewEngine {
                 return Err(AppError::engine("de pagina is te groot om op te slaan"));
             }
         }
-        serde_json::from_str(&payload).map_err(|e| AppError::engine(format!("onleesbaar antwoord: {e}")))
+        let mut page: RenderedPage = serde_json::from_str(&payload).map_err(|e| AppError::engine(format!("onleesbaar antwoord: {e}")))?;
+        if session.is_some() {
+            // Na het laden gelezen: sites vernieuwen hun sessiecookie vaak bij elk bezoek.
+            page.session_cookies = cookies_of(window.clone()).await?;
+        }
+        Ok(page)
     }
 
     fn user_agent(&self) -> &'static str {

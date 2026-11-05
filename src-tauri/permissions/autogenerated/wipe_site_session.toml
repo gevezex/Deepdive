@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wipe-site-session"
+description = "Enables the wipe_site_session command without any pre-configured scope."
+commands.allow = ["wipe_site_session"]
+
+[[permission]]
+identifier = "deny-wipe-site-session"
+description = "Denies the wipe_site_session command without any pre-configured scope."
+commands.deny = ["wipe_site_session"]
