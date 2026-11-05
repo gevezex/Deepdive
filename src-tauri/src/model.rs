@@ -122,6 +122,9 @@ pub struct Source {
     /// De kopie die deze heeft vervangen, of waarvoor deze klaarstaat zolang de lezer nog moet kiezen.
     #[serde(default)]
     pub previous_id: Option<String>,
+    /// De lezer koos "Popup weghalen". De kopie op schijf blijft gelijk; de app verbergt de zwevende lagen bij het tonen.
+    #[serde(default)]
+    pub hide_floating: bool,
 }
 
 /// Korte vorm voor de bronnenlijst.

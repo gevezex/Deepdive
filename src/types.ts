@@ -33,6 +33,7 @@ export interface Source {
   fetchedWithSession: boolean;
   supersededBy: string | null;
   previousId: string | null;
+  hideFloating: boolean;
 }
 
 export type CompletenessVerdict = "complete" | "likely_incomplete" | "unknown";

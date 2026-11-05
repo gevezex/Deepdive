@@ -20,6 +20,8 @@ const LAST_KEY = "deepdive.lastSource";
 let current: Source | null = null;
 let pdfHandle: PdfViewHandle | null = null;
 let opening = 0;
+let frameLoads = 0;
+let lastHighlight: string | null = null;
 
 const snapshotBase = navigator.userAgent.includes("Windows") ? "http://deepdive-snapshot.localhost" : "deepdive-snapshot://localhost";
 
@@ -81,6 +83,9 @@ function renderStatus(source: Source | null) {
   $("status-text").title = source.finalUrl ?? source.url ?? "";
   $("status-warnings").textContent = source.warnings.join(" ");
   $("refresh").hidden = !source.url || source.kind === "text";
+  const hide = $("hide-floating");
+  hide.hidden = source.kind !== "web";
+  hide.textContent = source.hideFloating ? "Popup terugzetten" : "Popup weghalen";
 }
 
 // ---------- melding boven de kopie ----------
@@ -290,9 +295,30 @@ async function show(source: Source) {
     }
   } else {
     frame.hidden = false;
-    frame.src = `${snapshotBase}/${source.id}/index.html`;
+    lastHighlight = null;
+    loadFrame(source.id);
   }
   await refreshList();
+}
+
+/** `reload`: een adres dat alleen in het anker verschilt, laadt de iframe niet opnieuw. Daarom krijgt het dan een eigen nummer. */
+function loadFrame(id: string, reload = false) {
+  const query = [lastHighlight ? `hl=${lastHighlight}` : null, reload ? `v=${++frameLoads}` : null].filter(Boolean).join("&");
+  frame.src = `${snapshotBase}/${id}/index.html${query ? `?${query}` : ""}${lastHighlight ? "#dd-doel" : ""}`;
+}
+
+/** De iframe is afgeschermd en voert geen scripts uit. De app laadt de kopie opnieuw, met een stijl die de zwevende lagen verbergt. */
+async function toggleFloating() {
+  if (!current || current.kind !== "web") return;
+  try {
+    const saved = await invoke<Source>("set_hide_floating", { id: current.id, hide: !current.hideFloating });
+    if (current?.id !== saved.id) return;
+    current = saved;
+    renderStatus(saved);
+    loadFrame(saved.id, true);
+  } catch (err) {
+    showError(err);
+  }
 }
 
 /**
@@ -309,7 +335,8 @@ function jumpToParagraphs(ranges: ParagraphRange[]) {
     void pdfHandle?.highlight(regions);
     return;
   }
-  frame.src = `${snapshotBase}/${current.id}/index.html?hl=${highlightParam(ranges)}#dd-doel`;
+  lastHighlight = highlightParam(ranges);
+  loadFrame(current.id);
 }
 
 // ---------- invoer ----------
@@ -373,6 +400,7 @@ $("url-form").addEventListener("submit", (e) => {
   e.preventDefault();
   void openUrl(urlInput.value);
 });
+$("hide-floating").addEventListener("click", () => void toggleFloating());
 $("refresh").addEventListener("click", () => {
   if (current?.url) void refetch(current);
 });

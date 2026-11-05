@@ -49,6 +49,11 @@ async fn accept_incomplete(store: State<'_, Store>, id: String) -> Result<Source
 }
 
 #[tauri::command]
+async fn set_hide_floating(store: State<'_, Store>, id: String, hide: bool) -> Result<Source, AppError> {
+    import::set_hide_floating(&store, &id, hide)
+}
+
+#[tauri::command]
 async fn import_pdf(store: State<'_, Store>, request: Request<'_>) -> Result<Source, AppError> {
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err(AppError::new("pdf", "Het bestand is niet goed aangekomen."));
@@ -97,6 +102,12 @@ fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Re
     let bytes = match request.uri().query().and_then(snapshot::highlight_query) {
         Some(ranges) if store::mime_for(&path).starts_with("text/html") => snapshot::highlight(bytes, &ranges),
         _ => bytes,
+    };
+    // De lezer koos "Popup weghalen": de server zet een stijl in de pagina. De kopie op schijf blijft zoals ze is.
+    let bytes = if store::mime_for(&path).starts_with("text/html") && store.snapshot_hides_floating(request.uri().path()) {
+        snapshot::hide_floating(bytes, path.parent().map(|dir| dir.join("assets")).as_deref())
+    } else {
+        bytes
     };
     let mut res = Response::builder()
         .header(header::CONTENT_TYPE, store::mime_for(&path))
@@ -158,6 +169,7 @@ pub fn run() {
             adopt_candidate,
             discard_candidate,
             accept_incomplete,
+            set_hide_floating,
             blueprint::commands::generate_blueprint,
             blueprint::commands::cancel_blueprint,
             blueprint::commands::saved_blueprints,

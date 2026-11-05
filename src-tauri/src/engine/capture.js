@@ -294,6 +294,48 @@
   const CONSENT_TEXT = /(cookie|privacy|toestemming|consent|gdpr|personal data|persoonsgegevens)/i;
   const ACCEPT_BUTTON = /(akkoord|accept|aanvaard|toestaan|agree|allow all|got it|^ok[é.!]?$)/i;
 
+  // Inschrijf-, nieuwsbrief- en app-lagen. Ze hebben vaak een sluitknop of een e-mailveld, en dat heeft een betaalmuur meestal niet.
+  const POPUP_NAME = /(subscribe-?(modal|dialog|popup|prompt|overlay|banner)|newsletter|nieuwsbrief|sign-?up-?(modal|popup)|pop-?up|app-?(banner|promo)|smart-?banner|get-?app)/i;
+  const POPUP_TEXT = /(subscri|newsletter|nieuwsbrief|inschrijv|aanmeld|sign ?up|get the app|open in (the )?app|download (the|our) app|in de app|don.?t miss)/i;
+  const CLOSE_LABEL = /^(close|dismiss|sluit|sluiten|no,? thanks|nee,? bedankt|not now|niet nu|maybe later|later|skip)\b|^[×✕✖x]$/i;
+  const READ_ON = /(verder (te )?lezen|lees verder|continue reading|keep reading|to continue|rest of (this|the)|read the full|unlock)/i;
+
+  function isPromoLayer(el, vw, vh) {
+    if (holdsArticle(el) || el.querySelector("h1, nav, [role=navigation], input[type=password]")) return false;
+    if (el.closest("header, nav, [role=banner], [role=navigation]") || GATE_NAME.test(nameOf(el))) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    const text = norm(el.textContent);
+    if (text.length > 1500) return false;
+    const closable = [...el.querySelectorAll("button, a, [role=button]")].some((b) => {
+      const label = norm(b.getAttribute("aria-label") || b.getAttribute("title") || b.textContent);
+      return label.length <= 30 && CLOSE_LABEL.test(label);
+    });
+    const hasEmail = [...el.querySelectorAll("input")].some((i) => i.type === "email" || /e-?mail/i.test((i.placeholder || "") + " " + (i.getAttribute("aria-label") || "")));
+    const promo = POPUP_NAME.test(nameOf(el) + " " + (el.getAttribute("aria-label") || "")) || POPUP_TEXT.test(text.slice(0, 600));
+    if (closable && (promo || hasEmail)) return true;
+    // Zonder sluitknop kan dit een betaalmuur zijn die om inloggen vraagt. Die blijft staan.
+    if (READ_ON.test(text)) return false;
+    if (hasEmail && promo) return true;
+    return promo && r.bottom >= vh - 4 && r.height < vh * 0.4 && r.width >= vw * 0.4;
+  }
+
+  // Zet het scrollen weer aan als de pagina langer is dan het scherm. Zonder scripts kan de kopie dat later niet meer.
+  function unlockScrolling() {
+    const html = document.documentElement;
+    const body = document.body;
+    if (!body) return;
+    if (Math.max(html.scrollHeight, body.scrollHeight) <= window.innerHeight + 50) return;
+    for (const el of [html, body]) {
+      const c = getComputedStyle(el);
+      if (c.overflowY === "hidden" || c.overflowY === "clip") el.style.setProperty("overflow-y", "visible", "important");
+      if (c.position === "fixed") {
+        el.style.setProperty("position", "relative", "important");
+        el.style.setProperty("top", "auto", "important");
+      }
+    }
+  }
+
   // Alle elementen, ook die in een schaduw-DOM zitten.
   function deepAll(root, out) {
     for (const el of root.querySelectorAll("*")) {
@@ -354,15 +396,17 @@
       }
     }
 
-    for (const el of doomed) el.remove();
-    if (doomed.size) {
-      // De overlay zette het scrollen vaak uit.
-      for (const el of [document.documentElement, document.body]) {
-        const c = getComputedStyle(el);
-        if (c.overflowY === "hidden") el.style.setProperty("overflow", "visible", "important");
-        if (c.position === "fixed") el.style.setProperty("position", "static", "important");
+    // 3. Inschrijf-, nieuwsbrief- en app-lagen, ook als ze klein zijn.
+    for (const el of all) {
+      const floats = getComputedStyle(el).position === "fixed" || (el.tagName === "DIALOG" && el.hasAttribute("open"));
+      if (floats && isPromoLayer(el, vw, vh)) {
+        const root = el.getRootNode();
+        doomed.add(root instanceof ShadowRoot ? root.host : el);
       }
     }
+
+    for (const el of doomed) el.remove();
+    unlockScrolling();
     return doomed.size;
   }
 

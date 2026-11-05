@@ -92,6 +92,29 @@ export async function startSite(password) {
       }
       return html(shell("Betaald stuk", `<article><h1>Betaald stuk</h1>${paragraphs(1, 3)}</article><div class="subscribe-box"><h2>Lees verder met een abonnement</h2><p>Log in om verder te lezen. <a href="/login">Inloggen</a></p></div>`, ld(false, FULL_WORDS)));
     }
+    // Lagen zoals sites ze tonen, ook pas na een tijdje. De tekst is van onszelf.
+    const float = (css, inner) => `<div style="position:fixed;${css}">${inner}</div>`;
+    const late = (html) => `<script>setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(html)}), 300)</script>`;
+    const stuk = (titel) => `<article><h1>${titel}</h1>${paragraphs(1, 40)}</article>`;
+    const SLUIT = `<button aria-label="close">x</button>`;
+    if (path === "/popup-inschrijf") {
+      return html(shell("Inschrijflaag", stuk("Inschrijflaag") + late(float("top:200px;left:400px;width:400px;background:#fff", `<div role="dialog" aria-label="Subscribe modal">${SLUIT}<p>POPUPTEKST Discover more</p><input placeholder="Enter your email"><button>Subscribe</button></div>`))));
+    }
+    if (path === "/popup-balk") {
+      return html(shell("Appbalk", stuk("Appbalk") + float("bottom:0;left:0;right:0;height:60px;background:#fff", `<p>POPUPTEKST Get the app</p>`)));
+    }
+    if (path === "/popup-slot") {
+      return html(shell("Vergrendeld", stuk("Vergrendeld") + `<style>html,body{overflow:hidden}body{position:fixed;top:-100px}</style>` + float("top:100px;left:400px;width:300px", `${SLUIT}<p>POPUPTEKST nieuwsbrief</p>`)));
+    }
+    if (path === "/popup-onbekend") {
+      return html(shell("Onbekende laag", stuk("Onbekende laag") + `<style>.iets-anders{position:fixed;top:100px;left:300px;width:300px;height:200px;background:#c33}</style><div class="iets-anders">BLIJFTTEKST ontdek dit</div>`));
+    }
+    if (path === "/popup-betaalmuur") {
+      return html(shell("Muur", `<article><h1>Muur</h1>${paragraphs(1, 3)}</article>` + float("bottom:0;left:0;right:0;height:300px;background:#fff", `<p>MUURTEKST Word abonnee om verder te lezen</p><button>Subscribe</button>`)));
+    }
+    if (path === "/popup-menu") {
+      return html(shell("Menu", stuk("Menu") + `<nav style="position:fixed;top:0;left:0;right:0;height:50px"><a href="/">MENUTEKST</a> <a href="/abonneren">Subscribe</a></nav>`));
+    }
     if (path === "/kort") {
       return html(shell("Kort bericht", `<article><h1>Kort bericht</h1><p>Vandaag ging de brug weer open, nadat die een week dicht was geweest. De gemeente verwacht geen nieuwe hinder.</p><p>De werkzaamheden zijn klaar. Fietsers kunnen er vanaf vanmiddag weer langs, en ook de bus rijdt weer zijn gewone route door het centrum van de stad.</p></article>`));
     }

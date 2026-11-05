@@ -29,6 +29,7 @@ fn source(texts: &[&str]) -> Source {
         fetched_with_session: false,
         superseded_by: None,
         previous_id: None,
+        hide_floating: false,
     }
 }
 

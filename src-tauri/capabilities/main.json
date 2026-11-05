@@ -16,6 +16,7 @@
     "allow-adopt-candidate",
     "allow-discard-candidate",
     "allow-accept-incomplete",
+    "allow-set-hide-floating",
     "allow-site-login-open",
     "allow-site-login-close",
     "allow-list-site-sessions",

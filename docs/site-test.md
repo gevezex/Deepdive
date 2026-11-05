@@ -121,3 +121,16 @@ Getest zonder in te loggen op 5 november 2026. De waarheid per site komt uit de 
 - Een inlog-pop-up opent in hetzelfde venster. Sites die een echte pop-up met terugkoppeling nodig hebben, kunnen daarop vastlopen.
 - Sites op een gedeeld domein vallen onder één sessie wanneer de publieke-suffixlijst ze niet scheidt.
 - Inloggen vraagt om macOS 14 of nieuwer. Dat is alleen op macOS 27 getest; de melding op oudere versies en de Windows-tak zijn niet uitgevoerd.
+
+## Popups in de kopie
+
+Getest op 5 november 2026 op dezelfde 33 adressen plus één Substack-stuk met een inschrijflaag, één keer met de code van vóór deze wijziging en één keer erna.
+
+| Uitkomst | Sites | Toelichting |
+|---|---:|---|
+| Zelfde blokken en woorden | 29 | Waaronder de 2 pdf's. |
+| Kleine verschillen | 2 | FT (71 → 53 woorden): andere tekst in het abonnementsaanbod. The New Yorker (1394 → 1390): een ander videoblok. Geen artikeltekst, en de site levert dit niet altijd hetzelfde. |
+| Geen kopie, voor en na | 2 | De Volkskrant (cookiemuur) en NYT (geblokkeerd). |
+| Laag weg | 1 | Het Substack-stuk: 494 blokken en 7279 woorden, voor en na. |
+
+Het oordeel over de volledigheid is op geen enkele site veranderd. Deze lijst bevat buiten dat ene stuk geen laag die de nieuwe regels raakt, dus hij toont vooral dat er niets stukgaat. Hoe goed de regels andere popups herkennen, is hiermee niet gemeten.

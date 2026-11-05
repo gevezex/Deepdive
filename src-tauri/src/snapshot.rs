@@ -599,9 +599,228 @@ pub fn highlight(bytes: Vec<u8>, ranges: &[(u32, u32)]) -> Vec<u8> {
     }
 }
 
+// ---------- zwevende lagen verbergen ----------
+// De iframe draait zonder scripts, dus een laag is daar niet weg te klikken en wij kunnen er niet in kijken. Wat wél kan:
+// bij het serveren een stijl meegeven die alles verbergt wat volgens de CSS van de kopie zweeft. Lagen die alinea's van
+// het stuk bevatten blijven altijd staan.
+
+const MAX_FLOATING_SELECTORS: usize = 5000;
+const ALWAYS_FLOATING: &str = "dialog,[role=dialog],[role=alertdialog],[aria-modal=true],[style*=\"position: fixed\" i],[style*=\"position:fixed\" i]";
+/// Wat nooit weg mag: de pagina zelf, het stuk, en alles waarin een genummerde alinea staat.
+const KEEP_ARTICLE: &str = ":not(html,body,article,main,[data-dd-n]):not(:has(article,main,[data-dd-n]))";
+/// `relative` en niet `static`: lagen met `position:absolute` in de pagina moeten binnen de body blijven.
+const UNLOCK_CSS: &str = "html,body{overflow-y:auto!important;position:relative!important;top:auto!important;height:auto!important;filter:none!important;pointer-events:auto!important}";
+
+/// Geeft de positie na de `}` die hoort bij de `{` op `open`.
+fn block_end(css: &[u8], open: usize) -> usize {
+    let (mut depth, mut quote, mut i) = (0usize, None::<u8>, open);
+    while i < css.len() {
+        let c = css[i];
+        match quote {
+            Some(_) if c == b'\\' => i += 1,
+            Some(q) if c == q => quote = None,
+            Some(_) => {}
+            None => match c {
+                b'"' | b'\'' => quote = Some(c),
+                b'{' => depth += 1,
+                b'}' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return i + 1;
+                    }
+                }
+                _ => {}
+            },
+        }
+        i += 1;
+    }
+    css.len()
+}
+
+fn declares_floating(body: &str) -> bool {
+    static FIXED: OnceLock<Regex> = OnceLock::new();
+    static HIGH: OnceLock<Regex> = OnceLock::new();
+    let fixed = FIXED.get_or_init(|| Regex::new(r"(?i)(^|[;\s{])position\s*:\s*fixed").unwrap());
+    let high = HIGH.get_or_init(|| Regex::new(r"(?i)(^|[;\s{])position\s*:\s*absolute[\s\S]*z-index\s*:\s*\d{4,}|(^|[;\s{])z-index\s*:\s*\d{4,}[\s\S]*position\s*:\s*absolute").unwrap());
+    fixed.is_match(body) || high.is_match(body)
+}
+
+fn split_selectors(prelude: &str, out: &mut Vec<String>) {
+    let (mut depth, mut quote, mut part) = (0i32, None::<char>, String::new());
+    let mut push = |part: &mut String| {
+        let s = part.trim();
+        let lower = s.to_ascii_lowercase();
+        // Een pseudo-element mag niet in :is(), en met deze tekens komt niets anders dan een kiezer in de pagina.
+        let balanced = s.matches('"').count() % 2 == 0 && s.matches('\'').count() % 2 == 0;
+        let bad = s.is_empty() || !balanced || s.contains(['<', '{', '}', ';', '@'])
+            || lower.contains("::") || lower.contains(":before") || lower.contains(":after") || lower.contains(":root");
+        if !bad && out.len() < MAX_FLOATING_SELECTORS {
+            out.push(s.to_string());
+        }
+        part.clear();
+    };
+    for c in prelude.chars() {
+        match (quote, c) {
+            (Some(q), _) if c == q => quote = None,
+            (None, '"' | '\'') => quote = Some(c),
+            (None, '(' | '[') => depth += 1,
+            (None, ')' | ']') => depth -= 1,
+            (None, ',') if depth == 0 => {
+                push(&mut part);
+                continue;
+            }
+            _ => {}
+        }
+        part.push(c);
+    }
+    push(&mut part);
+}
+
+/// Zoekt in CSS de kiezers van regels die iets laten zweven. Blokken in `@media`, `@supports` en `@layer` tellen mee,
+/// behalve voor print. Andere @-regels (fonts, keyframes) slaan we over.
+pub fn floating_selectors(css: &str, out: &mut Vec<String>) {
+    static COMMENT: OnceLock<Regex> = OnceLock::new();
+    let css = COMMENT.get_or_init(|| Regex::new(r"(?s)/\*.*?\*/").unwrap()).replace_all(css, "");
+    scan_rules(&css, out);
+}
+
+/// De eerste `{` of `;` buiten een tekenreeks.
+fn next_rule_mark(css: &[u8], start: usize) -> Option<usize> {
+    let (mut quote, mut i) = (None::<u8>, start);
+    while i < css.len() {
+        let c = css[i];
+        match quote {
+            Some(_) if c == b'\\' => i += 1,
+            Some(q) if c == q => quote = None,
+            Some(_) => {}
+            None if c == b'"' || c == b'\'' => quote = Some(c),
+            None if c == b'{' || c == b';' => return Some(i),
+            None => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn scan_rules(css: &str, out: &mut Vec<String>) {
+    let bytes = css.as_bytes();
+    let mut start = 0;
+    while start < bytes.len() {
+        let Some(open) = next_rule_mark(bytes, start) else { return };
+        if bytes[open] == b';' {
+            start = open + 1;
+            continue;
+        }
+        let end = block_end(bytes, open);
+        let prelude = css[start..open].trim();
+        let inner = css.get(open + 1..end.saturating_sub(1)).unwrap_or("");
+        if let Some(rule) = prelude.strip_prefix('@') {
+            let rule = rule.to_ascii_lowercase();
+            let nested = ["media", "supports", "layer", "container"].iter().any(|k| rule.starts_with(k));
+            if nested && !(rule.starts_with("media") && rule.contains("print") && !rule.contains("screen")) {
+                scan_rules(inner, out);
+            }
+        } else if declares_floating(inner) {
+            split_selectors(prelude, out);
+        }
+        start = end;
+    }
+}
+
+/// Zet de stijl die zwevende lagen verbergt in de pagina. De kopie op schijf verandert niet en de pagina krijgt er
+/// niets bij dan CSS: geen scripts, geen adressen, en de CSP en de sandbox blijven gelijk.
+pub fn hide_floating(bytes: Vec<u8>, assets: Option<&Path>) -> Vec<u8> {
+    let Ok(html) = std::str::from_utf8(&bytes) else { return bytes };
+    let mut selectors = vec![];
+    static STYLE: OnceLock<Regex> = OnceLock::new();
+    for caps in STYLE.get_or_init(|| Regex::new(r"(?is)<style[^>]*>(.*?)</style").unwrap()).captures_iter(html) {
+        floating_selectors(&caps[1], &mut selectors);
+    }
+    if let Some(entries) = assets.and_then(|dir| std::fs::read_dir(dir).ok()) {
+        for entry in entries.flatten() {
+            if entry.path().extension().is_some_and(|e| e == "css") {
+                if let Ok(css) = std::fs::read_to_string(entry.path()) {
+                    floating_selectors(&css, &mut selectors);
+                }
+            }
+        }
+    }
+    let seen: HashSet<&str> = selectors.iter().map(String::as_str).collect();
+    let mut list: Vec<&str> = seen.into_iter().collect();
+    list.sort_unstable();
+    list.insert(0, ALWAYS_FLOATING);
+    // :is() is vergevingsgezind: één kiezer die de browser niet kent, maakt de rest niet ongeldig.
+    let style = format!("<style data-dd-style>:is({}){KEEP_ARTICLE}{{display:none!important}}{UNLOCK_CSS}</style>", list.join(","));
+    let head_seen = RefCell::new(false);
+    let out = rewrite_str(
+        html,
+        RewriteStrSettings {
+            element_content_handlers: vec![element!("head", |el| {
+                *head_seen.borrow_mut() = true;
+                el.append(&style, ContentType::Html);
+                Ok(())
+            })],
+            ..RewriteStrSettings::new()
+        },
+    );
+    match out {
+        Ok(out) if *head_seen.borrow() => out.into_bytes(),
+        Ok(out) => format!("{style}{out}").into_bytes(),
+        Err(_) => bytes,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floating_rules_are_found_in_css() {
+        let mut out = vec![];
+        floating_selectors(
+            "/* .uit{position:fixed} */ .modal,.toast > a{top:0;position : fixed} .gewoon{position:relative}\
+             @media (min-width:1px){.in-media{position:fixed}} @media print{.alleen-print{position:fixed}}\
+             @font-face{font-family:x;src:url(position:fixed)} @keyframes k{from{position:fixed}}\
+             .hoog{position:absolute;z-index:9999} .laag{position:absolute;z-index:5} .pseudo::before{position:fixed}\
+             a[href=\"x,y{\"]{position:fixed} .daarna{position:fixed}",
+            &mut out,
+        );
+        assert_eq!(out, [".modal", ".toast > a", ".in-media", ".hoog", ".daarna"], "een kiezer met een accolade blijft eruit");
+    }
+
+    #[test]
+    fn hiding_adds_only_css_and_protects_the_article() {
+        let html = r#"<html><head><style>.pop{position:fixed}</style></head><body><p data-dd-n="1">a</p><div class="pop">b</div></body></html>"#;
+        let out = String::from_utf8(hide_floating(html.as_bytes().to_vec(), None)).unwrap();
+        assert!(out.contains(":has(article,main,[data-dd-n])"), "{out}");
+        assert!(out.contains(".pop"), "{out}");
+        assert!(out.contains(r#"<p data-dd-n="1">a</p><div class="pop">b</div>"#), "de inhoud blijft gelijk: {out}");
+        assert!(!out.contains("<script"));
+        assert!(!out.to_ascii_lowercase().contains("@import") && !out.contains("url("), "de stijl haalt niets op: {out}");
+    }
+
+    #[test]
+    fn hostile_css_cannot_leave_the_style_block() {
+        let html = r#"<html><head><style>.a</title><img src=x>,.b{position:fixed}</style></head><body></body></html>"#;
+        let dir = std::env::temp_dir().join(format!("dd-css-{}", new_test_id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("x.css"), "</style><script>evil()</script>,.c{position:fixed}").unwrap();
+        let out = String::from_utf8(hide_floating(html.as_bytes().to_vec(), Some(&dir))).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(!out.contains("evil"), "{out}");
+        assert!(out.contains(".c"), "{out}");
+    }
+
+    fn new_test_id() -> String {
+        uuid::Uuid::new_v4().simple().to_string()
+    }
+
+    #[test]
+    fn the_shield_stays_as_it_is() {
+        assert_eq!(CSP, "default-src 'none'; img-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; style-src deepdive-snapshot: http://deepdive-snapshot.localhost 'unsafe-inline'; font-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; form-action 'none'; base-uri 'none'; frame-src 'none'");
+        let index = include_str!("../../index.html");
+        assert!(index.contains(r#"<iframe id="source-frame" title="Vaste kopie van de bron" sandbox="" referrerpolicy="no-referrer" hidden></iframe>"#));
+    }
 
     fn clean(html: &str) -> String {
         let page = Url::parse("https://example.com/a/b.html").unwrap();

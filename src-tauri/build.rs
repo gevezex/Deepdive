@@ -13,6 +13,7 @@ fn main() {
         "adopt_candidate",
         "discard_candidate",
         "accept_incomplete",
+        "set_hide_floating",
         "site_login_open",
         "site_login_close",
         "list_site_sessions",

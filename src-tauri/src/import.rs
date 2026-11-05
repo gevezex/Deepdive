@@ -60,6 +60,7 @@ fn base_source(id: String, kind: SourceKind, title: String) -> Source {
         fetched_with_session: false,
         superseded_by: None,
         previous_id: None,
+        hide_floating: false,
     }
 }
 
@@ -311,6 +312,7 @@ pub async fn refetch(app: &AppHandle, store: &Store, id: &str) -> Result<Refetch
         return Ok(RefetchOutcome { status: RefetchStatus::Unchanged, current: old, old_words, new_words, candidate_id: None });
     }
     new.previous_id = Some(old.id.clone());
+    new.hide_floating = old.hide_floating;
     if is_worse(&old, &new) {
         new.superseded_by = Some(old.id.clone());
         store.update(&new)?;
@@ -349,6 +351,14 @@ pub fn discard_candidate(store: &Store, old_id: &str, candidate_id: &str) -> Res
 pub fn accept_incomplete(store: &Store, id: &str) -> Result<Source, AppError> {
     let mut source = store.get(id)?;
     source.completeness.accepted_by_user = true;
+    store.update(&source)?;
+    Ok(source)
+}
+
+/// Onthoudt per bron of de zwevende lagen verborgen zijn. De kopie zelf en de alineanummers veranderen niet.
+pub fn set_hide_floating(store: &Store, id: &str, hide: bool) -> Result<Source, AppError> {
+    let mut source = store.get(id)?;
+    source.hide_floating = hide;
     store.update(&source)?;
     Ok(source)
 }

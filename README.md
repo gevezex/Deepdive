@@ -64,6 +64,8 @@ Gewoon TypeScript met Vite, zonder framework. De schermdelen zijn klein en pdf.j
 
 **Blokken in de kopie:** elk tekstblok heeft in de visuele kopie een attribuut `data-dd-n` met zijn alineanummer. Latere stappen kunnen tekst en beeld daarmee aan elkaar koppelen. Bij pdf's staan paginanummer en positie in het blok zelf.
 
+**Popups in de kopie:** zonder scripts is een laag niet weg te klikken. Daarom gebeurt er twee dingen. Bij het vastleggen haalt `capture.js` cookielagen en inschrijf-, nieuwsbrief- en app-lagen weg, en zet het scrollen weer aan als de pagina dat had uitgezet. Een laag die zonder sluitknop vraagt om in te loggen of te betalen blijft staan. Blijft er toch iets hinderen, dan is er de knop **Popup weghalen** onder de kopie. De keuze staat als `hideFloating` in `source.json`. Bij het serveren voegt de app dan een stijl toe die verbergt wat volgens de CSS van de kopie zweeft (`position: fixed`, dialogen, en `position: absolute` met een z-index vanaf 1000). Elementen met of rond een genummerde alinea blijven altijd staan. De kopie op schijf, de tekst en het oordeel over de volledigheid veranderen niet, en de afscherming blijft gelijk. De kopie laadt opnieuw en begint dan bovenaan. Opnieuw ophalen neemt de keuze mee naar de nieuwe kopie.
+
 **Springen in de kopie:** de afgeschermde iframe draait geen scripts en de app kan er niet in kijken. Daarom vraagt de iframe een nieuw adres op: `index.html?hl=31-40#dd-doel`. De server van de app zet dan een stijl in de pagina en markeert die alinea's, en de browser scrolt zelf naar het anker. Uit de query komen alleen getallen, en de kopie op schijf verandert niet. `sandbox=""` en de CSP blijven zoals ze zijn. De prijs is dat de kopie bij elke sprong opnieuw laadt. Een pdf staat niet in een iframe: daar komt een markering op de pagina, op de plek uit het blok.
 
 **Blauwdrukken:** per bron, model en promptversie één bestand in `sources/<id>/blueprints/`. De iframe kan die map niet opvragen. Opnieuw openen roept geen model aan. Een onvolledige blauwdruk vervangt nooit een volledige van hetzelfde model.
@@ -108,6 +110,18 @@ Bedient de echte app tegen de lokale nepserver: knop, stap voor stap tonen, spri
 
 ```bash
 node tests/e2e/blueprint.e2e.mjs
+```
+
+## De end-to-endtest van de popups
+
+Bedient de echte app tegen de lokale testsite `tests/e2e/mock-site.mjs`, zonder echte sites of accounts:
+
+```bash
+npm run tauri build -- --debug --no-bundle --features screenshots
+```
+
+```bash
+node tests/e2e/popups.e2e.mjs
 ```
 
 ## De site-test herhalen

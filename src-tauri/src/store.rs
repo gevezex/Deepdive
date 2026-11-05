@@ -124,6 +124,14 @@ impl Store {
     }
 }
 
+impl Store {
+    /// Heeft de lezer bij deze bron gekozen voor het verbergen van zwevende lagen?
+    pub fn snapshot_hides_floating(&self, path: &str) -> bool {
+        let id = path.trim_start_matches('/').split('/').next().unwrap_or("");
+        self.get(id).is_ok_and(|s| s.hide_floating)
+    }
+}
+
 pub fn mime_for(path: &Path) -> &'static str {
     match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
         "html" => "text/html; charset=utf-8",
