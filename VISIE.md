@@ -58,21 +58,70 @@ De kapstok is bij voorkeur een **kaartje** (blokjes met pijlen) en geen lap teks
 - Je kunt inzoomen: het hele stuk, dit hoofdstuk, deze alinea.
 - Bij een lang stuk verschijnt de kapstok **automatisch** zodra je begint.
 
-### 3. Uitleg op maat
+**Kanttekeningen** horen ook bij de kapstok: waar moet je voorzichtig mee zijn voordat je op deze tekst vertrouwt? Denk aan een opiniestuk, één enkel onderzoek, wat de tekst niet onderzoekt, of een kop die verder gaat dan het bewijs. Cijfers uit een samenvatting worden gecontroleerd tegen de tabellen waar ze vandaan komen.
 
-- **Jip & Janneke**: eenvoudige taal, zonder vakjargon.
-- **Leg beter uit**: dezelfde inhoud op een andere manier.
-- **Wat bedoelt hij?**: de bedoeling achter een zin, inclusief ironie of wat er tussen de regels staat.
-- **Voorbeelden**: concreet en herkenbaar.
-- **Teken het**: diagram, tijdlijn, schema of begrippenkaart (SVG of Mermaid).
-- **Eigen vraag**: vrij doorvragen.
+### 3. Het selectiemenu
 
-### 4. De coach vraagt terug
+De drie meest gebruikte acties staan direct in beeld, de rest zit onder **⋯**. Je kunt ook gewoon beginnen met typen terwijl iets geselecteerd is.
+
+| Actie | Wat het doet |
+|---|---|
+| **Vraag stellen** | Eigen vraag, door te typen |
+| **Leg uit** | Wat het hier betekent én waarom het op deze plek staat; wie of wat een naam is; beeldspraak uitgelegd |
+| **Jip & Janneke** | Eenvoudige taal, zonder vakjargon |
+| **Eenvoudiger** | Hetzelfde idee in gewone woorden, plus één regel over het punt dat het maakt |
+| **Wat bedoelt hij?** | De bedoeling achter een zin, inclusief ironie of wat er tussen de regels staat |
+| **Wat betekent dit woord?** | Het woord zoals déze auteur het gebruikt; of het ouderwets of vaktaal is |
+| **Geef voorbeelden** | Concreet en herkenbaar |
+| **Teken het** | Diagram, tijdlijn, schema of begrippenkaart (SVG of Mermaid) |
+| **Klopt dit nog?** | Zoekt op het web: wat klopt nog, wat is veranderd, hoe zeker is dat |
+| **Waar komt dit nog terug?** | Waar de tekst dit idee verder uitwerkt, met alineanummers |
+| **Tegenargument** | Het sterkste bezwaar, en hoe de auteur zou antwoorden |
+| **Overhoor me** | Vragen over wat je net gelezen hebt |
+| **Citaat kopiëren** | Met titel en alineanummer |
+| **Markeren** | In 4 kleuren |
+| **Notitie** | In je eigen woorden, bij de markering |
+
+**Het menu past zich aan de selectie aan:**
+
+| Selectie | Voorgestelde acties en vragen |
+|---|---|
+| Woord of korte zinsdeel (≤ 4 woorden) | Wat betekent dit woord? · "Waarom dit woord hier?" · "Waar komt het vandaan?" · "Gebruik het in een zin" |
+| Passage | Eenvoudiger / Jip & Janneke · "Geef een voorbeeld" · "Waarom doet dit ertoe?" · "Wat is het bewijs?" |
+| Grafiek of tabel | "Lees deze grafiek voor me" · "Wat is de conclusie?" |
+| Formule | "Leg stap voor stap uit" · "Wat betekent elk symbool?" |
+| Afbeelding | "Wat zie ik hier?" |
+| Andere taal | "Vertaal en leg uit" |
+
+### 4. Hoe antwoorden eruitzien
+
+- **De kern voorop en gemarkeerd**, zodat je in één oogopslag het antwoord ziet.
+- **Verwijzingen naar alinea's** (¶12): klikken springt naar die plek.
+- **"Volgens de tekst" en "buiten de tekst" gescheiden**: de coach zegt het als hij kennis van buiten het stuk toevoegt.
+- **Lengte instelbaar**: kort, normaal, uitgebreid.
+- **Schakelaar "Web"** aan of uit, met bronnen als [1], [2].
+- **Lange antwoorden klappen in** tot vijf regels.
+
+### 5. De coach vraagt terug
 
 De coach legt niet alleen uit, hij **activeert** ook:
 - "Wat denk je dat de auteur hierna gaat zeggen?"
 - Een controlevraag na een lastig stuk.
 - **Overhoor me**: vragen over wat je net gelezen hebt, met bijhouden wat je goed of fout had.
+- **Dagelijkse herhaling**: elke dag komen een paar van je eigen markeringen en overhoorvragen terug, zoals flashcards. Bewaar je er een, dan komt hij terug na 3 dagen, een week, twee weken, een maand. Markeer je hem als klaar, dan komt hij niet meer terug.
+
+### 6. Tijdens het lezen (in de ingebouwde lezer)
+
+- **Minikaart in de zijlijn**: de hele tekst als streepjes, met markeringen, antwoorden en de secties van de kapstok. Klik om te springen. Dit is de vorm voor "je bent hier".
+- **Alineanummers** in de kantlijn.
+- **Focusmodus**: alleen de tekst.
+- **Voorlezen** vanaf waar je bent, met de alinea die gelezen wordt gemarkeerd.
+- **Vragen over de hele tekst** vanaf je leespositie ("ik ben nu bij ¶12").
+- **Sneltoetsen**: `/` vraag over de hele tekst · `J`/`K` volgende of vorige alinea · `Enter` vraag over de huidige alinea · `B` kapstok · `N` notitieboek · `F` focus · `[` `]` vorig of volgend antwoord · `Esc` terug · `?` overzicht.
+
+### 7. Notitieboek
+
+Al je vragen, antwoorden, markeringen en notities, in de volgorde van de tekst. Te exporteren als Markdown, ook als zip die je direct in Obsidian kunt zetten.
 
 ---
 
@@ -85,6 +134,7 @@ Een overzicht van alleen wat op het scherm staat, is een overzicht van een half 
 | Webartikel | De browserextensie geeft de volledige tekst en URL door. |
 | PDF | De app opent het bestand en leest alle bladzijden. |
 | Stencil of boek | Een reeks foto's ("bladzijde 1 t/m 4") wordt één bron, bijvoorbeeld vanaf je telefoon via een QR-code. |
+| Lastige pdf | Staan kolommen, tabellen of formules door elkaar, dan kun je de pdf "zorgvuldiger laten lezen" met een beter model. |
 | Overig scherm | De vensternaam en titel via de toegankelijkheidsfuncties van het OS, plus een schermafbeelding. |
 
 De selectie (het kader) gaat als afbeelding naar de coach, en de volledige bron gaat mee als context.
@@ -107,6 +157,8 @@ Alles over één onderwerp blijft bij elkaar in een project.
 
 - Een project kan **meerdere bronnen** hebben. De coach legt verbanden tussen bronnen ("dit zegt het artikel ook, maar anders").
 - Projecten worden **lokaal** opgeslagen als map of bestand, zonder dat je een server nodig hebt.
+- **Automatisch indelen**: bij een nieuwe bron stelt Deepdive voor bij welk project die hoort, met onderwerp en tags. Zelf verplaatsen gaat altijd voor.
+- **Koppeling met andere AI** (MCP): Claude of een andere assistent kan bronnen aan een project toevoegen en erin zoeken.
 
 ### Delen
 
@@ -152,13 +204,22 @@ Aandachtspunten:
 
 ## Volgorde van bouwen
 
-1. **Basis**: sneltoets, kader, knoppen en antwoord in het zijpaneel. Daarmee werkt het al overal.
-2. **Kapstok**: het overzicht, het kaartje, "je bent hier" en terugverwijzen.
-3. **Projecten**: lokaal opslaan, bronnen, uitdiepingen en notities.
+1. **Basis**: sneltoets, kader, selectiemenu en antwoord in het zijpaneel. Daarmee werkt het al overal.
+2. **Kapstok**: het overzicht met kanttekeningen, het kaartje, "je bent hier" en terugverwijzen.
+3. **Projecten**: lokaal opslaan, bronnen, uitdiepingen, markeringen en het notitieboek.
 4. **Browserextensie**: de volledige artikeltekst als context.
-5. **Ingebouwde lezer**: pdf's, foto's en een fotoreeks vanaf de telefoon.
-6. **Coach vraagt terug**: Overhoor me, voorspelvragen, resultaten bijhouden.
-7. **Delen en les maken**: `.deepdive`-bestand, export, weblink, "Maak hier een les van".
+5. **Ingebouwde lezer**: pdf's, foto's, fotoreeks vanaf de telefoon, minikaart, alineanummers, focus, voorlezen en sneltoetsen.
+6. **Coach vraagt terug**: Overhoor me, voorspelvragen, dagelijkse herhaling.
+7. **Delen en les maken**: `.deepdive`-bestand, export (ook Markdown/Obsidian), weblink, "Maak hier een les van".
+8. **Koppelingen**: automatisch indelen, MCP-koppeling met andere AI.
+
+## Referentie: Gloss
+
+[Gloss](https://github.com/Nutlope/gloss) is een open-source web-app waarin je artikelen en pdf's leest en bij een selectie antwoorden in de kantlijn krijgt. Het selectiemenu, de antwoordstijl, de kanttekeningen in de kapstok, de minikaart, het notitieboek en de dagelijkse herhaling hierboven zijn op Gloss geïnspireerd.
+
+**Het verschil:** bij Gloss breng je de tekst naar de AI, in de lezer van Gloss. Bij Deepdive komt de coach naar de plek waar je leest, en houdt een project alles bij elkaar.
+
+De Gloss-repo heeft **geen licentie**, dus we nemen ideeën over en geen code.
 
 ## Open vragen
 
