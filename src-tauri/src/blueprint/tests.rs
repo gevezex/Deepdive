@@ -49,9 +49,9 @@ fn structure_json() -> serde_json::Value {
 }
 
 fn critique_json() -> serde_json::Value {
-    let checked: Vec<_> = ["assumption", "leap", "gap", "evidence", "missing", "headline_vs_content", "prior_knowledge"].iter().map(|c| json!({ "category": c, "result": if *c == "leap" { "found" } else { "nothing_found" }, "note": null })).collect();
+    let checked: Vec<_> = ["assumption", "leap", "gap", "evidence", "missing", "headline_vs_content"].iter().map(|c| json!({ "category": c, "result": if *c == "leap" { "found" } else { "nothing_found" }, "note": null })).collect();
     json!({
-        "points": [ { "id": "k1", "category": "leap", "origin": "inferred", "certainty": "medium", "anchor": "r1", "claim": "Sprong.", "explanation": "Omdat.", "paragraphs": [[3, 3]], "quotes": [], "evidenceKind": null } ],
+        "points": [ { "id": "k1", "category": "leap", "polarity": "minus", "origin": "inferred", "certainty": "medium", "anchor": "r1", "claim": "Sprong.", "explanation": "Omdat.", "paragraphs": [[3, 3]], "quotes": [], "evidenceKind": null } ],
         "checked": checked,
         "overall": "Redelijk."
     })
@@ -262,7 +262,7 @@ struct Fake {
 }
 
 impl Caller for Fake {
-    async fn call(&mut self, request: ChatRequest, _track_goal: bool) -> Result<Reply, AppError> {
+    async fn call(&mut self, request: ChatRequest, _stage: Stage, _attempt: u32) -> Result<Reply, AppError> {
         self.seen.push(request);
         self.answers.next().expect("te veel aanroepen").map(reply)
     }
@@ -272,7 +272,7 @@ impl Caller for Fake {
 async fn play(s: &Source, answers: Vec<Result<String, AppError>>, context: Option<u32>) -> (Result<Blueprint, AppError>, RunReport, Vec<ChatRequest>) {
     let mut report = RunReport::default();
     let mut fake = Fake { answers: answers.into_iter(), seen: vec![] };
-    let result = run(s, &Options::default(), "testmodel", context, &mut report, &mut fake).await;
+    let result = run(s, &Options::default(), "testmodel", "provider1", context, &mut report, &mut fake).await;
     (result, report, fake.seen)
 }
 
@@ -352,4 +352,172 @@ async fn bron_zonder_tekst_wordt_geweigerd() {
     let (result, _, seen) = play(&s, vec![], None).await;
     assert_eq!(result.unwrap_err().kind, "no_text");
     assert!(seen.is_empty());
+}
+
+fn with_points(points: serde_json::Value) -> serde_json::Value {
+    let mut v = critique_json();
+    v["points"] = points;
+    v
+}
+
+fn long_source_blocks(n: usize) -> Vec<SourceBlock> {
+    (1..=n as u32).map(|n| SourceBlock { n, kind: "paragraph".into(), level: None, text: format!("Alinea {n}."), page: None, bbox: None }).collect()
+}
+
+fn broadness(paragraphs: serde_json::Value, total: usize, article: (u32, u32)) -> (bool, u32, Vec<Issue>) {
+    let mut s = parsed_structure(structure_json());
+    s.article_paragraphs = article;
+    let v = with_points(json!([{ "id": "k1", "category": "missing", "polarity": "minus", "origin": "inferred", "certainty": "low", "anchor": "b1", "claim": "Mist.", "explanation": "Omdat.", "paragraphs": paragraphs, "quotes": [], "broad": false }]));
+    let mut c: Critique = serde_json::from_value(v).unwrap();
+    let (mut issues, mut checks) = (vec![], Checks::default());
+    validate::check_critique(&mut c, &s, &SourceIndex::new(&long_source_blocks(total)), &mut issues, &mut checks);
+    (c.points[0].broad, checks.broad_points, issues)
+}
+
+#[test]
+fn te_brede_verwijzing_wordt_gemarkeerd() {
+    let (broad, count, issues) = broadness(json!([[1, 25]]), 100, (1, 100));
+    assert!(broad);
+    assert_eq!(count, 1);
+    assert!(codes(&issues).contains(&"range_broad"));
+}
+
+#[test]
+fn breedte_telt_alinea_s_uit_alle_bereiken_samen() {
+    assert!(broadness(json!([[1, 5], [10, 14]]), 100, (1, 100)).0);
+    assert!(!broadness(json!([[1, 4], [3, 6]]), 100, (1, 100)).0, "overlap telt niet dubbel");
+}
+
+#[test]
+fn een_paar_alinea_s_is_niet_breed_ook_niet_in_een_kort_stuk() {
+    assert!(!broadness(json!([[1, 4]]), 100, (1, 100)).0);
+    assert!(!broadness(json!([[1, 4]]), 6, (1, 6)).0);
+    assert!(broadness(json!([[1, 5]]), 6, (1, 6)).0, "bijna het hele stuk");
+    assert!(!broadness(json!([[1, 8]]), 100, (1, 100)).0, "op de grens");
+}
+
+#[test]
+fn het_model_kan_breed_niet_zelf_uitzetten_of_aanzetten() {
+    let mut v = with_points(json!([{ "id": "k1", "category": "leap", "polarity": "minus", "origin": "inferred", "certainty": "low", "anchor": "r1", "claim": "S.", "explanation": "O.", "paragraphs": [[1, 1]], "broad": true }]));
+    v["terms"] = json!([]);
+    assert!(!checked_critique(v).0.points[0].broad);
+}
+
+#[test]
+fn plus_of_min_is_verplicht_en_blijft_bewaard() {
+    let plus = with_points(json!([{ "id": "k1", "category": "evidence", "polarity": "plus", "origin": "inferred", "certainty": "medium", "anchor": "b1", "claim": "Sterk.", "explanation": "O.", "paragraphs": [[1, 1]], "evidenceKind": "study" }]));
+    assert_eq!(checked_critique(plus).0.points[0].polarity, Polarity::Plus);
+    let none = with_points(json!([{ "id": "k1", "category": "evidence", "origin": "inferred", "certainty": "medium", "anchor": "b1", "claim": "S.", "explanation": "O.", "paragraphs": [[1, 1]] }]));
+    assert!(serde_json::from_value::<Critique>(none).is_err());
+}
+
+#[test]
+fn begrippen_zijn_geen_punten_en_hun_verwijzingen_worden_gecontroleerd() {
+    let mut v = critique_json();
+    v["terms"] = json!([{ "term": "cafeïne", "explanation": "Een stof.", "paragraphs": [[2, 2], [90, 91]] }]);
+    let (c, _, _) = checked_critique(v);
+    assert_eq!(c.points.len(), 1);
+    assert_eq!(c.terms[0].paragraphs, vec![(2, 2)]);
+    let mut old = critique_json();
+    old["points"][0]["category"] = json!("prior_knowledge");
+    assert!(serde_json::from_value::<Critique>(old).is_err(), "voorkennis is geen onderdeel van de kritiek meer");
+}
+
+#[test]
+fn prompt_noemt_de_vaste_maat_en_geen_voorkennis_als_categorie() {
+    assert!(CRITIQUE_TASK.contains("\"polarity\""));
+    assert!(CRITIQUE_TASK.contains("\"terms\""));
+    assert!(CRITIQUE_TASK.contains("- high:") && CRITIQUE_TASK.contains("- medium:") && CRITIQUE_TASK.contains("- low:"));
+    assert!(!CRITIQUE_TASK.contains("prior_knowledge"));
+}
+
+#[tokio::test]
+async fn afgebroken_kritiek_laat_de_structuur_staan_en_zegt_dat() {
+    let s = source(&TEXTS);
+    let (result, _, _) = play(&s, vec![Ok(structure_json().to_string()), Err(AppError::new(CANCELLED, "Afgebroken."))], None).await;
+    let b = result.unwrap();
+    assert!(b.critique.is_none());
+    assert_eq!(codes(&b.issues), [CRITIQUE_CANCELLED]);
+}
+
+#[tokio::test]
+async fn afbreken_tijdens_de_structuur_geeft_geen_halve_blauwdruk() {
+    let s = source(&TEXTS);
+    let (result, report, _) = play(&s, vec![Err(AppError::new(CANCELLED, "Afgebroken."))], None).await;
+    assert_eq!(result.unwrap_err().kind, CANCELLED);
+    assert_eq!(report.calls.len(), 1);
+}
+
+#[tokio::test]
+async fn blauwdruk_noemt_herkomst() {
+    let s = source(&TEXTS);
+    let (result, _, _) = play(&s, vec![Ok(structure_json().to_string()), Ok(critique_json().to_string())], None).await;
+    let b = result.unwrap();
+    assert_eq!((b.provider_id.as_str(), b.model.as_str(), b.prompt_version), ("provider1", "testmodel", PROMPT_VERSION));
+}
+
+mod bewaren {
+    use super::*;
+    use crate::store::{new_id, Store};
+
+    fn store() -> (Store, std::path::PathBuf, String) {
+        let root = std::env::temp_dir().join(format!("dd-saved-{}", uuid::Uuid::new_v4().simple()));
+        let store = Store::new(root.clone()).unwrap();
+        let id = new_id();
+        std::fs::create_dir_all(store.source_dir(&id).unwrap()).unwrap();
+        (store, root, id)
+    }
+
+    async fn blueprint(id: &str, model: &str, with_critique: bool) -> Blueprint {
+        let mut s = source(&TEXTS);
+        s.id = id.to_string();
+        let second = if with_critique { Ok(critique_json().to_string()) } else { Err(AppError::new("server", "stuk")) };
+        let mut report = RunReport::default();
+        let mut fake = Fake { answers: vec![Ok(structure_json().to_string()), second].into_iter(), seen: vec![] };
+        run(&s, &Options::default(), model, "provider1", None, &mut report, &mut fake).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn per_model_apart_en_terug_te_lezen_zonder_aanroep() {
+        let (store, root, id) = store();
+        saved::save(&store, &blueprint(&id, "model-a", true).await).unwrap();
+        saved::save(&store, &blueprint(&id, "model-b", true).await).unwrap();
+        let all = saved::all(&store, &id).unwrap();
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|b| b.critique.is_some()));
+        assert_eq!(saved::find(&store, &id, "provider1", "model-a", PROMPT_VERSION).unwrap().model, "model-a");
+        assert!(saved::find(&store, &id, "provider1", "model-a", PROMPT_VERSION + 1).is_none(), "andere promptversie is een ander bestand");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn onvolledige_komt_niet_in_de_plaats_van_een_volledige() {
+        let (store, root, id) = store();
+        assert!(saved::save(&store, &blueprint(&id, "m", true).await).unwrap());
+        assert!(!saved::save(&store, &blueprint(&id, "m", false).await).unwrap());
+        assert!(saved::find(&store, &id, "provider1", "m", PROMPT_VERSION).unwrap().critique.is_some());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn volledige_vervangt_de_onvolledige() {
+        let (store, root, id) = store();
+        assert!(saved::save(&store, &blueprint(&id, "m", false).await).unwrap());
+        assert!(saved::save(&store, &blueprint(&id, "m", true).await).unwrap());
+        assert!(saved::find(&store, &id, "provider1", "m", PROMPT_VERSION).unwrap().critique.is_some());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn oudere_vorm_of_kapot_bestand_wordt_overgeslagen() {
+        let (store, root, id) = store();
+        let dir = store.source_dir(&id).unwrap().join("blueprints");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("kapot-p1.json"), "{").unwrap();
+        let mut old = blueprint(&id, "oud", true).await;
+        old.schema_version = 1;
+        std::fs::write(dir.join("oud-p1.json"), serde_json::to_vec(&old).unwrap()).unwrap();
+        assert!(saved::all(&store, &id).unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

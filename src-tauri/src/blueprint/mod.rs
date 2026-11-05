@@ -5,8 +5,14 @@
 //! krijgt de gecontroleerde structuur als vaststaand gegeven. Zo kan die laag het diagram niet tegenspreken: hij
 //! kan er alleen met bestaande ids naar verwijzen. Beide beginnen met dezelfde systeemtekst en bron, zodat een
 //! provider met prompt-caching de bron maar één keer hoeft te verwerken.
+//!
+//! `commands` is de ingang voor de interface, `saved` de opslag per bron, model en promptversie, en `stream` leest
+//! doel en blokken uit het antwoord terwijl het nog binnenkomt.
 
+pub mod commands;
+mod saved;
 mod schema;
+mod stream;
 #[cfg(test)]
 mod tests;
 mod validate;
@@ -22,6 +28,7 @@ use serde::Serialize;
 use std::future::Future;
 use std::ops::ControlFlow;
 use std::time::Instant;
+use tokio::sync::watch;
 
 const SYSTEM: &str = include_str!("prompts/system.md");
 const STRUCTURE_TASK: &str = include_str!("prompts/structure.md");
@@ -87,33 +94,113 @@ pub struct RunReport {
     pub calls: Vec<CallReport>,
 }
 
-/// Maakt de blauwdruk met het gekozen model. `report` is ook bij een fout gevuld met wat er tot dan is gebeurd.
-pub async fn generate(target: &Target, source: &Source, options: &Options, report: &mut RunReport) -> Result<Blueprint, AppError> {
+/// Welke van de twee aanroepen bezig is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Stage {
+    Structure,
+    Critique,
+}
+
+impl Stage {
+    fn name(self) -> &'static str {
+        match self {
+            Stage::Structure => "structure",
+            Stage::Critique => "critique",
+        }
+    }
+}
+
+/// Wat er tijdens het maken gebeurt, voor wie het wil volgen.
+pub enum Live<'a> {
+    /// Een aanroep begint. Poging 2 betekent dat het vorige antwoord niet aan het schema voldeed.
+    Attempt { stage: Stage, attempt: u32 },
+    Chunk { stage: Stage, event: &'a StreamEvent },
+    /// Doel en diagram zijn gecontroleerd. De kritische laag ontbreekt nog.
+    StructureReady(&'a Blueprint),
+}
+
+/// Maakt de blauwdruk met het gekozen model, zonder dat iemand meekijkt. `report` is ook bij een fout gevuld met wat
+/// er tot dan is gebeurd.
+#[cfg(debug_assertions)]
+pub async fn generate(target: &Target, provider_id: &str, source: &Source, options: &Options, report: &mut RunReport) -> Result<Blueprint, AppError> {
+    let (_keep, cancel) = watch::channel(false);
+    generate_live(target, provider_id, source, options, report, cancel, |_| {}).await
+}
+
+/// Als `generate`, met voortgang en de mogelijkheid om af te breken.
+pub async fn generate_live(
+    target: &Target,
+    provider_id: &str,
+    source: &Source,
+    options: &Options,
+    report: &mut RunReport,
+    cancel: watch::Receiver<bool>,
+    on: impl FnMut(Live<'_>) + Send,
+) -> Result<Blueprint, AppError> {
     report.context_tokens = target.context_tokens;
     let model = target.model.clone();
-    run(source, options, &model, target.context_tokens, report, &mut LiveModel { target }).await
+    run(source, options, &model, provider_id, target.context_tokens, report, &mut LiveModel { target, cancel, on }).await
+}
+
+/// Doet alleen de kritische laag opnieuw, op een structuur die al bewaard is. Scheelt bij een lokaal model minuten.
+pub async fn redo_critique(
+    target: &Target,
+    source: &Source,
+    options: &Options,
+    mut previous: Blueprint,
+    report: &mut RunReport,
+    cancel: watch::Receiver<bool>,
+    on: impl FnMut(Live<'_>) + Send,
+) -> Result<Blueprint, AppError> {
+    report.context_tokens = target.context_tokens;
+    previous.issues.retain(|i| !matches!(i.code.as_str(), CRITIQUE_FAILED | CRITIQUE_CANCELLED));
+    let start = Instant::now();
+    let frame = Frame::new(source, options);
+    let index = SourceIndex::new(&source.blocks);
+    add_critique(&frame, &mut previous, &index, report, &mut LiveModel { target, cancel, on }).await?;
+    previous.seconds += start.elapsed().as_secs_f32();
+    previous.created_at = now();
+    Ok(previous)
 }
 
 /// De plek waar de kern een model aanroept. Een eigen trait en geen closure: Tauri-opdrachten moeten `Send` zijn.
 pub(crate) trait Caller: Send {
-    /// `track_goal`: meet ook de tijd tot het doel binnen is.
-    fn call(&mut self, request: ChatRequest, track_goal: bool) -> impl Future<Output = Result<Reply, AppError>> + Send;
+    fn call(&mut self, request: ChatRequest, stage: Stage, attempt: u32) -> impl Future<Output = Result<Reply, AppError>> + Send;
+    /// Doel en diagram zijn gecontroleerd. Standaard hoeft daar niemand iets mee.
+    fn structure_ready(&mut self, _draft: &Blueprint) {}
 }
 
-struct LiveModel<'a> {
+struct LiveModel<'a, F> {
     target: &'a Target,
+    cancel: watch::Receiver<bool>,
+    on: F,
 }
 
-impl Caller for LiveModel<'_> {
-    async fn call(&mut self, request: ChatRequest, track_goal: bool) -> Result<Reply, AppError> {
-        call_model(self.target, &request, track_goal).await
+impl<F: FnMut(Live<'_>) + Send> Caller for LiveModel<'_, F> {
+    async fn call(&mut self, request: ChatRequest, stage: Stage, attempt: u32) -> Result<Reply, AppError> {
+        (self.on)(Live::Attempt { stage, attempt });
+        call_model(self.target, &request, stage, &mut self.cancel, &mut self.on).await
+    }
+
+    fn structure_ready(&mut self, draft: &Blueprint) {
+        (self.on)(Live::StructureReady(draft));
     }
 }
 
-async fn call_model(target: &Target, request: &ChatRequest, track_goal: bool) -> Result<Reply, AppError> {
+/// Wordt pas wakker als er is afgebroken; als niemand meer kan afbreken, nooit.
+async fn cancelled(cancel: &mut watch::Receiver<bool>) {
+    if cancel.wait_for(|stop| *stop).await.is_err() {
+        std::future::pending::<()>().await;
+    }
+}
+
+async fn call_model(target: &Target, request: &ChatRequest, stage: Stage, cancel: &mut watch::Receiver<bool>, on: &mut (impl FnMut(Live<'_>) + Send)) -> Result<Reply, AppError> {
     let start = Instant::now();
+    let track_goal = stage == Stage::Structure;
     let mut reply = Reply { text: String::new(), stop: StopReason::Other, seconds: 0.0, first_text_seconds: None, goal_ready_seconds: None, input_tokens: None, output_tokens: None, reasoning_chars: 0 };
-    ai::stream_chat(target, request, |event| {
+    let streaming = ai::stream_chat(target, request, |event| {
+        on(Live::Chunk { stage, event: &event });
         match event {
             StreamEvent::Text { text } => {
                 reply.first_text_seconds.get_or_insert(start.elapsed().as_secs_f32());
@@ -130,17 +217,26 @@ async fn call_model(target: &Target, request: &ChatRequest, track_goal: bool) ->
             }
         }
         ControlFlow::Continue(())
-    })
-    .await?;
+    });
+    // Afbreken laat de lopende aanroep vallen. Dat sluit de verbinding, zodat ook een lokaal model kan stoppen.
+    tokio::select! {
+        result = streaming => result?,
+        _ = cancelled(cancel) => return Err(AppError::new(CANCELLED, "Afgebroken.")),
+    }
     reply.seconds = start.elapsed().as_secs_f32();
     Ok(reply)
 }
+
+pub const CANCELLED: &str = "cancelled";
+pub const CRITIQUE_FAILED: &str = "critique_failed";
+pub const CRITIQUE_CANCELLED: &str = "critique_cancelled";
 
 /// De kern, los van het netwerk.
 pub(crate) async fn run(
     source: &Source,
     options: &Options,
     model: &str,
+    provider_id: &str,
     context_tokens: Option<u32>,
     report: &mut RunReport,
     caller: &mut impl Caller,
@@ -148,6 +244,7 @@ pub(crate) async fn run(
     if !source.text_ready || source.blocks.is_empty() {
         return Err(AppError::new("no_text", "Deze bron heeft nog geen tekst om een blauwdruk van te maken."));
     }
+    let start = Instant::now();
     let frame = Frame::new(source, options);
     report.estimated_input_tokens = frame.estimated_tokens();
     if let Some(limit) = context_tokens {
@@ -163,33 +260,45 @@ pub(crate) async fn run(
     let mut issues = vec![];
     let mut checks = Checks::default();
 
-    let mut structure: Structure = ask(&frame, frame.structure_task(), "structure", true, validate::structure_errors, report, caller).await?;
+    let mut structure: Structure = ask(&frame, frame.structure_task(), Stage::Structure, validate::structure_errors, report, caller).await?;
     validate::check_structure(&mut structure, &index, &mut issues, &mut checks);
 
-    let critique_task = frame.critique_task(&structure)?;
-    let critique: Result<Critique, AppError> = ask(&frame, critique_task, "critique", false, |_| vec![], report, caller).await;
-    let critique = match critique {
-        Ok(mut critique) => {
-            validate::check_critique(&mut critique, &structure, &index, &mut issues, &mut checks);
-            Some(critique)
-        }
-        Err(e) => {
-            issues.push(Issue { code: "critique_failed".into(), path: "critique".into(), detail: e.message.clone() });
-            None
-        }
-    };
-
-    Ok(Blueprint {
+    let mut blueprint = Blueprint {
         schema_version: SCHEMA_VERSION,
         source: source_status(source),
         model: model.to_string(),
+        provider_id: provider_id.to_string(),
+        prompt_version: PROMPT_VERSION,
         language: options.language.clone(),
         created_at: now(),
+        seconds: start.elapsed().as_secs_f32(),
         structure,
-        critique,
+        critique: None,
         issues,
         checks,
-    })
+    };
+    caller.structure_ready(&blueprint);
+    add_critique(&frame, &mut blueprint, &index, report, caller).await?;
+    blueprint.seconds = start.elapsed().as_secs_f32();
+    Ok(blueprint)
+}
+
+/// De tweede aanroep. Mislukt die of breekt de lezer af, dan blijft de structuur gewoon staan, met een melding.
+async fn add_critique(frame: &Frame, blueprint: &mut Blueprint, index: &SourceIndex, report: &mut RunReport, caller: &mut impl Caller) -> Result<(), AppError> {
+    let task = frame.critique_task(&blueprint.structure)?;
+    match ask::<Critique>(frame, task, Stage::Critique, |_| vec![], report, caller).await {
+        Ok(mut critique) => {
+            validate::check_critique(&mut critique, &blueprint.structure, index, &mut blueprint.issues, &mut blueprint.checks);
+            blueprint.critique = Some(critique);
+        }
+        Err(e) if e.kind == CANCELLED => {
+            blueprint.issues.push(Issue { code: CRITIQUE_CANCELLED.into(), path: "critique".into(), detail: "De kritische laag is afgebroken.".into() });
+        }
+        Err(e) => {
+            blueprint.issues.push(Issue { code: CRITIQUE_FAILED.into(), path: "critique".into(), detail: e.message.clone() });
+        }
+    }
+    Ok(())
 }
 
 fn now() -> String {
@@ -213,18 +322,17 @@ pub fn source_status(source: &Source) -> SourceStatus {
 async fn ask<T: DeserializeOwned + Send>(
     frame: &Frame,
     task: String,
-    stage: &'static str,
-    track_goal: bool,
+    stage: Stage,
     extra_errors: impl Fn(&T) -> Vec<String> + Send,
     report: &mut RunReport,
     caller: &mut impl Caller,
 ) -> Result<T, AppError> {
     let mut request = frame.request(&task);
     for attempt in 1..=2 {
-        let reply = match caller.call(request.clone(), track_goal).await {
+        let reply = match caller.call(request.clone(), stage, attempt).await {
             Ok(reply) => reply,
             Err(e) => {
-                report.calls.push(CallReport { stage, attempt, seconds: 0.0, first_text_seconds: None, goal_ready_seconds: None, input_tokens: None, output_tokens: None, reasoning_chars: 0, stop: StopReason::Other, schema_ok: false, schema_error: None, error_kind: Some(e.kind), raw: String::new() });
+                report.calls.push(CallReport { stage: stage.name(), attempt, seconds: 0.0, first_text_seconds: None, goal_ready_seconds: None, input_tokens: None, output_tokens: None, reasoning_chars: 0, stop: StopReason::Other, schema_ok: false, schema_error: None, error_kind: Some(e.kind), raw: String::new() });
                 return Err(e);
             }
         };
@@ -236,7 +344,7 @@ async fn ask<T: DeserializeOwned + Send>(
             Ok(_) => (true, None),
             Err(e) => (false, Some(e.clone())),
         };
-        report.calls.push(CallReport { stage, attempt, seconds: reply.seconds, first_text_seconds: reply.first_text_seconds, goal_ready_seconds: reply.goal_ready_seconds, input_tokens: reply.input_tokens, output_tokens: reply.output_tokens, reasoning_chars: reply.reasoning_chars, stop: reply.stop, schema_ok, schema_error, error_kind: None, raw: reply.text.clone() });
+        report.calls.push(CallReport { stage: stage.name(), attempt, seconds: reply.seconds, first_text_seconds: reply.first_text_seconds, goal_ready_seconds: reply.goal_ready_seconds, input_tokens: reply.input_tokens, output_tokens: reply.output_tokens, reasoning_chars: reply.reasoning_chars, stop: reply.stop, schema_ok, schema_error, error_kind: None, raw: reply.text.clone() });
         match parsed {
             Ok(value) => return Ok(value),
             Err(error) if attempt == 1 && reply.stop != StopReason::Length => {

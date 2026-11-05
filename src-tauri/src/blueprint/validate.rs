@@ -45,6 +45,12 @@ fn strip_outer_quotes(text: &str) -> &str {
     t.trim_matches(|c: char| matches!(c, '"' | '\'' | '\u{201C}' | '\u{201D}' | '\u{2018}' | '\u{2019}' | '\u{201E}' | '\u{00AB}' | '\u{00BB}')).trim()
 }
 
+/// Boven dit aantal alinea's is een verwijzing niet meer na te zoeken. In de test van stap 3a wees Sushi in 16 punten
+/// naar meer dan 20 alinea's en ChatGPT in 5 punten naar meer dan 8.
+const MAX_POINT_PARAGRAPHS: usize = 8;
+/// In een kort stuk telt ook de helft van het stuk als breed, maar een paar alinea's is altijd na te zoeken.
+const MIN_BROAD_SHARE_PARAGRAPHS: usize = 5;
+
 struct Checker<'a> {
     index: &'a SourceIndex,
     issues: &'a mut Vec<Issue>,
@@ -79,6 +85,13 @@ impl Checker<'_> {
         }
         *ranges = kept;
         !ranges.is_empty()
+    }
+
+    /// Wijst deze verwijzing naar te veel alinea's om na te zoeken? Telt alleen alinea's die echt bestaan.
+    fn is_broad(&self, ranges: &[ParagraphRange], article: ParagraphRange) -> bool {
+        let named: BTreeSet<u32> = ranges.iter().flat_map(|&(lo, hi)| self.index.numbers.range(lo..=hi).copied()).collect();
+        let article_size = self.index.numbers.range(article.0..=article.1).count();
+        named.len() > MAX_POINT_PARAGRAPHS || (named.len() >= MIN_BROAD_SHARE_PARAGRAPHS && named.len() * 2 > article_size)
     }
 
     /// Zoekt het citaat letterlijk op. Staat het in een andere alinea, dan klopt daarna de verwijzing.
@@ -260,6 +273,11 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
         if !c.ranges(&mut point.paragraphs, &path) {
             c.issue("point_without_source", &path, "Dit punt verwijst naar geen enkele bestaande alinea.".into());
         }
+        point.broad = c.is_broad(&point.paragraphs, s.article_paragraphs);
+        if point.broad {
+            c.checks.broad_points += 1;
+            c.issue("range_broad", &path, "Dit punt wijst naar te veel alinea's om na te zoeken. Springen gaat naar de eerste.".into());
+        }
         let mut quotes = vec![];
         for mut quote in std::mem::take(&mut point.quotes) {
             if c.quote(&mut quote, &path) {
@@ -270,6 +288,11 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
         if point.origin == Origin::Stated && point.quotes.is_empty() {
             c.issue("stated_without_quote", &path, "Volgens het model staat dit in de tekst, maar er is geen controleerbaar citaat.".into());
         }
+    }
+
+    for term in &mut critique.terms {
+        let path = format!("terms.{}", term.term);
+        c.ranges(&mut term.paragraphs, &path);
     }
 
     // De lijst per onderdeel moet kloppen met de punten: alle onderdelen één keer, en "gevonden" alleen met een punt.

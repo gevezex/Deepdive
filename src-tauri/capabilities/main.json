@@ -32,6 +32,9 @@
     "allow-chatgpt-cancel-login",
     "allow-chatgpt-logout",
     "allow-chatgpt-welcome-seen",
-    "allow-open-chatgpt-usage"
+    "allow-open-chatgpt-usage",
+    "allow-generate-blueprint",
+    "allow-cancel-blueprint",
+    "allow-saved-blueprints"
   ]
 }

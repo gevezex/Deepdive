@@ -133,6 +133,12 @@ pub fn check_key_transport(url: &Url) -> Result<(), AppError> {
     Err(AppError::new("insecure_key", "Een API-sleutel wordt alleen via https verstuurd. Gebruik een https-adres, of haal de sleutel weg als deze server er geen nodig heeft."))
 }
 
+/// Haalt alvast op wat een aanroep nodig heeft. Een verlopen login komt zo meteen aan het licht, en de wachttijd op een
+/// melding van de sleutelhanger telt niet mee als duur van het model.
+pub async fn prepare(target: &Target) -> Result<(), AppError> {
+    target.endpoint.authorized().await.map(|_| ())
+}
+
 /// Het model waar een verzoek heen gaat, met wat de app over dat model weet.
 #[derive(Debug, Clone)]
 pub struct Target {

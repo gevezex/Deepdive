@@ -115,7 +115,10 @@ Op hetzelfde diagram zie je waar het betoog zwak is. De meeste zwakke plekken zi
 | **Bewijs** | Hoe sterk is het bewijs voor elke claim? Is het een onderzoek, een anekdote of alleen een bewering? |
 | **Wat ontbreekt** | Welke tegenargumenten, alternatieve verklaringen of partijen blijven buiten beeld? |
 | **Kop tegenover inhoud** | Gaan de kop of de samenvatting verder dan de tekst zelf? Cijfers uit een samenvatting worden gecontroleerd tegen de tabellen waar ze vandaan komen. |
-| **Voorkennis** | Welke woorden en begrippen worden bekend verondersteld? |
+
+Elk punt is een plus of een min, zodat lof niet op een gebrek lijkt.
+
+Naast de kritiek staat een hulplijst met **begrippen**: welke woorden worden bekend verondersteld? Die lijst is hulp bij het lezen en telt niet als kritisch punt.
 
 De professor is hierin eerlijk over de grenzen van de analyse:
 
@@ -325,7 +328,7 @@ Aandachtspunten:
 1. **Bronnen openen**: URL of pdf plakken of slepen, tonen in het linkerpaneel en vastleggen als vaste kopie. Vroeg testen op 20 echte sites op macOS.
 2. **Providers en modellen**: providers aanmaken, sleutels veilig opslaan en lokale modellen koppelen.
    **2b. Onvolledige stukken en inloggen**: per bron een oordeel (volledig, waarschijnlijk onvolledig, onbekend) op meerdere signalen, een melding met "Inloggen" en "Toch gebruiken", zelf inloggen in een venster in de app, een scherm met sites waar je bent ingelogd en "Opnieuw ophalen" die de oude kopie bewaart. Komt vóór de blauwdruk, omdat een blauwdruk van een half artikel misleidend is.
-3. **Blauwdruk**: de knop, de samenvatting, het doel, de levensloop en de kritische laag in het rechterpaneel.
+3. **Blauwdruk**: de knop, de samenvatting, het doel, de levensloop en de kritische laag in het rechterpaneel. Gebouwd. "Je bent hier" hoort bij stap 4. Ontwerp en metingen staan in [docs/blauwdruk-ontwerp.md](docs/blauwdruk-ontwerp.md).
 4. **Selecteren en vragen**: selecteren, kader, selectiemenu, markeren, antwoorden, "je bent hier" en terugverwijzen.
 
 **Daarna:**

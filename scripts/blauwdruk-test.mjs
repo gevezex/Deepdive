@@ -1,6 +1,7 @@
 // Stuurt de blauwdruktest aan via de testhaak van de debug-build. Alle uitvoer komt in .blauwdruk-test/, die git negeert.
 //   node scripts/blauwdruk-test.mjs fetch             haalt de selectie op en toont het oordeel per stuk
-//   node scripts/blauwdruk-test.mjs run [labels...]   maakt blauwdrukken; een stuk dat er al is wordt overgeslagen
+//   node scripts/blauwdruk-test.mjs run [labels...]   maakt blauwdrukken; een stuk dat er al is wordt overgeslagen.
+//                                                     Met labels worden ook alleen die stukken geopend.
 // Vraagt modellen op bij de providers die in de app staan. Sleutels en tokens blijven in de AI-laag van de app.
 // MODELS=sushi of MODELS=chatgpt beperkt de run tot één model.
 import { spawnSync } from "node:child_process";
@@ -37,10 +38,13 @@ function models() {
 
 const [command, ...labels] = process.argv.slice(2);
 mkdirSync(OUT, { recursive: true });
-const plan = command === "fetch" ? { pieces: pieces() } : { pieces: pieces().filter((p) => !p.kind || p.kind !== "reserve"), models: models(), only: labels };
-writeFileSync(join(OUT, "plan.json"), JSON.stringify(plan, null, 1));
+const chosen = pieces().filter((p) => !p.kind || p.kind !== "reserve").filter((p) => !labels.length || labels.includes(p.label));
+const plan = command === "fetch" ? { pieces: pieces() } : { pieces: chosen, models: models(), only: labels };
+// Een eigen plan per run: twee runs tegelijk (één per model) lezen zo niet elkaars plan.
+const planFile = join(OUT, `plan-${process.pid}.json`);
+writeFileSync(planFile, JSON.stringify(plan, null, 1));
 const result = spawnSync(BIN, [], {
   stdio: "inherit",
-  env: { ...process.env, DEEPDIVE_DATA_DIR: join(OUT, "data"), DEEPDIVE_BLUEPRINT_TEST: join(OUT, "plan.json"), DEEPDIVE_BLUEPRINT_OUT: OUT },
+  env: { ...process.env, DEEPDIVE_DATA_DIR: join(OUT, "data"), DEEPDIVE_BLUEPRINT_TEST: planFile, DEEPDIVE_BLUEPRINT_OUT: OUT },
 });
 process.exit(result.status ?? 1);

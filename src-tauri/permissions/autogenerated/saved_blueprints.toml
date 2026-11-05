@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-saved-blueprints"
+description = "Enables the saved_blueprints command without any pre-configured scope."
+commands.allow = ["saved_blueprints"]
+
+[[permission]]
+identifier = "deny-saved-blueprints"
+description = "Denies the saved_blueprints command without any pre-configured scope."
+commands.deny = ["saved_blueprints"]

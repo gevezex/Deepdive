@@ -9,7 +9,7 @@
 use crate::{
     blueprint, engine::RenderedPage, import,
     model::Source,
-    providers::{secrets::Keychain, ModelRef, ProviderStore},
+    providers::{secrets::{CachedSecrets, Keychain}, ModelRef, ProviderStore},
     store::Store,
 };
 use serde::Deserialize;
@@ -143,7 +143,7 @@ async fn run_blueprint_test(app: AppHandle, plan: String, out: String) {
 
     // De echte instellingen van de gebruiker. Sleutels en tokens blijven in de AI-laag.
     let root = app.path().app_data_dir().expect("gegevensmap");
-    let providers = Arc::new(ProviderStore::open(root, Arc::new(Keychain::new(app.config().identifier.clone()))).expect("providers"));
+    let providers = Arc::new(ProviderStore::open(root, Arc::new(CachedSecrets::new(Keychain::new(app.config().identifier.clone())))).expect("providers"));
     let sources = Arc::new(sources);
     let only = Arc::new(plan.only);
     let mut jobs = vec![];
@@ -201,7 +201,7 @@ async fn run_blueprint(providers: &ProviderStore, model: &PlanModel, label: &str
     let mut report = blueprint::RunReport::default();
     let chosen = ModelRef { provider_id: model.provider_id.clone(), model_id: model.model_id.clone() };
     let result = match providers.target(&chosen) {
-        Ok(target) => blueprint::generate(&target, source, &blueprint::Options::default(), &mut report).await,
+        Ok(target) => blueprint::generate(&target, &model.provider_id, source, &blueprint::Options::default(), &mut report).await,
         Err(e) => Err(e),
     };
     let raw: Vec<_> = report.calls.iter().map(|c| json!({ "stage": c.stage, "attempt": c.attempt, "text": c.raw })).collect();

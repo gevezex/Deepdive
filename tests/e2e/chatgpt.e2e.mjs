@@ -214,6 +214,16 @@ async function main() {
   check("Responses kreeg het token als Bearer", firstResponse.headers.authorization === `Bearer ${s.issued.access.at(-1)}`);
   check("geen schendingen van de preview-eisen", s.violations.length === 0, s.violations.join("; "));
 
+  // ---------- voorstel in het blauwdrukpaneel ----------
+  await run(`$("providers-close").click(); $("paste-open").click(); $("paste-title").value = "Stuk"; $("paste-text").value = "Eerste alinea met genoeg woorden.\\n\\nTweede alinea met nog meer woorden."; $("paste-form").requestSubmit(); await wait(800);`);
+  const suggestion = await run(`return { shown: !!$("bp-suggest"), text: $("bp-suggest")?.textContent ?? "", picker: $("model-picker").value }`);
+  check("blauwdruk: zonder keuze wordt ChatGPT voorgesteld", suggestion.shown && suggestion.text.includes("Jij kiest") && suggestion.text.includes("Nep GPT Snel"), JSON.stringify(suggestion));
+  check("blauwdruk: het voorstel kiest niet stilletjes", suggestion.picker === "" && (await list()).selection.active === null);
+  await run(`$("bp-suggest-use").click(); await wait(400);`);
+  check("blauwdruk: pas na een klik is ChatGPT gekozen", (await list()).selection.active?.modelId === "nep-gpt-snel");
+  check("blauwdruk: voorstel verdwijnt na kiezen", (await run(`return !$("bp-suggest")`)) === true);
+  await shot("4b-voorstel");
+
   // ---------- modelkiezer en merkteken ----------
   const value = JSON.stringify([chatgpt.id, "nep-gpt-diep"]);
   await run(`$("providers-close").click(); const p = $("model-picker"); p.value = ${JSON.stringify(value)}; p.dispatchEvent(new Event("change", { bubbles: true })); await wait(300);`);
@@ -315,6 +325,10 @@ async function main() {
   const lostStatus = await run(`return { text: $("chatgpt-account-status").textContent, signin: !$("chatgpt-signin").hidden }`);
   check("ingetrokken sessie: knop om opnieuw in te loggen", lostStatus.signin && lostStatus.text.includes("ingetrokken"), lostStatus.text);
   await shot("7-ingetrokken");
+  await run(`$("bp-start").click(); for (let i = 0; i < 100 && !$("bp-error"); i++) await wait(50);`);
+  const expired = await run(`const e = $("bp-error"); return { kind: e?.dataset.kind, text: e?.textContent ?? "", providers: !!$("bp-action-providers") }`);
+  check("blauwdruk: verlopen login krijgt een eigen melding met weg terug", expired.kind === "chatgpt_session_revoked" && expired.text.includes("login is verlopen") && expired.providers, JSON.stringify(expired));
+  await shot("7b-blauwdruk-verlopen");
   s.responsesMode = "ok";
 
   // ---------- abonnement niet toegestaan, daarna inschakelen ----------

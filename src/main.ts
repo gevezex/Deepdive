@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { initBlueprint, setBlueprintSource } from "./blueprint";
+import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
 import { initSites, refreshSites } from "./sites";
-import type { AppError, LoginClosed, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
+import type { PdfViewHandle } from "./pdf";
+import type { AppError, LoginClosed, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const urlInput = $<HTMLInputElement>("url-input");
@@ -15,7 +18,7 @@ const sourceList = $<HTMLSelectElement>("source-list");
 const LAST_KEY = "deepdive.lastSource";
 
 let current: Source | null = null;
-let pdfHandle: { destroy(): void } | null = null;
+let pdfHandle: PdfViewHandle | null = null;
 let opening = 0;
 
 const snapshotBase = navigator.userAgent.includes("Windows") ? "http://deepdive-snapshot.localhost" : "deepdive-snapshot://localhost";
@@ -126,7 +129,10 @@ function renderSourceNotice(source: Source) {
       run: async () => {
         try {
           const saved = await invoke<Source>("accept_incomplete", { id: source.id });
-          if (current?.id === saved.id) current = saved;
+          if (current?.id === saved.id) {
+            current = saved;
+            void setBlueprintSource(saved);
+          }
           clearNotice();
         } catch (err) {
           showError(err);
@@ -254,6 +260,7 @@ async function show(source: Source) {
   urlInput.value = source.url ?? "";
   renderStatus(source);
   renderSourceNotice(source);
+  void setBlueprintSource(source);
 
   if (source.kind === "pdf") {
     pdfView.hidden = false;
@@ -271,6 +278,7 @@ async function show(source: Source) {
         const saved = await invoke<Source>("save_pdf_text", { id: source.id, title: text.title, pageCount: text.pageCount, blocks: text.blocks });
         if (token === opening) {
           current = saved;
+          void setBlueprintSource(saved);
           renderStatus(saved);
           document.title = `${saved.title} – Deepdive`;
         }
@@ -285,6 +293,23 @@ async function show(source: Source) {
     frame.src = `${snapshotBase}/${source.id}/index.html`;
   }
   await refreshList();
+}
+
+/**
+ * Springt naar alinea's en laat ze oplichten. De sitekopie staat in een iframe met sandbox="" en een CSP zonder
+ * scripts: wij kunnen er niet in kijken en er draait niets in. Daarom vraagt de iframe een nieuw adres op. De server
+ * van de app markeert de alinea's met een stijl in de pagina, en de browser scrolt zelf naar het anker. De afscherming
+ * blijft precies zoals ze is.
+ */
+function jumpToParagraphs(ranges: ParagraphRange[]) {
+  if (!current || !ranges.length) return;
+  if (current.kind === "pdf") {
+    const inRange = (n: number) => ranges.some(([a, b]) => a <= n && n <= b);
+    const regions = current.blocks.filter((b) => inRange(b.n) && b.page && b.bbox).map((b) => ({ page: b.page!, bbox: b.bbox! }));
+    void pdfHandle?.highlight(regions);
+    return;
+  }
+  frame.src = `${snapshotBase}/${current.id}/index.html?hl=${highlightParam(ranges)}#dd-doel`;
 }
 
 // ---------- invoer ----------
@@ -430,6 +455,7 @@ for (const type of ["mousemove", "mousedown", "wheel"]) {
 
 async function start() {
   initSites();
+  initBlueprint(jumpToParagraphs);
   await Promise.all([refreshList(), initProviders()]);
   const last = remembered();
   if (!last) return;

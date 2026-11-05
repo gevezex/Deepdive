@@ -232,6 +232,11 @@ impl Hub {
         Ok(self.secrets.get(&keychain_account(provider_id))?.and_then(|text| serde_json::from_str(text.expose()).ok()))
     }
 
+    /// Als `load_credentials`, maar altijd uit de sleutelhanger: een andere kopie van de app kan het token hebben vervangen.
+    fn load_fresh_credentials(&self, provider_id: &str) -> Result<Option<Credentials>, AppError> {
+        Ok(self.secrets.get_fresh(&keychain_account(provider_id))?.and_then(|text| serde_json::from_str(text.expose()).ok()))
+    }
+
     pub fn delete_credentials(&self, provider_id: &str) -> Result<(), AppError> {
         self.secrets.delete(&keychain_account(provider_id))
     }
@@ -396,7 +401,7 @@ impl Session {
                 return match code.as_deref() {
                     Some("invalid_grant" | "invalid_refresh_token" | "token_expired" | "refresh_token_expired" | "refresh_token_invalidated" | "refresh_token_reused") => {
                         // Een andere instantie van de app kan het token net hebben vervangen.
-                        match self.hub.load_credentials(&self.provider_id)? {
+                        match self.hub.load_fresh_credentials(&self.provider_id)? {
                             Some(latest) if latest.refresh_token != credentials.refresh_token && latest.client_id == self.client_id => Ok(latest),
                             _ => Err(self.lose_session()),
                         }

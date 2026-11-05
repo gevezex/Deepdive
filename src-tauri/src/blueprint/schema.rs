@@ -5,7 +5,11 @@ use crate::model::CompletenessVerdict;
 use serde::{Deserialize, Serialize};
 
 /// Omhoog bij elke wijziging die een eerder opgeslagen blauwdruk onleesbaar of anders van betekenis maakt.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
+
+/// Omhoog bij elke inhoudelijke wijziging van de opdrachten in `prompts/`. Een blauwdruk wordt per bron, model en
+/// promptversie bewaard, dus een nieuwe versie overschrijft niets.
+pub const PROMPT_VERSION: u32 = 2;
 
 /// Eerste en laatste alineanummer, allebei inbegrepen. In JSON: `[3, 5]`.
 pub type ParagraphRange = (u32, u32);
@@ -189,11 +193,10 @@ pub enum Category {
     Evidence,
     Missing,
     HeadlineVsContent,
-    PriorKnowledge,
 }
 
 impl Category {
-    pub const ALL: [Category; 7] = [Self::Assumption, Self::Leap, Self::Gap, Self::Evidence, Self::Missing, Self::HeadlineVsContent, Self::PriorKnowledge];
+    pub const ALL: [Category; 6] = [Self::Assumption, Self::Leap, Self::Gap, Self::Evidence, Self::Missing, Self::HeadlineVsContent];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,6 +205,14 @@ pub enum Certainty {
     High,
     Medium,
     Low,
+}
+
+/// Maakt een punt het betoog zwakker of juist sterker? Zo lijkt lof op het scherm niet op een gebrek.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Polarity {
+    Minus,
+    Plus,
 }
 
 /// Alleen bij `Category::Evidence`: wat voor bewijs de auteur geeft.
@@ -220,6 +231,7 @@ pub enum EvidenceKind {
 pub struct Point {
     pub id: String,
     pub category: Category,
+    pub polarity: Polarity,
     pub origin: Origin,
     pub certainty: Certainty,
     /// Het id van een blok of relatie. `None` als het model verwees naar iets dat niet bestaat.
@@ -232,6 +244,19 @@ pub struct Point {
     pub quotes: Vec<Quote>,
     #[serde(default)]
     pub evidence_kind: Option<EvidenceKind>,
+    /// Te veel alinea's om na te zoeken. Zet alleen de controle in de app, nooit het model.
+    #[serde(default)]
+    pub broad: bool,
+}
+
+/// Een begrip dat de lezer nodig heeft en dat de tekst niet uitlegt. Hulp, geen kritiek: telt niet als punt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Term {
+    pub term: String,
+    pub explanation: String,
+    #[serde(default, deserialize_with = "ranges")]
+    pub paragraphs: Vec<ParagraphRange>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -257,6 +282,8 @@ pub struct CategoryCheck {
 #[serde(rename_all = "camelCase")]
 pub struct Critique {
     pub points: Vec<Point>,
+    #[serde(default)]
+    pub terms: Vec<Term>,
     pub checked: Vec<CategoryCheck>,
     pub overall: String,
 }
@@ -305,6 +332,9 @@ pub struct Checks {
     pub relations_removed: u32,
     pub ranges_fixed: u32,
     pub anchors_removed: u32,
+    /// Punten die naar te veel alinea's wijzen om na te zoeken.
+    #[serde(default)]
+    pub broad_points: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -314,8 +344,13 @@ pub struct Blueprint {
     pub source: SourceStatus,
     /// Herkomst zichtbaar: welk model deze blauwdruk maakte.
     pub model: String,
+    /// Samen met `model` en `prompt_version` de sleutel waaronder deze blauwdruk bewaard is.
+    pub provider_id: String,
+    pub prompt_version: u32,
     pub language: String,
     pub created_at: String,
+    /// Hoe lang het maken duurde.
+    pub seconds: f32,
     #[serde(flatten)]
     pub structure: Structure,
     /// `None` als alleen de kritische laag mislukte: doel en diagram blijven dan bruikbaar.

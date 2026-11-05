@@ -1,6 +1,4 @@
 mod ai;
-// De blauwdruk heeft nog geen knop: die komt in stap 3b. Tot dan gebruikt alleen de testhaak deze module.
-#[cfg_attr(not(debug_assertions), allow(dead_code))]
 mod blueprint;
 mod chatgpt;
 mod completeness;
@@ -17,7 +15,7 @@ mod testhook;
 
 use error::AppError;
 use model::{Block, Source, SourceSummary};
-use providers::{secrets::Keychain, ProviderStore};
+use providers::{secrets::{CachedSecrets, Keychain}, ProviderStore};
 use sessions::SiteSessions;
 use std::sync::Arc;
 use store::Store;
@@ -94,6 +92,12 @@ fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Re
     let store = app.state::<Store>();
     let Some(path) = store.snapshot_file(request.uri().path()) else { return not_found() };
     let Ok(bytes) = std::fs::read(&path) else { return not_found() };
+    // Zo werkt springen zonder iets aan de afscherming te veranderen: de iframe krijgt een nieuwe pagina met de
+    // alinea's al gemarkeerd, en het adres eindigt op een anker waar de browser zelf heen scrolt.
+    let bytes = match request.uri().query().and_then(snapshot::highlight_query) {
+        Some(ranges) if store::mime_for(&path).starts_with("text/html") => snapshot::highlight(bytes, &ranges),
+        _ => bytes,
+    };
     let mut res = Response::builder()
         .header(header::CONTENT_TYPE, store::mime_for(&path))
         .header(header::CONTENT_SECURITY_POLICY, snapshot::CSP)
@@ -133,8 +137,9 @@ pub fn run() {
             if let Ok(service) = std::env::var("DEEPDIVE_KEYCHAIN_SERVICE") {
                 keychain_service = service;
             }
-            app.manage(ProviderStore::open(root.clone(), Arc::new(Keychain::new(keychain_service)))?);
+            app.manage(ProviderStore::open(root.clone(), Arc::new(CachedSecrets::new(Keychain::new(keychain_service))))?);
             app.manage(SiteSessions::open(root.clone()));
+            app.manage(blueprint::commands::Jobs::default());
             app.manage(Store::new(root)?);
             sessions::finish_pending_wipes(app.handle().clone());
             #[cfg(debug_assertions)]
@@ -153,6 +158,9 @@ pub fn run() {
             adopt_candidate,
             discard_candidate,
             accept_incomplete,
+            blueprint::commands::generate_blueprint,
+            blueprint::commands::cancel_blueprint,
+            blueprint::commands::saved_blueprints,
             sessions::site_login_open,
             sessions::site_login_close,
             sessions::list_site_sessions,

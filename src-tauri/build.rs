@@ -30,6 +30,9 @@ fn main() {
         "chatgpt_logout",
         "chatgpt_welcome_seen",
         "open_chatgpt_usage",
+        "generate_blueprint",
+        "cancel_blueprint",
+        "saved_blueprints",
     ])))
     .expect("tauri-build mislukte");
 }

@@ -521,6 +521,84 @@ fn note_failure(stats: &mut AssetStats, url: Url) {
     }
 }
 
+/// Het anker waar het adres van een gemarkeerde kopie op eindigt: `index.html?hl=12-15,20-20#dd-doel`.
+pub const HIGHLIGHT_ANCHOR: &str = "dd-doel";
+/// Meer bereiken dan dit komt niet van de eigen interface.
+const MAX_HIGHLIGHT_RANGES: usize = 40;
+
+const HIGHLIGHT_CSS: &str = "html{scroll-padding-top:18vh}\
+[data-dd-hl]{background-color:rgba(255,205,86,.38)!important;outline:2px solid rgba(176,120,20,.55)!important;outline-offset:2px;animation:dd-flash 1.6s ease-out 1}\
+@keyframes dd-flash{0%{background-color:rgba(255,186,40,.9)}100%{background-color:rgba(255,205,86,.38)}}\
+@media (prefers-reduced-motion:reduce){[data-dd-hl]{animation:none}}";
+
+/// Leest `hl=12-15,20-20` uit de query. Alleen getallen komen eruit, dus er kan niets van buiten in de pagina komen.
+pub fn highlight_query(query: &str) -> Option<Vec<(u32, u32)>> {
+    let value = query.split('&').find_map(|part| part.strip_prefix("hl="))?;
+    let ranges: Vec<(u32, u32)> = value
+        .split(',')
+        .take(MAX_HIGHLIGHT_RANGES)
+        .filter_map(|range| {
+            let (a, b) = range.split_once('-')?;
+            let (a, b) = (a.parse::<u32>().ok()?, b.parse::<u32>().ok()?);
+            Some((a.min(b), a.max(b)))
+        })
+        .collect();
+    (!ranges.is_empty()).then_some(ranges)
+}
+
+/// Markeert de alinea's in de kopie en zet het anker bij de eerste die er is. De kopie op schijf verandert niet.
+/// Lukt het herschrijven niet, dan komt de gewone kopie terug.
+pub fn highlight(bytes: Vec<u8>, ranges: &[(u32, u32)]) -> Vec<u8> {
+    let Ok(html) = std::str::from_utf8(&bytes) else { return bytes };
+    let style = format!("<style data-dd-style>{HIGHLIGHT_CSS}</style>");
+    let anchor = format!("<a id=\"{HIGHLIGHT_ANCHOR}\" aria-hidden=\"true\" style=\"position:absolute\"></a>");
+    let head_seen = RefCell::new(false);
+    // none: nog niets gevonden, some(false): een tabelrij wacht op zijn eerste cel, some(true): het anker staat.
+    let placed = RefCell::new(None::<bool>);
+    let out = rewrite_str(
+        html,
+        RewriteStrSettings {
+            element_content_handlers: vec![
+                element!("head", |el| {
+                    *head_seen.borrow_mut() = true;
+                    el.append(&style, ContentType::Html);
+                    Ok(())
+                }),
+                element!("[data-dd-n]", |el| {
+                    let n = el.get_attribute("data-dd-n").and_then(|n| n.parse::<u32>().ok());
+                    if !n.is_some_and(|n| ranges.iter().any(|&(lo, hi)| lo <= n && n <= hi)) {
+                        return Ok(());
+                    }
+                    el.set_attribute("data-dd-hl", "")?;
+                    if placed.borrow().is_none() {
+                        // Een los element direct in een tabelrij zou de browser buiten de tabel zetten.
+                        if el.tag_name().eq_ignore_ascii_case("tr") {
+                            *placed.borrow_mut() = Some(false);
+                        } else {
+                            el.prepend(&anchor, ContentType::Html);
+                            *placed.borrow_mut() = Some(true);
+                        }
+                    }
+                    Ok(())
+                }),
+                element!("td, th", |el| {
+                    if *placed.borrow() == Some(false) {
+                        el.prepend(&anchor, ContentType::Html);
+                        *placed.borrow_mut() = Some(true);
+                    }
+                    Ok(())
+                }),
+            ],
+            ..RewriteStrSettings::new()
+        },
+    );
+    match out {
+        Ok(out) if *head_seen.borrow() => out.into_bytes(),
+        Ok(out) => format!("{style}{out}").into_bytes(),
+        Err(_) => bytes,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -634,5 +712,50 @@ mod tests {
         assert!(resolve_asset("http://localhost:8080/x.png", &page, false).is_none());
         assert!(resolve_asset("file:///etc/passwd", &page, false).is_none());
         assert!(resolve_asset("/x.png", &page, false).is_some());
+    }
+
+    #[test]
+    fn query_geeft_alleen_getallen_door() {
+        assert_eq!(highlight_query("hl=12-15,20-20"), Some(vec![(12, 15), (20, 20)]));
+        assert_eq!(highlight_query("x=1&hl=5-3"), Some(vec![(3, 5)]));
+        assert_eq!(highlight_query("hl=<script>"), None);
+        assert_eq!(highlight_query("hl=1-2\"><script>,3-4"), Some(vec![(3, 4)]));
+        assert_eq!(highlight_query("x=1"), None);
+    }
+
+    fn marked(html: &str, ranges: &[(u32, u32)]) -> String {
+        String::from_utf8(highlight(html.as_bytes().to_vec(), ranges)).unwrap()
+    }
+
+    #[test]
+    fn alinea_s_krijgen_een_markering_en_de_eerste_het_anker() {
+        let out = marked(r#"<html><head><title>t</title></head><body><p data-dd-n="1">a</p><p data-dd-n="2">b</p><p data-dd-n="3">c</p></body></html>"#, &[(2, 3)]);
+        assert!(out.contains(r#"<p data-dd-n="1">a</p>"#), "{out}");
+        assert!(out.contains(r#"<p data-dd-n="2" data-dd-hl=""><a id="dd-doel""#), "{out}");
+        assert!(out.contains(r#"<p data-dd-n="3" data-dd-hl="">c"#), "{out}");
+        assert_eq!(out.matches("dd-doel").count(), 1, "{out}");
+        assert!(out.contains("</style></head>"), "{out}");
+        assert!(!out.contains("<script"), "{out}");
+    }
+
+    #[test]
+    fn anker_in_een_tabelrij_komt_in_de_eerste_cel() {
+        let out = marked(r#"<head></head><table><tr data-dd-n="4"><td>x</td><td>y</td></tr></table>"#, &[(4, 4)]);
+        assert!(out.contains(r#"<td><a id="dd-doel""#), "{out}");
+        assert_eq!(out.matches("dd-doel").count(), 1);
+    }
+
+    #[test]
+    fn ontbrekend_eerste_nummer_verplaatst_het_anker_naar_het_volgende() {
+        let out = marked(r#"<head></head><p data-dd-n="5">a</p><p data-dd-n="7">b</p>"#, &[(6, 7)]);
+        assert!(out.contains(r#"<p data-dd-n="7" data-dd-hl=""><a id="dd-doel""#), "{out}");
+    }
+
+    #[test]
+    fn stijl_past_binnen_de_afscherming() {
+        // De markering gebruikt alleen een stijl in de pagina, die de CSP toestaat, en geen script of adres.
+        assert!(CSP.contains("'unsafe-inline'"));
+        assert!(!HIGHLIGHT_CSS.contains("url("));
+        assert!(!CSP.contains("script-src"));
     }
 }

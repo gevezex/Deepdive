@@ -2,7 +2,7 @@
 // opslaan geleegd en de app krijgt alleen `hasKey` terug.
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { chatgptState, chatgptStatus, countSummary, describeReport, filterModels, imagesToValue, modelCount, modelLabel, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, usesChatgptPlan, valueToImages } from "./providerLogic";
-import type { ApiKind, AppError, ConnectionReport, KeyChange, LoginOutcome, LogoutOutcome, Model, Provider, ProvidersFile, StreamEvent } from "./types";
+import type { ApiKind, AppError, ConnectionReport, KeyChange, LoginOutcome, LogoutOutcome, Model, ModelRef, Provider, ProvidersFile, StreamEvent } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const dialog = $<HTMLDialogElement>("providers-dialog");
@@ -43,6 +43,21 @@ let data: ProvidersFile = { schemaVersion: 1, providers: [], selection: { active
 let selectedId: string | null = null;
 
 const selected = () => data.providers.find((p) => p.id === selectedId) ?? null;
+
+const changeListeners: (() => void)[] = [];
+
+/** Wat er nu is ingesteld. Het blauwdrukpaneel leest hier het gekozen model uit. */
+export const currentProviders = () => data;
+
+export function onProvidersChange(listener: () => void) {
+  changeListeners.push(listener);
+}
+
+/** Kiest een model namens de lezer, alleen na een klik van de lezer zelf. */
+export async function selectModel(selection: ModelRef) {
+  await invoke("select_model", { selection });
+  await reload();
+}
 
 function toError(err: unknown): AppError {
   if (err && typeof err === "object" && "message" in err) return err as AppError;
@@ -115,6 +130,7 @@ function renderPicker() {
   picker.value = data.selection.active ? refValue(data.selection.active) : "";
   picker.disabled = groups.length === 0;
   planBadge.hidden = !usesChatgptPlan(data);
+  for (const listener of changeListeners) listener();
 }
 
 picker.addEventListener("change", async () => {

@@ -7,6 +7,9 @@ import type { Block } from "./types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
+/** Een blok hoort een paar alinea's te zijn. Meer markeringen dan dit voegt op het scherm niets toe. */
+const MAX_PDF_MARKS = 60;
+
 const asset = (dir: string) => new URL(`/pdfjs/${dir}/`, location.href).href;
 
 export async function loadPdf(bytes: Uint8Array): Promise<pdfjs.PDFDocumentProxy> {
@@ -40,8 +43,15 @@ export async function extractText(doc: pdfjs.PDFDocumentProxy): Promise<{ title:
   return { title: info?.Title?.trim() || null, pageCount: doc.numPages, blocks: buildBlocks(pages) };
 }
 
+export interface PdfRegion {
+  page: number;
+  bbox: [number, number, number, number];
+}
+
 export interface PdfViewHandle {
   destroy(): void;
+  /** Scrolt naar de eerste plek en markeert ze allemaal. De vorige markering verdwijnt. */
+  highlight(regions: PdfRegion[]): Promise<void>;
 }
 
 /** Bouwt de pagina's lazy op: alleen wat in beeld komt wordt getekend, wat ver weg is wordt weer vrijgegeven. */
@@ -140,6 +150,30 @@ export async function renderPdf(container: HTMLElement, doc: pdfjs.PDFDocumentPr
   resize.observe(container);
 
   return {
+    async highlight(regions) {
+      for (const mark of container.querySelectorAll(".pdf-mark")) mark.remove();
+      let first: HTMLElement | null = null;
+      for (const region of regions.slice(0, MAX_PDF_MARKS)) {
+        const slot = slots[region.page - 1];
+        if (!slot) continue;
+        const view = (await doc.getPage(region.page)).getViewport({ scale: 1 });
+        const [x0, y0] = view.convertToViewportPoint(region.bbox[0], region.bbox[1]) as [number, number];
+        const [x1, y1] = view.convertToViewportPoint(region.bbox[2], region.bbox[3]) as [number, number];
+        const mark = document.createElement("div");
+        mark.className = "pdf-mark";
+        // In procenten van de pagina, zodat de markering meeschaalt als het paneel breder of smaller wordt.
+        mark.style.left = `${(Math.min(x0, x1) / view.width) * 100}%`;
+        mark.style.top = `${(Math.min(y0, y1) / view.height) * 100}%`;
+        mark.style.width = `${(Math.abs(x1 - x0) / view.width) * 100}%`;
+        mark.style.height = `${(Math.abs(y1 - y0) / view.height) * 100}%`;
+        slot.el.append(mark);
+        first ??= mark;
+      }
+      if (!first) return;
+      const page = first.parentElement as HTMLElement;
+      const top = page.offsetTop + (parseFloat(first.style.top) / 100) * page.offsetHeight;
+      container.scrollTo({ top: Math.max(0, top - container.clientHeight * 0.18) });
+    },
     destroy() {
       clearTimeout(timer);
       near.disconnect();

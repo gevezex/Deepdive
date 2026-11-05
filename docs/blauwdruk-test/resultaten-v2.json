@@ -1,0 +1,245 @@
+[
+ {
+  "label": "devto",
+  "model": "chatgpt",
+  "modelId": "gpt-6.1-sol",
+  "seconds": 73,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 2,
+  "plus": 1,
+  "terms": 6,
+  "certainty": {
+   "high": 1,
+   "medium": 1
+  },
+  "inferred": 2,
+  "broad": 0,
+  "maxParagraphs": 4,
+  "byCategory": {
+   "evidence": 1,
+   "leap": 1
+  },
+  "results": {
+   "assumption": "nothing_found",
+   "leap": "found",
+   "gap": "nothing_found",
+   "evidence": "found",
+   "missing": "nothing_found",
+   "headline_vs_content": "nothing_found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 3,
+   "verified": 3
+  },
+  "issues": []
+ },
+ {
+  "label": "fouten-koffie",
+  "model": "chatgpt",
+  "modelId": "gpt-6.1-sol",
+  "seconds": 53,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 4,
+  "plus": 0,
+  "terms": 0,
+  "certainty": {
+   "high": 3,
+   "medium": 1
+  },
+  "inferred": 3,
+  "broad": 0,
+  "maxParagraphs": 3,
+  "byCategory": {
+   "headline_vs_content": 1,
+   "leap": 2,
+   "missing": 1
+  },
+  "results": {
+   "assumption": "nothing_found",
+   "leap": "found",
+   "gap": "nothing_found",
+   "evidence": "nothing_found",
+   "missing": "found",
+   "headline_vs_content": "found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 2,
+   "verified": 2
+  },
+  "issues": []
+ },
+ {
+  "label": "guardian",
+  "model": "chatgpt",
+  "modelId": "gpt-6.1-sol",
+  "seconds": 284,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 3,
+  "plus": 0,
+  "terms": 4,
+  "certainty": {
+   "medium": 3
+  },
+  "inferred": 3,
+  "broad": 0,
+  "maxParagraphs": 2,
+  "byCategory": {
+   "leap": 2,
+   "evidence": 1
+  },
+  "results": {
+   "assumption": "nothing_found",
+   "leap": "found",
+   "gap": "nothing_found",
+   "evidence": "found",
+   "missing": "nothing_found",
+   "headline_vs_content": "nothing_found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 1,
+   "verified": 1
+  },
+  "issues": []
+ },
+ {
+  "label": "memoire-camino",
+  "model": "chatgpt",
+  "modelId": "gpt-6.1-sol",
+  "seconds": 42,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 3,
+  "plus": 0,
+  "terms": 0,
+  "certainty": {
+   "high": 2,
+   "medium": 1
+  },
+  "inferred": 3,
+  "broad": 0,
+  "maxParagraphs": 4,
+  "byCategory": {
+   "leap": 1,
+   "gap": 1,
+   "missing": 1
+  },
+  "results": {
+   "assumption": "nothing_found",
+   "leap": "found",
+   "gap": "found",
+   "evidence": "not_applicable",
+   "missing": "found",
+   "headline_vs_content": "nothing_found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 3,
+   "verified": 3
+  },
+  "issues": []
+ },
+ {
+  "label": "schoon-priemgetallen",
+  "model": "chatgpt",
+  "modelId": "gpt-6.1-sol",
+  "seconds": 38,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 0,
+  "plus": 0,
+  "terms": 1,
+  "certainty": {},
+  "inferred": 0,
+  "broad": 0,
+  "maxParagraphs": 0,
+  "byCategory": {},
+  "results": {
+   "assumption": "nothing_found",
+   "leap": "nothing_found",
+   "gap": "nothing_found",
+   "evidence": "nothing_found",
+   "missing": "nothing_found",
+   "headline_vs_content": "nothing_found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 1,
+   "verified": 1
+  },
+  "issues": []
+ },
+ {
+  "label": "fouten-koffie",
+  "model": "sushi",
+  "modelId": "GLM-5.3-Flash-Sushi-2.4bpw",
+  "seconds": 394,
+  "calls": 2,
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 7,
+  "plus": 1,
+  "terms": 0,
+  "certainty": {
+   "high": 2,
+   "medium": 5
+  },
+  "inferred": 5,
+  "broad": 0,
+  "maxParagraphs": 4,
+  "byCategory": {
+   "headline_vs_content": 2,
+   "leap": 2,
+   "assumption": 1,
+   "evidence": 2
+  },
+  "results": {
+   "assumption": "found",
+   "leap": "found",
+   "gap": "nothing_found",
+   "evidence": "found",
+   "missing": "nothing_found",
+   "headline_vs_content": "found"
+  },
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 10,
+   "verified": 10
+  },
+  "issues": []
+ },
+ {
+  "label": "schoon-priemgetallen",
+  "model": "sushi",
+  "modelId": "GLM-5.3-Flash-Sushi-2.4bpw",
+  "seconds": 279,
+  "calls": 2,
+  "schemaFirstTry": false,
+  "critique": false,
+  "quotes": {
+   "moved": 0,
+   "removed": 0,
+   "total": 5,
+   "verified": 5
+  },
+  "issues": [
+   "critique_failed"
+  ]
+ }
+]

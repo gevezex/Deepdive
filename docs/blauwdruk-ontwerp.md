@@ -1,23 +1,23 @@
-# Blauwdruk: ontwerp en testresultaten (stap 3a)
+# Blauwdruk: ontwerp en testresultaten
 
-Stap 3a legt de blauwdruk vast als data en test de kwaliteit. Er is nog geen knop, paneel of diagram in de app; dat is stap 3b.
+Stap 3a legde de blauwdruk vast als data en testte de kwaliteit. Stap 3b bracht het schema naar versie 2 en zette de blauwdruk in de app. De eerste helft van dit document beschrijft het huidige ontwerp, [Test van stap 3a](#test-van-stap-3a) de oorspronkelijke meting en [Stap 3b](#stap-3b) wat er daarna is veranderd.
 
 ## Conclusie
 
 - Doel, boodschap en structuur zijn op beide modellen bruikbaar.
 - ChatGPT is de betere standaard: snel, en weinig ruis.
 - Sushi vindt meer, maar levert ook meer ruis en is ruim vier keer zo traag.
-- De kritische laag moet nog op drie punten veranderen voordat er een scherm op komt: zie [Wat stap 3b nodig heeft](#wat-stap-3b-nodig-heeft).
+- Versie 2 scheidt lof, kritiek en begrippen, en de zekerheid zegt nu iets. Op de kleine set wijst geen enkel punt meer te breed.
 
 ## Schema
 
-Het schema staat in `src-tauri/src/blueprint/schema.rs` en heeft versienummer 1.
+Het schema staat in `src-tauri/src/blueprint/schema.rs` en heeft versienummer 2. De opdrachten aan het model hebben een eigen versienummer, `PROMPT_VERSION`, dat ook 2 is.
 
 | Laag | Inhoud |
 |---|---|
 | 1. Doel | Hoofddoel en bijdoelen, boodschap in één zin, aanleiding, samenvatting, soort tekst |
 | 2. Structuur | Blokken met rol, inhoud en alinea's; relaties tussen blokken |
-| 3. Kritiek | Punten aan een blok of relatie, met soort, gezegd of afgeleid, zekerheid, alinea's en citaten |
+| 3. Kritiek | Punten aan een blok of relatie, met soort, plus of min, gezegd of afgeleid, zekerheid, alinea's en citaten. Daarnaast een hulplijst met begrippen, die niet als punt telt |
 
 Bij de kritiek hoort per onderdeel een uitkomst: gevonden, niets gevonden of niet van toepassing. "Geen gat gevonden" is daarmee een geldige uitkomst, en een memoire hoeft niets te bewijzen.
 
@@ -43,12 +43,14 @@ Beide aanroepen beginnen met dezelfde tekst, zodat de provider die kan hergebrui
 | Relaties wijzen naar bestaande blokken, zonder kringen | Relatie wordt weggehaald |
 | Kritische punten hangen aan iets dat bestaat | Punt wordt weggehaald |
 | Citaat staat letterlijk in de bron | Verplaatst naar de juiste alinea, of weggehaald |
+| Punt wijst naar meer dan 8 alinea's, of naar minstens 5 en meer dan de helft van het stuk | Gemarkeerd als breed; springen gaat naar de eerste alinea |
 
 Er wordt nooit een verwijzing verzonnen, en elke reparatie komt in het resultaat te staan. Vóór het versturen rekent de code uit of de tekst in het model past. Past die niet, dan gaat er niets weg.
 
-De brontekst staat tussen een tag met een willekeurige code en geldt als bron, niet als instructie. De code heeft 25 tests.
+De brontekst staat tussen een tag met een willekeurige code en geldt als bron, niet als instructie.
+## Test van stap 3a
 
-## Test
+De cijfers hieronder gaan over schema versie 1.
 
 - **Stukken:** 19 echte stukken (nieuws, opinie, essay, recensie, blog, onderzoek, naslag, 2 open pdf's en 1 bewust onvolledig stuk) en 6 eigen testteksten. De lijst staat in `docs/blauwdruk-test/selectie.txt`, de antwoorden in `docs/blauwdruk-test/fixtures/VERWACHT.md`.
 - **Modellen:** ChatGPT `gpt-6.1-sol` en lokaal `GLM-5.3-Flash-Sushi-2.4bpw`, via de providers in de app.
@@ -97,25 +99,61 @@ Dit is de inschatting van Claude. Alle testteksten zijn met de antwoorden vergel
 - Sushi is alleen op deze machine en met deze instellingen gemeten.
 - Het overzicht is in de browser nagekeken, behalve de knop om oordelen als bestand te bewaren.
 
-## Wat stap 3b nodig heeft
+## Stap 3b
 
-Eerst in het schema, in versie 2:
+### Schema versie 2
 
-1. **Plus of min per punt.** De prompt vraagt ook om opvallend sterk bewijs, maar nu lijkt lof op het scherm op een gebrek.
-2. **Voorkennis apart.** Begrippen zijn een hulplijst en geen kritiek, en vullen nu 55 van de 244 punten.
-3. **Zekerheid opnieuw bepalen.** Bij ChatGPT is bijna alles hoog. Geef vaste criteria per niveau, of toon het veld niet.
+| Wens uit stap 3a | Wat er nu is |
+|---|---|
+| Plus of min per punt | Verplicht veld `polarity`. Een plus is groen en krijgt een +, een min is warmbruin en krijgt een − |
+| Voorkennis apart | Geen kritisch onderdeel meer, maar een eigen lijst `terms`, ingeklapt onder de kritiek |
+| Zekerheid | Vaste criteria per niveau in de prompt. Het veld blijft zichtbaar, omdat het nu iets zegt: zie hieronder |
+| Brede verwijzingen | De prompt vraagt om hooguit vijf alinea's. De controle markeert wat te breed blijft |
 
-Daarna in de prompt en de controles:
+### Nieuwe meting
 
-4. **Brede verwijzingen weigeren of markeren.** De controle moet ook naar de omvang kijken. Daarna de punten opnieuw meten op een kleine set.
+Vijf stukken met ChatGPT `gpt-6.1-sol` en twee korte met Sushi. De cijfers staan in `docs/blauwdruk-test/resultaten-v2.json`.
 
-In de app:
+| Stuk en model | Punten v1 (waarvan voorkennis) | Punten v2 | Begrippen | Plus | Zekerheid hoog / gemiddeld | Duur v1 en v2 |
+|---|---|---|---|---|---|---|
+| `fouten-koffie`, ChatGPT | 5 (0) | 4 | 0 | 0 | 3 / 1 | 62 s, 53 s |
+| `schoon-priemgetallen`, ChatGPT | 0 (0) | 0 | 1 | 0 | geen punten | 38 s, 38 s |
+| `memoire-camino`, ChatGPT | 3 (0) | 3 | 0 | 0 | 2 / 1 | 49 s, 42 s |
+| `guardian`, ChatGPT | 4 (0) | 3 | 4 | 0 | 0 / 3 | 98 s, niet bruikbaar |
+| `devto`, ChatGPT | 4 (2) | 2 | 6 | 1 | 1 / 1 | 85 s, 73 s |
+| `fouten-koffie`, Sushi | 8 (0) | 7 | 0 | 1 | 2 / 5 | 153 s, 394 s |
+SUSHI_SCHOON_RIJ
 
-5. **ChatGPT als standaard,** met Sushi als lokale, langzamere keuze waarbij de duur vooraf wordt genoemd.
-6. **Voortgang tonen en het doel meteen laten zien.** Zelfs bij ChatGPT duurt het 15 seconden tot het doel en anderhalve minuut tot het geheel. Bij Sushi kan het een kwartier duren.
-7. **Eén keer maken en bewaren,** per bron, model en promptversie, zoals `VISIE.md` vraagt.
-8. **De waarschuwing voor een onvolledige bron bovenaan** tonen, en de dekking niet als kwaliteitscijfer gebruiken. Bij WIRED is die laag doordat de rest van de pagina navigatie is.
-9. **De sleutel één keer per sessie lezen** en de gewone app echt ondertekenen. Nu leest `providers/mod.rs` de sleutel per aanroep, wat bij een testbouw herhaalde sleutelhangermeldingen geeft.
+- **Zekerheid:** bij ChatGPT was in stap 3a 77 van de 79 punten hoog. Op deze set is dat 6 van de 12, en bij Sushi 2 van de 7. Daarom blijft het veld staan, bij het uitgeklapte punt. Met zo weinig punten is dit een aanwijzing en geen bewijs.
+- **Breedte:** geen enkel punt is breed; het breedste wijst naar 4 alinea's. In stap 3a zaten de ergste gevallen in lange stukken (Sushi tot 287 alinea's in de PLOS-pdf), en die zijn niet opnieuw gedraaid met Sushi. De prompt is daar dus niet op getest. De markering is dat wel, met tests.
+- **Geplante fouten:** ChatGPT benoemt in `fouten-koffie` vier van de vijf duidelijk. De zwakke test als meetinstrument komt alleen zijdelings terug ("eenmalige online denktest"). Sushi noemt alle vijf.
+- **Niets verzinnen:** `schoon-priemgetallen` levert bij ChatGPT nul punten en één begrip op. `memoire-camino` krijgt bij bewijs "niet van toepassing".
+- **Lof:** de pluspunten die er zijn, zijn terecht of klein. Sushi prijst dat het koffiebericht de financier noemt, wat aan de magere kant is.
+- **De duren zijn niet zuiver.** `guardian` wachtte op een sleutelhangermelding. Sushi op `fouten-koffie` deelde de server even met een dubbele run door een fout in het testscript, die nu is opgelost.
+- **Sushi:** de eerste poging op `schoon-priemgetallen` kreeg bij de kritiek "overbelast" terug, en later reageerde de server even helemaal niet. De oorzaak is niet onderzocht. Beide meldingen kwamen wel goed in beeld, en de structuur bleef staan.
+
+Dit oordeel is weer dat van Claude. De steekproef is klein en het oordeel van de gebruiker ontbreekt nog.
+
+### Wat er in de app zit
+
+- **Knop in het rechterpaneel.** Het model is wat de lezer in de modelkiezer heeft gekozen. Zonder keuze stelt het paneel ChatGPT voor als dat gekoppeld is, maar er wordt pas gekozen na een klik.
+- **Stap voor stap.** `stream.rs` leest doel, boodschap en blokken uit het antwoord terwijl het binnenkomt. Dat is ongecontroleerd en alleen om te tonen. De gecontroleerde structuur vervangt het daarna. Bij een tweede poging gaat wat er stond eerst weg.
+- **Afbreken** laat de lopende aanroep vallen, wat de verbinding sluit. Tijdens de structuur blijft er niets over. Tijdens de kritiek blijven doel en diagram bewaard, en kan de lezer later alleen de kritiek maken.
+- **Doorlezen kan.** Een blauwdruk loopt door als de lezer een ander stuk opent, en is er nog bij terugkomst.
+- **Diagram.** Blokken staan in tekstvolgorde onder elkaar, omdat dat in een smal paneel leesbaar blijft. Pijlen lopen in hooguit vier banen links ervan. Vlak boven elk blok staan de pijlen die erin komen, met hun uitleg en punten. Dat is eigen HTML en SVG uit de data, zonder Mermaid.
+- **Bewaren.** Per bron, model en promptversie, meteen na de structuur en opnieuw na de kritiek. Een onvolledige blauwdruk vervangt nooit een volledige van hetzelfde model.
+- **Sleutel.** `CachedSecrets` leest elk item één keer per sessie. Dat geldt ook voor de ChatGPT-tokens, die anders bij elk verzoek werden gelezen.
+
+Hoe springen werkt binnen de afscherming staat in `README.md`.
+
+### Open punten
+
+- **De gewone app is nog niet ondertekend.** Zonder vaste handtekening vraagt macOS na elke nieuwe build opnieuw om toegang tot de sleutelhanger. De test in de echte app stond daardoor ongeveer 20 minuten stil. De voortgang noemt die mogelijkheid nu na 20 seconden.
+- **Springen laadt de kopie opnieuw.** Bij een zware pagina kan dat even zichtbaar zijn.
+- **Er is geen donkere stand,** omdat de app die nog niet heeft.
+- **De taal** staat vast op Nederlands en zit niet in de bewaarnaam. Maak je dat instelbaar, neem de taal dan mee in die naam.
+- **Tijdens het streamen** kan een blok nog naar een alinea wijzen die niet bestaat. Springen doet dan niets, tot de controle het heeft hersteld.
+- **Het overzicht van stap 3a** (`scripts/blauwdruk-overzicht.mjs`) kent plus of min en begrippen nog niet.
 
 ## Opnieuw draaien
 
@@ -125,6 +163,12 @@ node scripts/blauwdruk-test.mjs fetch
 
 ```bash
 node scripts/blauwdruk-test.mjs run
+```
+
+Alleen een paar stukken en één model:
+
+```bash
+MODELS=chatgpt node scripts/blauwdruk-test.mjs run fouten-koffie schoon-priemgetallen
 ```
 
 ```bash
