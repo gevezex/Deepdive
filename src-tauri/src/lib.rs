@@ -1,4 +1,7 @@
 mod ai;
+// De blauwdruk heeft nog geen knop: die komt in stap 3b. Tot dan gebruikt alleen de testhaak deze module.
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
+mod blueprint;
 mod chatgpt;
 mod completeness;
 mod engine;

@@ -5,3 +5,6 @@ src-tauri/gen/schemas/
 .DS_Store
 .lavish/
 public/pdfjs/
+
+# Testuitvoer van de blauwdruk: bevat kopieën van artikelen en modeluitvoer. Nooit committen.
+.blauwdruk-test/

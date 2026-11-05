@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blauwdruk beoordelen</title>
+<style>
+:root { --paper:#f6f0e4; --paper-deep:#ece4d3; --card:#fbf7ee; --ink:#2b2620; --ink-soft:#6a6052; --line:#d8ccb6; --accent:#7a4a1e; --warn-bg:#f7e1d9; --warn-line:#c9806a; --ok:#3f6b3a; --mid:#9a7a1e; --bad:#a8432c; }
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body { background:var(--paper); color:var(--ink); font:15px/1.5 -apple-system, "Helvetica Neue", sans-serif; display:flex; flex-direction:column; }
+header { display:flex; gap:16px; align-items:center; padding:8px 16px; border-bottom:1px solid var(--line); background:var(--paper-deep); flex-wrap:wrap; }
+header h1 { font-size:16px; margin:0; font-weight:600; }
+nav.tabs { display:flex; gap:4px; }
+button { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:3px 10px; cursor:pointer; }
+button:hover { border-color:var(--accent); }
+button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.spacer { flex:1; }
+.progress { color:var(--ink-soft); font-size:13px; }
+main { flex:1; min-height:0; display:flex; }
+#view-review { flex:1; min-width:0; display:flex; }
+aside { width:230px; flex:none; overflow-y:auto; border-right:1px solid var(--line); padding:8px; }
+aside h2 { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); margin:12px 4px 4px; }
+aside a { display:flex; justify-content:space-between; gap:6px; padding:3px 6px; border-radius:5px; color:inherit; text-decoration:none; cursor:pointer; overflow-wrap:anywhere; }
+aside a:hover { background:var(--paper-deep); }
+aside a.on { background:var(--accent); color:#fff; }
+aside .done { font-size:12px; opacity:.75; white-space:nowrap; }
+.source, .blue { flex:1 1 50%; min-width:0; overflow-y:auto; padding:12px 16px 80px; }
+.source { border-right:1px solid var(--line); background:var(--card); }
+.source h2, .blue h2 { font-size:17px; margin:0 0 4px; overflow-wrap:anywhere; }
+.para { display:flex; gap:8px; padding:3px 4px; border-radius:4px; scroll-margin-top:30px; }
+.para .n { flex:none; width:34px; text-align:right; color:var(--ink-soft); font-size:12px; padding-top:2px; }
+.para .t { min-width:0; overflow-wrap:anywhere; }
+.para.heading .t { font-weight:600; }
+.para.mark { background:#f3dfae; }
+.muted { color:var(--ink-soft); font-size:13px; }
+.modeltabs { display:flex; gap:4px; margin:6px 0 10px; flex-wrap:wrap; }
+.warn { background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:6px; padding:6px 10px; margin:8px 0; }
+section.layer { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; background:var(--card); }
+section.layer > h3 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:center; }
+.rate { display:inline-flex; gap:3px; font-weight:400; }
+.rate button { padding:0 8px; font-size:13px; }
+.rate button.on.good { background:var(--ok); border-color:var(--ok); }
+.rate button.on.mid { background:var(--mid); border-color:var(--mid); }
+.rate button.on.bad { background:var(--bad); border-color:var(--bad); }
+textarea { width:100%; font:inherit; font-size:13px; margin-top:6px; padding:4px 6px; border:1px solid var(--line); border-radius:5px; background:#fff; color:var(--ink); min-height:30px; }
+.label { font-size:12px; color:var(--ink-soft); }
+.block { border:1px solid var(--line); border-radius:6px; padding:6px 10px; background:#fff; position:relative; }
+.block .role { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); }
+.block .title { font-weight:600; }
+.range { color:var(--accent); cursor:pointer; text-decoration:underline; text-decoration-style:dotted; font-size:13px; white-space:nowrap; }
+.link { margin:2px 0 2px 18px; padding:2px 0 2px 12px; border-left:2px solid var(--line); font-size:13px; color:var(--ink-soft); }
+.link b { color:var(--ink); font-weight:600; }
+blockquote { margin:4px 0; padding:2px 8px; border-left:3px solid var(--line); font-size:13px; font-style:italic; overflow-wrap:anywhere; }
+.point { border-left:4px solid var(--warn-line); background:#fff; border-radius:0 6px 6px 0; padding:5px 10px; margin:6px 0; }
+.point.prior { border-left-color:var(--line); }
+.point .meta { font-size:12px; color:var(--ink-soft); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.tag { background:var(--paper-deep); border-radius:4px; padding:0 5px; font-size:12px; white-space:nowrap; }
+.tag.inferred { background:#e6e0f0; }
+.tag.stated { background:#dcebd6; }
+.checks { font-size:13px; display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.issues { font-size:12px; color:var(--ink-soft); margin:6px 0 0; padding-left:16px; }
+#view-metrics, #view-verdict { flex:1; min-width:0; overflow:auto; padding:16px; }
+table { border-collapse:collapse; font-size:13px; background:var(--card); }
+th, td { border:1px solid var(--line); padding:3px 7px; text-align:right; white-space:nowrap; }
+th:first-child, td:first-child, td.l, th.l { text-align:left; }
+th { background:var(--paper-deep); position:sticky; top:0; }
+#view-verdict th, #view-verdict td { text-align:left; white-space:normal; vertical-align:top; }
+.prose { max-width:780px; }
+.prose h2 { font-size:18px; margin:18px 0 6px; }
+.prose h3 { font-size:15px; margin:14px 0 4px; }
+.prose p, .prose li { margin:4px 0; }
+details { margin:8px 0; }
+summary { cursor:pointer; color:var(--accent); }
+.claude { border:1px dashed var(--accent); border-radius:6px; padding:6px 10px; background:#fff; }
+@media (max-width: 800px) { #view-review { flex-direction:column; overflow-y:auto; } aside { width:auto; border-right:0; max-height:30vh; } .source, .blue { flex:none; overflow:visible; border-right:0; } main { overflow:auto; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Blauwdruk beoordelen</h1>
+  <nav class="tabs">
+    <button data-view="review" class="on">Beoordelen</button>
+    <button data-view="metrics">Metingen</button>
+    <button data-view="verdict">Oordeel van Claude</button>
+  </nav>
+  <span class="spacer"></span>
+  <span class="progress" id="progress"></span>
+  <button id="export">Oordelen bewaren als bestand</button>
+</header>
+<main>
+  <div id="view-review">
+    <aside id="list"></aside>
+    <div class="source" id="source"></div>
+    <div class="blue" id="blue"></div>
+  </div>
+  <div id="view-metrics" hidden></div>
+  <div id="view-verdict" hidden></div>
+</main>
+<script>
+const DATA = /*DATA*/null;
+const KEY = "deepdive-blauwdruk-oordelen-v1";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let ratings = {};
+try { ratings = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch {}
+const saveRatings = () => { try { localStorage.setItem(KEY, JSON.stringify(ratings)); } catch {} updateProgress(); };
+
+const CATEGORY = { assumption: "Aanname", leap: "Sprong", gap: "Logisch gat", evidence: "Bewijs", missing: "Wat ontbreekt", headline_vs_content: "Kop tegenover inhoud", prior_knowledge: "Voorkennis" };
+const RESULT = { found: "gevonden", nothing_found: "niets gevonden", not_applicable: "niet van toepassing" };
+const CERTAINTY = { high: "zeker", medium: "redelijk zeker", low: "onzeker" };
+const ORIGIN = { stated: "staat in de tekst", inferred: "afgeleid door het model" };
+const KIND = { news: "nieuws", opinion: "opinie", research: "onderzoek", memoir: "memoire", essay: "essay", explainer: "uitleg", review: "recensie", reference: "naslag", other: "anders" };
+const REL = { builds_on: "bouwt voort op", evidence_for: "is bewijs vanuit", example_of: "is voorbeeld bij", answers: "antwoordt op", contrasts: "staat tegenover", follows_in_time: "volgt op", concludes: "concludeert uit" };
+const GOAL = { explain_problem: "probleem uitleggen", offer_solution: "oplossing bieden", vent_frustration: "frustratie uiten", personal_experience: "persoonlijke ervaring", develop_concept: "idee uitwerken", persuade: "overtuigen", report_research: "onderzoek rapporteren", report_event: "gebeurtenis verslaan", refute: "weerleggen", evaluate: "beoordelen", instruct: "instrueren", other: "anders" };
+
+const state = { label: DATA.pieces[0]?.label, model: null };
+const piece = () => DATA.pieces.find((p) => p.label === state.label);
+const ratingKey = (label, model) => `${label}/${model}`;
+const rating = (label, model) => (ratings[ratingKey(label, model)] ??= {});
+const LAYERS = ["doel", "opbouw", "kritiek"];
+const isRated = (label, model) => { const r = ratings[ratingKey(label, model)]; return r && LAYERS.every((l) => r[l]); };
+
+function updateProgress() {
+  let done = 0, all = 0;
+  for (const p of DATA.pieces) for (const m of Object.keys(p.runs)) if (p.runs[m].ok) { all++; if (isRated(p.label, m)) done++; }
+  $("progress").textContent = `${done} van ${all} beoordeeld`;
+}
+
+function renderList() {
+  const groups = {};
+  for (const p of DATA.pieces) (groups[p.group] ??= []).push(p);
+  $("list").innerHTML = Object.entries(groups).map(([group, items]) => `<h2>${esc(group)}</h2>` + items.map((p) => {
+    const models = Object.keys(p.runs);
+    const done = models.filter((m) => isRated(p.label, m)).length;
+    return `<a data-label="${esc(p.label)}" class="${p.label === state.label ? "on" : ""}"><span>${esc(p.label)}</span><span class="done">${done}/${models.length}</span></a>`;
+  }).join("")).join("");
+  for (const a of $("list").querySelectorAll("a")) a.onclick = () => { state.label = a.dataset.label; state.model = null; renderAll(); $("blue").scrollTop = 0; $("source").scrollTop = 0; };
+}
+
+function renderSource() {
+  const p = piece();
+  const url = p.source.url && !p.source.url.includes("deepdive.invalid") ? `<a href="${esc(p.source.url)}" target="_blank" rel="noreferrer noopener">origineel</a> · ` : "";
+  $("source").innerHTML = `<h2>${esc(p.source.title)}</h2><div class="muted">${url}${esc(p.words)} woorden, ${esc(p.blocks)} alinea's, oordeel app: ${esc(p.verdict)}</div><div style="margin-top:10px">` +
+    p.source.blocks.map((b) => `<div class="para ${esc(b.kind)}" id="p${b.n}"><span class="n">¶${b.n}</span><span class="t">${esc(b.text)}</span></div>`).join("") + "</div>";
+}
+
+function jump(from, to) {
+  for (const el of document.querySelectorAll(".para.mark")) el.classList.remove("mark");
+  for (let n = from; n <= to; n++) $(`p${n}`)?.classList.add("mark");
+  $(`p${from}`)?.scrollIntoView({ block: "center" });
+}
+const rangeText = (ranges) => (ranges ?? []).map(([a, b]) => `<span class="range" data-a="${a}" data-b="${b}">¶${a === b ? a : `${a}–${b}`}</span>`).join(" ");
+
+function rateButtons(path) {
+  const r = rating(state.label, state.model);
+  return `<span class="rate" data-path="${esc(path)}">` + [["good", "klopt"], ["mid", "deels"], ["bad", "fout"]].map(([v, t]) => `<button data-v="${v}" class="${v} ${r[path] === v ? "on" : ""}">${t}</button>`).join("") + "</span>";
+}
+
+function renderPoint(p) {
+  const q = (p.quotes ?? []).map((x) => `<blockquote>${esc(x.text)} <span class="range" data-a="${x.paragraph}" data-b="${x.paragraph}">¶${x.paragraph}</span></blockquote>`).join("");
+  return `<div class="point ${p.category === "prior_knowledge" ? "prior" : ""}">
+    <div class="meta"><span class="tag">${esc(CATEGORY[p.category])}</span><span class="tag ${esc(p.origin)}">${esc(ORIGIN[p.origin])}</span><span>${esc(CERTAINTY[p.certainty])}</span>${p.evidenceKind ? `<span class="tag">${esc(p.evidenceKind)}</span>` : ""}<span>aan ${esc(p.anchor ?? "niets (los)")}</span>${rangeText(p.paragraphs)}<span class="spacer"></span>${rateButtons("punt:" + p.id)}</div>
+    <div><b>${esc(p.claim)}</b></div><div>${esc(p.explanation)}</div>${q}</div>`;
+}
+
+function renderBlueprint() {
+  const p = piece();
+  const models = Object.keys(p.runs);
+  state.model = state.model && models.includes(state.model) ? state.model : models[0];
+  const run = p.runs[state.model];
+  const tabs = `<div class="modeltabs">` + models.map((m) => `<button data-model="${esc(m)}" class="${m === state.model ? "on" : ""}">${esc(m)}</button>`).join("") + "</div>";
+  if (!run.ok) {
+    $("blue").innerHTML = `<h2>${esc(state.label)}</h2>${tabs}<div class="warn"><b>Geen blauwdruk.</b> ${esc(run.errorKind)}: ${esc(run.error)}<br><span class="muted">${esc(run.detail)}</span></div>`;
+    bindBlue();
+    return;
+  }
+  const b = run.blueprint, c = b.critique;
+  const relsFor = (id) => b.relations.filter((r) => r.block === id);
+  const pointsAt = (id) => (c?.points ?? []).filter((x) => x.anchor === id);
+  const flow = b.blocks.map((block) => {
+    const rels = relsFor(block.id).map((r) => `<div class="link"><b>${esc(block.id)} ${esc(REL[r.kind])} ${esc(r.dependsOn)}</b> <span class="muted">(${esc(r.id)})</span>: ${esc(r.explanation)}${pointsAt(r.id).map((x) => ` <span class="tag">⚠ ${esc(CATEGORY[x.category])} ${esc(x.id)}</span>`).join("")}</div>`).join("");
+    const marks = pointsAt(block.id).map((x) => `<span class="tag">⚠ ${esc(CATEGORY[x.category])} ${esc(x.id)}</span>`).join(" ");
+    return `${rels}<div class="block"><div class="role">${esc(block.id)} · ${esc(block.role)}</div><div class="title">${esc(block.title)} ${rangeText(block.paragraphs)}</div><div>${esc(block.content)}</div>${block.quote ? `<blockquote>${esc(block.quote.text)}</blockquote>` : ""}${marks}</div>`;
+  }).join("");
+  const r = rating(state.label, state.model);
+  const note = (path) => `<textarea data-note="${esc(path)}" placeholder="Opmerking (optioneel)">${esc(r["notitie:" + path] ?? "")}</textarea>`;
+  const loose = (c?.points ?? []).filter((x) => !x.anchor);
+  const claudeNote = DATA.verdict.pieces?.[`${state.label}/${state.model}`];
+  $("blue").innerHTML = `<h2>${esc(state.label)}</h2>${tabs}
+    <div class="muted">Gemaakt door ${esc(b.model)} in ${Math.round(run.seconds)} s · soort: ${esc(KIND[b.textKind])} · schema v${b.schemaVersion} · taal: ${esc(b.language)}</div>
+    ${b.source.likelyIncomplete ? `<div class="warn"><b>Waarschijnlijk onvolledig.</b> ${esc(b.source.warning)}</div>` : ""}
+    <section class="layer"><h3>Laag 1: doel ${rateButtons("doel")}</h3>
+      <div><span class="label">Hoofddoel (${esc(GOAL[b.goal.main.kind])})</span><br>${esc(b.goal.main.description)}</div>
+      ${b.goal.secondary.map((g) => `<div><span class="label">Bijdoel (${esc(GOAL[g.kind])})</span><br>${esc(g.description)}</div>`).join("")}
+      <div style="margin-top:6px"><span class="label">Boodschap</span><br><b>${esc(b.message)}</b></div>
+      <div style="margin-top:6px"><span class="label">Aanleiding ${b.occasion ? `(${esc(ORIGIN[b.occasion.origin])})` : ""}</span><br>${b.occasion ? `${esc(b.occasion.text)} ${rangeText(b.occasion.paragraphs)}` : "Het stuk zegt dit niet."}</div>
+      <div style="margin-top:6px"><span class="label">Samenvatting</span><br>${esc(b.summary)}</div>
+      ${note("doel")}</section>
+    <section class="layer"><h3>Laag 2: opbouw ${rateButtons("opbouw")}</h3>
+      <div class="muted">Het stuk loopt van ¶${b.articleParagraphs[0]} tot ¶${b.articleParagraphs[1]}; ${Math.round(b.checks.coverage * 100)}% daarvan valt in een blok.</div>
+      ${flow}${note("opbouw")}</section>
+    <section class="layer"><h3>Laag 3: kritiek ${rateButtons("kritiek")}</h3>
+      ${c ? `<div><b>${esc(c.overall)}</b></div>
+        ${c.points.length ? c.points.map(renderPoint).join("") : `<div class="muted" style="margin:6px 0">Geen gat gevonden.</div>`}
+        ${loose.length ? `<div class="warn">${loose.length} punt(en) hangen aan niets: het model verwees naar iets dat niet bestaat.</div>` : ""}
+        <div class="checks">${c.checked.map((k) => `<span class="tag">${esc(CATEGORY[k.category])}: ${esc(RESULT[k.result])}</span>`).join("")}</div>`
+      : `<div class="warn">De kritische laag is mislukt.</div>`}
+      ${note("kritiek")}</section>
+    ${b.issues.length ? `<details><summary>${b.issues.length} meldingen van de controle</summary><ul class="issues">${b.issues.map((i) => `<li>${esc(i.code)} (${esc(i.path)}): ${esc(i.detail)}</li>`).join("")}</ul></details>` : ""}
+    ${claudeNote ? `<details><summary>Oordeel van Claude over deze blauwdruk (pas lezen na je eigen oordeel)</summary><div class="claude">${esc(claudeNote)}</div></details>` : ""}`;
+  bindBlue();
+}
+
+function bindBlue() {
+  for (const el of $("blue").querySelectorAll("[data-model]")) el.onclick = () => { state.model = el.dataset.model; renderBlueprint(); };
+  for (const el of $("blue").querySelectorAll(".range")) el.onclick = () => jump(+el.dataset.a, +el.dataset.b);
+  for (const el of $("blue").querySelectorAll(".rate button")) el.onclick = () => {
+    const path = el.parentElement.dataset.path, r = rating(state.label, state.model);
+    r[path] = r[path] === el.dataset.v ? undefined : el.dataset.v;
+    saveRatings(); renderList();
+    for (const b of el.parentElement.children) b.classList.toggle("on", b.dataset.v === r[path]);
+  };
+  for (const el of $("blue").querySelectorAll("textarea")) el.oninput = () => { rating(state.label, state.model)["notitie:" + el.dataset.note] = el.value; saveRatings(); };
+}
+
+function median(xs) { const s = xs.filter((x) => x != null).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; }
+
+function renderMetrics() {
+  const rows = DATA.summary;
+  const models = [...new Set(rows.map((r) => r.model))];
+  const totals = models.map((m) => {
+    const rs = rows.filter((r) => r.model === m), ok = rs.filter((r) => r.ok), q = ok.map((r) => r.quotes);
+    const sum = (f) => q.reduce((a, x) => a + f(x), 0);
+    return `<tr><td>${esc(m)}</td><td class="l">${esc(rs[0]?.modelId)}</td><td>${ok.length}/${rs.length}</td><td>${rs.filter((r) => r.schemaFirstTry).length}</td><td>${rs.reduce((a, r) => a + r.calls, 0)}</td><td>${median(ok.map((r) => r.seconds))}</td><td>${Math.max(0, ...ok.map((r) => r.seconds))}</td><td>${Math.round(median(ok.map((r) => r.goalReadySeconds)) ?? 0)}</td><td>${sum((x) => x.total)}</td><td>${sum((x) => x.verified)}</td><td>${sum((x) => x.moved)}</td><td>${sum((x) => x.removed)}</td><td>${median(ok.map((r) => r.points))}</td></tr>`;
+  }).join("");
+  const table = rows.map((r) => `<tr><td>${esc(r.label)}</td><td class="l">${esc(r.model)}</td><td class="l">${esc(r.group)}</td><td>${r.words}</td><td class="l">${r.ok ? "ja" : esc(r.errorKind)}</td><td>${r.seconds}</td><td>${r.goalReadySeconds == null ? "" : Math.round(r.goalReadySeconds)}</td><td>${r.calls}</td><td>${r.schemaFirstTry ? "ja" : "nee"}</td><td class="l">${esc(r.textKind ? KIND[r.textKind] : "")}</td><td>${r.blocks}</td><td>${r.relations}</td><td>${r.points ?? ""}</td><td>${r.quotes ? `${r.quotes.verified + r.quotes.moved}/${r.quotes.total}` : ""}</td><td>${r.quotes?.removed ?? ""}</td><td>${r.coverage ?? ""}</td><td>${(r.rangesFixed ?? 0) + (r.relationsRemoved ?? 0) + (r.anchorsRemoved ?? 0)}</td><td>${r.estimatedInputTokens}</td><td>${r.contextTokens ?? ""}</td></tr>`).join("");
+  $("view-metrics").innerHTML = `<div class="prose"><h2>Metingen</h2><p>Alleen wat de code heeft gemeten, zonder oordeel over de inhoud. Tijden in seconden. "Citaten" telt wat de controle letterlijk in de bron terugvond.</p></div>
+    <h3>Per model</h3><table><tr><th>Model</th><th class="l">Id</th><th>Gelukt</th><th>Schema eerste keer</th><th>Aanroepen</th><th>Mediaan s</th><th>Max s</th><th>Mediaan s tot doel</th><th>Citaten</th><th>Letterlijk</th><th>Verplaatst</th><th>Weggehaald</th><th>Mediaan punten</th></tr>${totals}</table>
+    <h3>Per stuk</h3><table><tr><th>Stuk</th><th class="l">Model</th><th class="l">Soort</th><th>Woorden</th><th class="l">Gelukt</th><th>Duur</th><th>Tot doel</th><th>Aanroepen</th><th>Schema 1e keer</th><th class="l">Soort volgens model</th><th>Blokken</th><th>Relaties</th><th>Punten</th><th>Citaten ok</th><th>Weg</th><th>Dekking</th><th>Verwijzingen hersteld</th><th>Geschat tokens</th><th>Context</th></tr>${table}</table>`;
+}
+
+function renderVerdict() {
+  $("view-verdict").innerHTML = `<div class="prose">${DATA.verdict.general || "<p>Nog niet ingevuld.</p>"}</div>`;
+}
+
+function renderAll() { renderList(); renderSource(); renderBlueprint(); updateProgress(); }
+
+for (const b of document.querySelectorAll("nav.tabs button")) b.onclick = () => {
+  for (const x of document.querySelectorAll("nav.tabs button")) x.classList.toggle("on", x === b);
+  for (const v of ["review", "metrics", "verdict"]) { $(`view-${v}`).hidden = v !== b.dataset.view; }
+  $("view-review").style.display = b.dataset.view === "review" ? "" : "none";
+};
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify(ratings, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "blauwdruk-oordelen.json";
+  a.click();
+};
+renderMetrics(); renderVerdict();
+if (piece()) renderAll();
+</script>
+</body>
+</html>

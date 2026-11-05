@@ -1,0 +1,25 @@
+# Selectie voor de blauwdruktest (stap 3a), uit site-test-urls.txt en site-test-urls-controle.txt.
+# Formaat: soort label adres. Soort is wat ik verwacht, niet wat het model moet zeggen.
+nieuws nos https://nos.nl/l/2638133
+nieuws bbc https://www.bbc.co.uk/news/articles/cw33xm0de221o
+nieuws tweakers https://tweakers.net/nieuws/234180/nvidia-brengt-hotfix-uit-voor-bug-die-gpu-temperatuur-verkeerd-weergeeft.html
+nieuws ad https://www.ad.nl/buitenland/trump-wil-dat-alle-stemmen-voor-nep-dan-sullivan-naar-republikeinse-dan-sullivan-gaan-dan-wint-hij-met-gemak~a6a0f0b2/
+nieuws nunl https://www.nu.nl/darts/6415617/raymond-van-barneveld-59-plaatst-zich-voor-34e-keer-voor-wk-darts.html
+opinie guardian https://www.theguardian.com/commentisfree/2026/nov/05/kemi-badenoch-polls-tory-party-direction
+essay aeon https://aeon.co/essays/welcome-to-the-mixed-up-joyful-world-of-audhd
+essay paulgraham https://paulgraham.com/greatwork.html
+essay acx https://www.astralcodexten.com/p/your-book-review-the-history-and
+recensie newyorker https://www.newyorker.com/magazine/2026/11/16/the-heart-theatre-review-broadway-i-became-we
+blog simonwillison https://simonwillison.net/2026/Nov/4/datasette-llm/
+blog devto https://dev.to/daniel_pertu/sixty-three-of-our-pages-are-one-208-line-component-and-seven-of-the-eight-routes-behind-them-are-4hj1
+blog smashing https://smashingmagazine.com/2026/11/making-immersive-llm-chat-experiences-more-accessible/
+onderzoek quanta https://www.quantamagazine.org/new-research-tests-whether-ai-models-know-their-own-thoughts-20261104/
+naslag wikipedia https://nl.wikipedia.org/wiki/Klimaatakkoord_van_Parijs
+pdf plos-pdf https://journals.plos.org/plosone/article/asset?id=10.1371/journal.pone.0362398.PDF
+pdf arxiv-pdf https://arxiv.org/pdf/2611.05390
+# Bewust onvolledig: test alleen of die status in het resultaat komt.
+onvolledig medium https://medium.com/@JustSnehal/the-architecture-of-an-infinite-content-engine-upgrading-the-firecrawl-gpt-n8n-engine-28e612472b82
+# Reserve als een adres hierboven niet meer werkt of nu onvolledig is.
+recensie wired https://www.wired.com/story/aina-smart-ring/
+reserve parool https://www.parool.nl/amsterdam/terwijl-de-bouw-in-amsterdamse-poort-start-is-er-nog-altijd-geen-duidelijkheid-over-komst-hiphopcentrum~bf6b353b/
+reserve plos https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0362398

@@ -3,10 +3,19 @@
 //!   DEEPDIVE_E2E_DIR=map          voert map/cmd.js uit in het hoofdvenster en schrijft het antwoord naar map/out.json
 //!                                 "win:login\n<js>" voert het uit in het eerste venster waarvan de naam zo begint,
 //!                                 zodat de test de rol van de gebruiker kan spelen op de lokale testsite
+//!   DEEPDIVE_BLUEPRINT_TEST=plan.json  maakt blauwdrukken volgens het plan en schrijft ze naar DEEPDIVE_BLUEPRINT_OUT
 //!   DEEPDIVE_SIGNALS_OUT=map      schrijft de signalen en tekstblokken van elke opgehaalde pagina naar die map
 
-use crate::{engine::RenderedPage, import, store::Store};
+use crate::{
+    blueprint, engine::RenderedPage, import,
+    model::Source,
+    providers::{secrets::Keychain, ModelRef, ProviderStore},
+    store::Store,
+};
+use serde::Deserialize;
 use serde_json::json;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
@@ -14,6 +23,10 @@ pub fn start(app: AppHandle) {
     if let Ok(list) = std::env::var("DEEPDIVE_SITE_TEST") {
         let out = std::env::var("DEEPDIVE_SITE_TEST_OUT").unwrap_or_else(|_| "site-test.json".into());
         tauri::async_runtime::spawn(run_site_test(app.clone(), list, out));
+    }
+    if let Ok(plan) = std::env::var("DEEPDIVE_BLUEPRINT_TEST") {
+        let out = std::env::var("DEEPDIVE_BLUEPRINT_OUT").unwrap_or_else(|_| "blueprint-test".into());
+        tauri::async_runtime::spawn(run_blueprint_test(app.clone(), plan, out));
     }
     if let Ok(dir) = std::env::var("DEEPDIVE_E2E_DIR") {
         tauri::async_runtime::spawn(run_e2e(app, dir));
@@ -59,6 +72,145 @@ async fn run_site_test(app: AppHandle, list: String, out: String) {
         std::fs::write(&out, serde_json::to_string_pretty(&results).unwrap()).unwrap();
     }
     app.exit(0);
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PlanPiece {
+    label: String,
+    #[serde(default)]
+    url: Option<String>,
+    /// Een eigen testtekst: eerste regel de titel, daarna alinea's.
+    #[serde(default)]
+    fixture: Option<String>,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PlanModel {
+    slug: String,
+    provider_id: String,
+    model_id: String,
+}
+
+#[derive(Deserialize)]
+struct Plan {
+    pieces: Vec<PlanPiece>,
+    /// Leeg: alleen ophalen en de uitslag per stuk wegschrijven.
+    #[serde(default)]
+    models: Vec<PlanModel>,
+    /// Alleen deze labels naar het model sturen. Leeg: alle stukken.
+    #[serde(default)]
+    only: Vec<String>,
+}
+
+/// Haalt elk stuk op zoals de app dat doet, en maakt de blauwdrukken met de providers die de gebruiker heeft
+/// ingesteld. De bronnen komen in DEEPDIVE_DATA_DIR, dus buiten de bronnenlijst van de gebruiker.
+async fn run_blueprint_test(app: AppHandle, plan: String, out: String) {
+    let plan: Plan = serde_json::from_str(&std::fs::read_to_string(&plan).expect("plan")).expect("geldig plan");
+    let out = PathBuf::from(out);
+    std::fs::create_dir_all(&out).expect("uitvoermap");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    let mut pieces = vec![];
+    let mut sources: Vec<(String, Source)> = vec![];
+    for piece in &plan.pieces {
+        let store = app.state::<Store>();
+        let start = Instant::now();
+        let result = match (&piece.url, &piece.fixture) {
+            (_, Some(path)) => open_fixture(&store, &piece.label, path),
+            (Some(url), _) => match import::open_url(&app, &store, url, false).await {
+                Ok(source) if !source.text_ready => read_pdf_in_window(&app, url, &source.id).await,
+                other => other,
+            },
+            _ => panic!("stuk zonder url of fixture"),
+        };
+        match result {
+            Ok(source) => {
+                let entry = json!({ "label": piece.label, "url": piece.url, "fixture": piece.fixture, "ok": true, "id": source.id, "title": source.title, "kind": source.kind, "blocks": source.blocks.len(), "words": source.word_count, "verdict": source.completeness.verdict, "reason": source.completeness.reason, "seconds": start.elapsed().as_secs_f32() });
+                eprintln!("[blauwdruk] bron {entry}");
+                pieces.push(entry);
+                sources.push((piece.label.clone(), source));
+            }
+            Err(e) => {
+                let entry = json!({ "label": piece.label, "url": piece.url, "ok": false, "errorKind": e.kind, "error": e.message });
+                eprintln!("[blauwdruk] bron {entry}");
+                pieces.push(entry);
+            }
+        }
+        std::fs::write(out.join("pieces.json"), serde_json::to_string_pretty(&pieces).unwrap()).unwrap();
+    }
+
+    // De echte instellingen van de gebruiker. Sleutels en tokens blijven in de AI-laag.
+    let root = app.path().app_data_dir().expect("gegevensmap");
+    let providers = Arc::new(ProviderStore::open(root, Arc::new(Keychain::new(app.config().identifier.clone()))).expect("providers"));
+    let sources = Arc::new(sources);
+    let only = Arc::new(plan.only);
+    let mut jobs = vec![];
+    for model in plan.models {
+        let (providers, sources, only, out) = (providers.clone(), sources.clone(), only.clone(), out.clone());
+        jobs.push(tauri::async_runtime::spawn(async move {
+            for (label, source) in sources.iter() {
+                if only.is_empty() || only.contains(label) {
+                    run_blueprint(&providers, &model, label, source, &out).await;
+                }
+            }
+        }));
+    }
+    for job in jobs {
+        let _ = job.await;
+    }
+    app.exit(0);
+}
+
+fn open_fixture(store: &Store, label: &str, path: &str) -> Result<Source, crate::error::AppError> {
+    let url = format!("https://deepdive.invalid/fixture/{label}");
+    if let Some(existing) = store.find_by_url(&url) {
+        return Ok(existing);
+    }
+    let text = std::fs::read_to_string(path).map_err(crate::error::AppError::storage)?;
+    let (title, body) = text.split_once('\n').unwrap_or(("", &text));
+    import::import_text(store, Some(title.trim_start_matches("# ").to_string()), Some(url), body)
+}
+
+/// Bij een pdf leest de voorkant de tekst met pdf.js. Dus openen we het adres in het hoofdvenster, als een gebruiker.
+async fn read_pdf_in_window(app: &AppHandle, url: &str, id: &str) -> Result<Source, crate::error::AppError> {
+    if let Some(window) = app.get_webview_window("main") {
+        let js = format!("document.getElementById('url-input').value = {}; document.getElementById('url-form').requestSubmit();", json!(url));
+        let _ = window.eval(js);
+    }
+    let store = app.state::<Store>();
+    for _ in 0..240 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let source = store.get(id)?;
+        if source.text_ready {
+            return Ok(source);
+        }
+    }
+    Err(crate::error::AppError::new("pdf", "De tekst van de pdf is niet op tijd gelezen."))
+}
+
+async fn run_blueprint(providers: &ProviderStore, model: &PlanModel, label: &str, source: &Source, out: &Path) {
+    let dir = out.join("runs").join(&model.slug);
+    std::fs::create_dir_all(&dir).expect("uitvoermap");
+    let file = dir.join(format!("{label}.json"));
+    if file.exists() {
+        return; // Elk stuk maximaal één keer per model. Wie opnieuw wil, haalt het bestand weg.
+    }
+    let start = Instant::now();
+    let mut report = blueprint::RunReport::default();
+    let chosen = ModelRef { provider_id: model.provider_id.clone(), model_id: model.model_id.clone() };
+    let result = match providers.target(&chosen) {
+        Ok(target) => blueprint::generate(&target, source, &blueprint::Options::default(), &mut report).await,
+        Err(e) => Err(e),
+    };
+    let raw: Vec<_> = report.calls.iter().map(|c| json!({ "stage": c.stage, "attempt": c.attempt, "text": c.raw })).collect();
+    let value = match &result {
+        Ok(b) => json!({ "label": label, "model": model.model_id, "ok": true, "seconds": start.elapsed().as_secs_f32(), "report": report, "blueprint": b, "raw": raw }),
+        Err(e) => json!({ "label": label, "model": model.model_id, "ok": false, "seconds": start.elapsed().as_secs_f32(), "report": report, "errorKind": e.kind, "error": e.message, "detail": e.detail, "raw": raw }),
+    };
+    eprintln!("[blauwdruk] {} {label}: {} in {:.0} s, {} aanroepen", model.slug, if result.is_ok() { "klaar" } else { "mislukt" }, start.elapsed().as_secs_f32(), report.calls.len());
+    std::fs::write(&file, serde_json::to_string_pretty(&value).unwrap()).expect("wegschrijven");
 }
 
 async fn run_e2e(app: AppHandle, dir: String) {
