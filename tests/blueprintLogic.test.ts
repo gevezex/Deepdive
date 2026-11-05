@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignLanes, errorView, formatRanges, highlightParam, isLocalModel, MAX_LANES, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, suggestModel } from "../src/blueprintLogic";
+import { assignLanes, errorView, formatRanges, highlightParam, isLocalModel, MAX_LANES, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, suggestModel } from "../src/blueprintLogic";
 import type { Blueprint, Critique, DiagramBlock, Point, Provider, ProvidersFile, Relation } from "../src/types";
 
 const block = (id: string): DiagramBlock => ({ id, role: "argument", title: id, content: "", paragraphs: [], quote: null });
@@ -19,6 +19,14 @@ describe("verwijzingen", () => {
     expect(pointTarget(point({ paragraphs: [[2, 40], [50, 60]], broad: true }))).toEqual([[2, 2]]);
     expect(pointTarget(point({ paragraphs: [[2, 4]] }))).toEqual([[2, 4]]);
     expect(pointTarget(point({ paragraphs: [], broad: true }))).toEqual([]);
+  });
+});
+
+describe("tekst van het model", () => {
+  it("vervangt interne ids door het nummer dat de lezer ziet", () => {
+    const numbers = new Map([["b3", 2], ["b4", 3]]);
+    expect(readableIds("Het in b3 gemaakte getal en de tegenspraak in b4.", numbers)).toBe("Het in stap 2 gemaakte getal en de tegenspraak in stap 3.");
+    expect(readableIds("Vitamine b12 en b9 blijven staan.", numbers)).toBe("Vitamine b12 en b9 blijven staan.");
   });
 });
 

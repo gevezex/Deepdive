@@ -80,7 +80,7 @@
   "label": "guardian",
   "model": "chatgpt",
   "modelId": "gpt-6.1-sol",
-  "seconds": 284,
+  "seconds": 70,
   "calls": 2,
   "schemaFirstTry": true,
   "critique": true,
@@ -106,12 +106,13 @@
    "headline_vs_content": "nothing_found"
   },
   "quotes": {
+   "total": 0,
+   "verified": 0,
    "moved": 0,
-   "removed": 0,
-   "total": 1,
-   "verified": 1
+   "removed": 0
   },
-  "issues": []
+  "issues": [],
+  "measuredIn": "app"
  },
  {
   "label": "memoire-camino",
@@ -228,18 +229,39 @@
   "label": "schoon-priemgetallen",
   "model": "sushi",
   "modelId": "GLM-5.3-Flash-Sushi-2.4bpw",
-  "seconds": 279,
+  "seconds": 257,
   "calls": 2,
-  "schemaFirstTry": false,
-  "critique": false,
-  "quotes": {
-   "moved": 0,
-   "removed": 0,
-   "total": 5,
-   "verified": 5
+  "schemaFirstTry": true,
+  "critique": true,
+  "points": 3,
+  "plus": 2,
+  "terms": 2,
+  "certainty": {
+   "medium": 2,
+   "high": 1
   },
-  "issues": [
-   "critique_failed"
-  ]
+  "inferred": 3,
+  "broad": 0,
+  "maxParagraphs": 4,
+  "byCategory": {
+   "assumption": 1,
+   "evidence": 2
+  },
+  "results": {
+   "assumption": "found",
+   "leap": "nothing_found",
+   "gap": "nothing_found",
+   "evidence": "found",
+   "missing": "nothing_found",
+   "headline_vs_content": "nothing_found"
+  },
+  "quotes": {
+   "total": 8,
+   "verified": 8,
+   "moved": 0,
+   "removed": 0
+  },
+  "issues": [],
+  "measuredIn": "app"
  }
 ]

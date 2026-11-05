@@ -119,18 +119,18 @@ Vijf stukken met ChatGPT `gpt-6.1-sol` en twee korte met Sushi. De cijfers staan
 | `fouten-koffie`, ChatGPT | 5 (0) | 4 | 0 | 0 | 3 / 1 | 62 s, 53 s |
 | `schoon-priemgetallen`, ChatGPT | 0 (0) | 0 | 1 | 0 | geen punten | 38 s, 38 s |
 | `memoire-camino`, ChatGPT | 3 (0) | 3 | 0 | 0 | 2 / 1 | 49 s, 42 s |
-| `guardian`, ChatGPT | 4 (0) | 3 | 4 | 0 | 0 / 3 | 98 s, niet bruikbaar |
+| `guardian`, ChatGPT | 4 (0) | 3 | 4 | 0 | 0 / 3 | 98 s, 70 s |
 | `devto`, ChatGPT | 4 (2) | 2 | 6 | 1 | 1 / 1 | 85 s, 73 s |
 | `fouten-koffie`, Sushi | 8 (0) | 7 | 0 | 1 | 2 / 5 | 153 s, 394 s |
-SUSHI_SCHOON_RIJ
+| `schoon-priemgetallen`, Sushi | 2 (1) | 3 | 2 | 2 | 1 / 2 | 202 s, 257 s |
 
-- **Zekerheid:** bij ChatGPT was in stap 3a 77 van de 79 punten hoog. Op deze set is dat 6 van de 12, en bij Sushi 2 van de 7. Daarom blijft het veld staan, bij het uitgeklapte punt. Met zo weinig punten is dit een aanwijzing en geen bewijs.
+- **Zekerheid:** bij ChatGPT was in stap 3a 77 van de 79 punten hoog. Op deze set is dat 6 van de 12, en bij Sushi 3 van de 10. Daarom blijft het veld staan, bij het uitgeklapte punt. Met zo weinig punten is dit een aanwijzing en geen bewijs.
 - **Breedte:** geen enkel punt is breed; het breedste wijst naar 4 alinea's. In stap 3a zaten de ergste gevallen in lange stukken (Sushi tot 287 alinea's in de PLOS-pdf), en die zijn niet opnieuw gedraaid met Sushi. De prompt is daar dus niet op getest. De markering is dat wel, met tests.
 - **Geplante fouten:** ChatGPT benoemt in `fouten-koffie` vier van de vijf duidelijk. De zwakke test als meetinstrument komt alleen zijdelings terug ("eenmalige online denktest"). Sushi noemt alle vijf.
-- **Niets verzinnen:** `schoon-priemgetallen` levert bij ChatGPT nul punten en één begrip op. `memoire-camino` krijgt bij bewijs "niet van toepassing".
+- **Niets verzinnen:** `schoon-priemgetallen` levert bij ChatGPT nul punten en één begrip op. Sushi had daar in stap 3a een aanname met hoge zekerheid en is nu op dat punt goed: één aanname met gemiddelde zekerheid en twee pluspunten. Die aanname is wel mager. `memoire-camino` krijgt bij bewijs "niet van toepassing".
 - **Lof:** de pluspunten die er zijn, zijn terecht of klein. Sushi prijst dat het koffiebericht de financier noemt, wat aan de magere kant is.
-- **De duren zijn niet zuiver.** `guardian` wachtte op een sleutelhangermelding. Sushi op `fouten-koffie` deelde de server even met een dubbele run door een fout in het testscript, die nu is opgelost.
-- **Sushi:** de eerste poging op `schoon-priemgetallen` kreeg bij de kritiek "overbelast" terug, en later reageerde de server even helemaal niet. De oorzaak is niet onderzocht. Beide meldingen kwamen wel goed in beeld, en de structuur bleef staan.
+- **Duur:** `guardian` en Sushi op `schoon-priemgetallen` zijn gemeten in de echte app, waar het doel bij ChatGPT na 18 seconden en het diagram na 50 seconden stond. Bij Sushi was dat 45 en 64 seconden, en het geheel 265 seconden. Sushi op `fouten-koffie` deelde de server even met een dubbele run door een fout in het testscript, dus die 394 seconden zijn niet zuiver.
+- **Sushi-server:** een eerdere poging op `schoon-priemgetallen` kreeg bij de kritiek "overbelast" terug, en daarna reageerde de server even helemaal niet. De oorzaak is niet onderzocht. De echte app liet in dat laatste geval de melding over de lokale server zien, en de mislukte kritiek liet de structuur staan.
 
 Dit oordeel is weer dat van Claude. De steekproef is klein en het oordeel van de gebruiker ontbreekt nog.
 
@@ -148,11 +148,12 @@ Hoe springen werkt binnen de afscherming staat in `README.md`.
 
 ### Open punten
 
-- **De gewone app is nog niet ondertekend.** Zonder vaste handtekening vraagt macOS na elke nieuwe build opnieuw om toegang tot de sleutelhanger. De test in de echte app stond daardoor ongeveer 20 minuten stil. De voortgang noemt die mogelijkheid nu na 20 seconden.
+- **De gewone app is nog niet ondertekend.** Zonder vaste handtekening vraagt macOS na elke nieuwe build opnieuw om toegang tot de sleutelhanger. Een test in de echte app stond daardoor ongeveer 20 minuten stil. Bij een model dat niet lokaal draait noemt de voortgang die mogelijkheid nu na 20 seconden.
 - **Springen laadt de kopie opnieuw.** Bij een zware pagina kan dat even zichtbaar zijn.
 - **Er is geen donkere stand,** omdat de app die nog niet heeft.
 - **De taal** staat vast op Nederlands en zit niet in de bewaarnaam. Maak je dat instelbaar, neem de taal dan mee in die naam.
 - **Tijdens het streamen** kan een blok nog naar een alinea wijzen die niet bestaat. Springen doet dan niets, tot de controle het heeft hersteld.
+- **Interne ids:** modellen schrijven soms "b3" in hun tekst. Het paneel maakt daar "stap 3" van, maar de prompt vraagt er nog niet om het te laten. Neem dat mee in de volgende promptversie.
 - **Het overzicht van stap 3a** (`scripts/blauwdruk-overzicht.mjs`) kent plus of min en begrippen nog niet.
 
 ## Opnieuw draaien

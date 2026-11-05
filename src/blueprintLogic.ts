@@ -37,6 +37,11 @@ const CATEGORY_ORDER: Category[] = ["assumption", "leap", "gap", "evidence", "mi
 /** Hoogstens zoveel banen naast het diagram: daarna delen pijlen een baan, anders blijft er voor de blokken niets over. */
 export const MAX_LANES = 4;
 
+/** Modellen schrijven soms de interne ids in hun tekst ("het in b3 gemaakte getal"). De lezer kent alleen de nummers. */
+export function readableIds(text: string, numbers: Map<string, number>): string {
+  return text.replace(/\bb\d+\b/g, (id) => (numbers.has(id) ? `stap ${numbers.get(id)}` : id));
+}
+
 export function formatRanges(ranges: ParagraphRange[]): string {
   if (!ranges.length) return "";
   return `¶${ranges.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(", ")}`;

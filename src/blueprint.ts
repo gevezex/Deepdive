@@ -1,7 +1,7 @@
 // De blauwdruk in het rechterpaneel: de knop, de voortgang en de drie lagen. Alles wat van het model komt gaat via
 // textContent op het scherm, dus tekst uit een bron of antwoord kan hier geen opmaak of script worden.
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { assignLanes, CATEGORY_LABELS, CERTAINTY_LABELS, errorView, formatRanges, GOAL_LABELS, isLocalModel, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, RELATION_LABELS, ROLE_LABELS, sameModel, suggestModel, TEXT_KIND_LABELS, type ErrorAction } from "./blueprintLogic";
+import { assignLanes, CATEGORY_LABELS, CERTAINTY_LABELS, errorView, formatRanges, GOAL_LABELS, isLocalModel, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, RELATION_LABELS, ROLE_LABELS, sameModel, suggestModel, TEXT_KIND_LABELS, type ErrorAction } from "./blueprintLogic";
 import { currentProviders, onProvidersChange, selectModel } from "./providers";
 import type { AppError, Blueprint, Critique, DiagramBlock, DraftStructure, JobEvent, ModelRef, ParagraphRange, Point, Quote, Relation, Source, Stage, Structure } from "./types";
 
@@ -40,6 +40,9 @@ let jump: (ranges: ParagraphRange[]) => void = () => {};
 let selected: string | null = null;
 const expanded = new Set<string>();
 let opening = 0;
+/** De nummers van de blokken op het scherm, voor tekst die een blok bij zijn interne id noemt. */
+let numbers = new Map<string, number>();
+const readable = (text: string) => readableIds(text, numbers);
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -401,6 +404,7 @@ function errorAction(action: ErrorAction): HTMLElement {
 
 function layers(structure: DraftStructure | Structure, critique: Critique | null, job: Job | null): Node[] {
   const out: Node[] = [];
+  numbers = new Map(structure.blocks.map((b, i) => [b.id, i + 1]));
   const goal = goalLayer(structure);
   if (goal) out.push(goal);
   if (structure.blocks.length) out.push(diagramLayer(structure, critique));
@@ -511,7 +515,7 @@ function relationRow(relation: Relation, number: Map<string, number>, target: Di
   if (points.some((p) => p.polarity === "minus")) row.classList.add("has-minus");
   const head = el("button", "bp-rel-head");
   head.type = "button";
-  head.append(el("span", "bp-rel-from", `van ${number.get(relation.dependsOn)}`), el("span", "bp-rel-kind", RELATION_LABELS[relation.kind] ?? relation.kind), relation.explanation ? ` ${relation.explanation}` : "");
+  head.append(el("span", "bp-rel-from", `van ${number.get(relation.dependsOn)}`), el("span", "bp-rel-kind", RELATION_LABELS[relation.kind] ?? relation.kind), relation.explanation ? ` ${readable(relation.explanation)}` : "");
   head.addEventListener("click", () => selectItem(relation.id, target.paragraphs));
   row.append(head);
   if (points.length) row.append(pointList(points));
@@ -529,7 +533,7 @@ function blockCard(block: DiagramBlock, n: number, points: Point[]): HTMLElement
   const top = el("span", "bp-block-top");
   top.append(el("span", "bp-num", String(n)), el("span", "bp-role", ROLE_LABELS[block.role] ?? block.role));
   if (block.paragraphs.length) top.append(el("span", "bp-para", formatRanges(block.paragraphs)));
-  head.append(top, el("span", "bp-title", block.title), el("span", "bp-content", block.content));
+  head.append(top, el("span", "bp-title", block.title), el("span", "bp-content", readable(block.content)));
   head.addEventListener("click", () => selectItem(block.id, block.paragraphs));
   card.append(head);
   if (block.quote) card.append(quoteBlock(block.quote));
@@ -557,7 +561,7 @@ function pointItem(point: Point): HTMLElement {
   const sign = el("span", "bp-sign", point.polarity === "plus" ? "+" : "−");
   sign.title = point.polarity === "plus" ? "Maakt het betoog sterker" : "Maakt het betoog zwakker";
   top.append(sign, el("span", "bp-category", CATEGORY_LABELS[point.category] ?? point.category), originTag(point.origin));
-  head.append(top, el("span", "bp-claim", point.claim));
+  head.append(top, el("span", "bp-claim", readable(point.claim)));
   head.addEventListener("click", () => {
     if (expanded.has(point.id)) expanded.delete(point.id);
     else expanded.add(point.id);
@@ -568,7 +572,7 @@ function pointItem(point: Point): HTMLElement {
   item.append(head);
   if (open) {
     const more = el("div", "bp-point-more");
-    more.append(el("p", "", point.explanation));
+    more.append(el("p", "", readable(point.explanation)));
     for (const quote of point.quotes) more.append(quoteBlock(quote));
     const foot = el("p", "bp-point-foot");
     foot.append(el("span", "bp-certainty", CERTAINTY_LABELS[point.certainty]));
@@ -586,7 +590,7 @@ function critiqueLayer(s: DraftStructure | Structure, critique: Critique | null,
   box.id = "bp-critique";
   box.append(sectionHead("Kritische laag"));
   if (critique) {
-    box.append(el("p", "bp-overall", critique.overall));
+    box.append(el("p", "bp-overall", readable(critique.overall)));
     const list = el("dl", "bp-outcomes");
     list.id = "bp-outcomes";
     for (const outcome of outcomes(critique)) {
