@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deepdive</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <form id="url-form" class="url-form" autocomplete="off">
+        <input id="url-input" type="text" spellcheck="false" placeholder="Plak of sleep een webadres of pdf-link" aria-label="Webadres" />
+        <button id="url-open" type="submit" class="primary">Openen</button>
+      </form>
+      <label class="button" for="pdf-input">Pdf kiezen</label>
+      <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+      <button id="paste-open" type="button">Tekst plakken</button>
+      <select id="source-list" aria-label="Eerder geopende bronnen"></select>
+    </header>
+
+    <div id="error" class="error" role="alert" hidden>
+      <div class="error-text">
+        <strong id="error-message"></strong>
+        <details id="error-details" hidden><summary>Technische details</summary><code id="error-detail"></code></details>
+      </div>
+      <button id="error-paste" type="button" class="primary" hidden>Tekst plakken</button>
+      <button id="error-close" type="button" aria-label="Melding sluiten">Sluiten</button>
+    </div>
+
+    <main class="panels">
+      <section class="source-panel" aria-label="Bron">
+        <div id="source-view" class="source-view">
+          <div id="empty" class="empty">
+            <h1>Wat wil je begrijpen?</h1>
+            <p>Plak of sleep een webadres of een pdf hierheen. Deepdive bewaart een vaste kopie op deze computer, zodat je die later ook zonder internet kunt lezen.</p>
+          </div>
+          <div id="busy" class="busy" role="status" hidden><div class="spinner"></div><p id="busy-text"></p></div>
+          <iframe id="source-frame" title="Vaste kopie van de bron" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
+          <div id="pdf-view" class="pdf-view" hidden></div>
+          <div id="frame-shield" class="frame-shield" hidden></div>
+        </div>
+        <footer id="status" class="status" hidden>
+          <span id="status-text"></span>
+          <span id="status-warnings" class="warnings"></span>
+          <button id="refresh" type="button" class="link" hidden>Opnieuw ophalen</button>
+        </footer>
+      </section>
+      <aside class="professor" aria-label="Professor">
+        <p>Hier komen straks de samenvatting en de blauwdruk van het stuk.</p>
+      </aside>
+    </main>
+
+    <div id="drop-hint" class="drop-hint" hidden><p>Laat los om te openen</p></div>
+
+    <dialog id="paste-dialog">
+      <form id="paste-form" method="dialog">
+        <h2>Tekst plakken</h2>
+        <p>Kopieer het stuk uit je browser en plak het hier. Lege regels scheiden de alinea's.</p>
+        <label>Titel (mag leeg blijven)<input id="paste-title" type="text" /></label>
+        <label>Webadres (mag leeg blijven)<input id="paste-url" type="text" spellcheck="false" /></label>
+        <label>Tekst<textarea id="paste-text" rows="14" required></textarea></label>
+        <div class="dialog-buttons">
+          <button id="paste-cancel" type="button">Annuleren</button>
+          <button id="paste-save" type="submit" class="primary">Bewaren en lezen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

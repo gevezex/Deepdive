@@ -1,0 +1,23 @@
+# Testlijst van 5 november 2026. Formaat: label adres
+krant-nos https://nos.nl/l/2638133
+krant-nrc https://www.nrc.nl/nieuws/2026/11/05/een-heel-jaar-niet-komen-opdagen-is-zelfs-de-sociale-werkvoorziening-te-gortig-a4940372
+krant-volkskrant https://www.volkskrant.nl/buitenland/aan-de-oostgrens-van-estland-zien-duitse-en-nederlandse-generaals-de-russische-wachttorens-je-moet-de-oorlog-winnen-voordat-hij-uitbreekt~b375365e/
+krant-trouw https://www.trouw.nl/duurzaamheid-economie/techbazen-wilden-eerst-het-klimaat-redden-nu-flirten-ze-met-de-apocalyps-waarom~b9d43041/
+krant-bbc https://www.bbc.co.uk/news/articles/cw33xm0de221o
+krant-nyt https://www.nytimes.com/2026/11/05/world/middleeast/israel-election-netanyahu-trump.html
+opinie-guardian https://www.theguardian.com/commentisfree/2026/nov/05/kemi-badenoch-polls-tory-party-direction
+opinie-aeon https://aeon.co/essays/welcome-to-the-mixed-up-joyful-world-of-audhd
+nieuws-tweakers https://tweakers.net/nieuws/234180/nvidia-brengt-hotfix-uit-voor-bug-die-gpu-temperatuur-verkeerd-weergeeft.html
+blog-substack https://www.astralcodexten.com/p/your-book-review-the-history-and
+blog-simonwillison https://simonwillison.net/2026/Nov/4/datasette-llm/
+blog-paulgraham https://paulgraham.com/greatwork.html
+blog-medium https://medium.com/@JustSnehal/the-architecture-of-an-infinite-content-engine-upgrading-the-firecrawl-gpt-n8n-engine-28e612472b82
+blog-devto https://dev.to/daniel_pertu/sixty-three-of-our-pages-are-one-208-line-component-and-seven-of-the-eight-routes-behind-them-are-4hj1
+wetenschap-quanta https://www.quantamagazine.org/new-research-tests-whether-ai-models-know-their-own-thoughts-20261104/
+wetenschap-plos https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0362398
+wetenschap-plos-pdf https://journals.plos.org/plosone/article/asset?id=10.1371/journal.pone.0362398.PDF
+wetenschap-arxiv-pdf https://arxiv.org/pdf/2611.05390
+wetenschap-nature https://www.nature.com/articles/d41586-026-03487-0
+js-verge https://www.theverge.com/tech/1027358/sony-q2-2026-earnings-spider-man-playstation
+js-docsify https://docsify.js.org/#/quickstart
+referentie-wikipedia https://nl.wikipedia.org/wiki/Klimaatakkoord_van_Parijs

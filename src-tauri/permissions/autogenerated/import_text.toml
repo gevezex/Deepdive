@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-import-text"
+description = "Enables the import_text command without any pre-configured scope."
+commands.allow = ["import_text"]
+
+[[permission]]
+identifier = "deny-import-text"
+description = "Denies the import_text command without any pre-configured scope."
+commands.deny = ["import_text"]

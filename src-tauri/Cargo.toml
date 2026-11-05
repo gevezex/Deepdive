@@ -1,0 +1,38 @@
+[package]
+name = "deepdive"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "deepdive_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["time", "sync", "fs"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli", "deflate", "stream"] }
+futures-util = "0.3"
+lol_html = "2"
+uuid = { version = "1", features = ["v4"] }
+regex = "1"
+url = "2"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting"] }
+
+[features]
+# Alleen voor tests op macOS: schermafdruk van het hoofdvenster via de testhaak.
+screenshots = ["dep:objc2", "dep:objc2-web-kit", "dep:objc2-app-kit", "dep:objc2-foundation", "dep:block2"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", optional = true }
+objc2-web-kit = { version = "0.3", optional = true, features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+objc2-app-kit = { version = "0.3", optional = true, features = ["NSImage"] }
+objc2-foundation = { version = "0.3", optional = true, features = ["NSData", "NSError"] }
+block2 = { version = "0.6", optional = true }

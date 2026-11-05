@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Alleen het hoofdvenster, met lokale inhoud. Verborgen vensters en pagina's van internet krijgen niets.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-open-url",
+    "allow-import-pdf",
+    "allow-save-pdf-text",
+    "allow-read-pdf",
+    "allow-import-text",
+    "allow-list-sources",
+    "allow-get-source"
+  ]
+}
