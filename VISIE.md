@@ -294,7 +294,7 @@ Alles over één onderwerp blijft bij elkaar in een project.
 
 ## Techniek
 
-Cross-platform: **Windows en macOS**.
+Eerst alleen **macOS**: daar wordt alles gebouwd en getest. Windows volgt als alle functies naar wens werken.
 
 | Onderdeel | Keuze | Waarom |
 |---|---|---|
@@ -310,7 +310,7 @@ Cross-platform: **Windows en macOS**.
 
 Aandachtspunten:
 - **Engine vervangbaar houden:** het laden en opslaan van pagina's wordt een afgebakend onderdeel. Blijkt de systeem-webview te wisselvallig, dan is Chromium via CEF de logische volgende stap, zodra die koppeling voor Tauri stabiel is. Dat maakt de app wel fors groter. Andere kleine engines, zoals Servo, zijn nu nog niet betrouwbaar genoeg.
-- **Verschillen tussen OS'en:** WebKit en WebView2 gedragen zich niet altijd hetzelfde, dus alles wordt op beide getest.
+- **Verschillen tussen OS'en:** WebKit en WebView2 gedragen zich niet altijd hetzelfde. Daarom wordt alles opnieuw getest zodra de Windows-stap begint.
 - **Veiligheid:** een pagina van internet is onbetrouwbare inhoud. De pagina draait afgeschermd en kan niet bij de sleutels komen. Tekst op een pagina wordt behandeld als bron en niet als instructie aan het model.
 - **Kwaliteit per model:** de blauwdruk moet worden getest op verschillende soorten teksten en modellen, ook lokale modellen.
 - **Stijl:** het rechterpaneel krijgt het gevoel van Gloss, met een warme papierkleur, rustige serif en veel witruimte. We maken deze stijl zelf, omdat de Gloss-repo geen licentie heeft.
@@ -321,7 +321,7 @@ Aandachtspunten:
 
 **Eerste versie:**
 
-1. **Bronnen openen**: URL of pdf plakken of slepen, tonen in het linkerpaneel en vastleggen als vaste kopie. Vroeg testen op 20 echte sites, op macOS en Windows.
+1. **Bronnen openen**: URL of pdf plakken of slepen, tonen in het linkerpaneel en vastleggen als vaste kopie. Vroeg testen op 20 echte sites op macOS.
 2. **Providers en modellen**: providers aanmaken, sleutels veilig opslaan en lokale modellen koppelen.
 3. **Blauwdruk**: de knop, de samenvatting, het doel, de levensloop en de kritische laag in het rechterpaneel.
 4. **Selecteren en vragen**: selecteren, kader, selectiemenu, markeren, antwoorden, "je bent hier" en terugverwijzen.
@@ -333,6 +333,7 @@ Aandachtspunten:
 7. **De professor denkt mee**: meedenkvragen en signalen tijdens het lezen.
 8. **Delen**: `.deepdive`-bestand en export (ook Markdown/Obsidian).
 9. **Koppelingen**: automatisch indelen, MCP-koppeling met andere AI.
+10. **Windows**: de app werkend maken en testen op Windows, als al het bovenstaande naar wens werkt.
 
 **Bewust niet in dit plan:** een browserextensie en een kader over andere apps, zoals Word of Kindle. Ook lezen op de telefoon valt hier voorlopig buiten.
 

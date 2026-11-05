@@ -2,7 +2,7 @@
 
 Getest op 5 november 2026 op macOS 27.0.1 met WebKit, in de debug-build met de testhaak. De adressen staan in [site-test-urls.txt](site-test-urls.txt) en zijn dezelfde dag uit de rss-feeds van de sites gehaald.
 
-**Windows is niet getest.** Op deze Mac kan dat niet. De code heeft wel een aparte tak voor WebView2, maar die is nooit uitgevoerd. VISIE.md vraagt om een test op beide systemen, dus dat staat nog open.
+**Windows is niet getest.** Op deze Mac kan dat niet. De code heeft wel een aparte tak voor WebView2, maar die is nooit uitgevoerd. Dat is een bewuste keuze: Windows komt pas als alle functies op macOS naar wens werken (zie VISIE.md).
 
 ## Uitslag
 
@@ -52,7 +52,7 @@ Blokken zijn de alinea's in de tekstkopie. Bestanden zijn afbeeldingen, CSS en f
 
 ## Niet getest
 
-- **Windows**, zie boven.
+- **Windows**, bewust uitgesteld (zie boven).
 - **Echt slepen vanuit Finder of een browser.** Alleen nagebootste sleepacties zijn getest, ook die op de kopie zelf.
 - **De knop "Pdf kiezen"**, omdat die een dialoog van het systeem opent.
 - **Plakken met Cmd+V buiten het invoerveld.**
