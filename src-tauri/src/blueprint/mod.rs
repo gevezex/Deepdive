@@ -82,7 +82,9 @@ pub struct CallReport {
     pub schema_ok: bool,
     pub schema_error: Option<String>,
     pub error_kind: Option<&'static str>,
+    /// Alleen de testhaak leest dit.
     #[serde(skip)]
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     pub raw: String,
 }
 
