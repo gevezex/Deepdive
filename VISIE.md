@@ -219,6 +219,8 @@ Aandachtspunten:
 
 **Het verschil:** bij Gloss breng je de tekst naar de AI, in de lezer van Gloss. Bij Deepdive komt de coach naar de plek waar je leest, en houdt een project alles bij elkaar.
 
+Uitproberen kan op de demosite: [gloss-lovat.vercel.app](https://gloss-lovat.vercel.app).
+
 De Gloss-repo heeft **geen licentie**, dus we nemen ideeën over en geen code.
 
 ## Open vragen
