@@ -11,6 +11,14 @@
     "allow-read-pdf",
     "allow-import-text",
     "allow-list-sources",
-    "allow-get-source"
+    "allow-get-source",
+    "allow-list-providers",
+    "allow-save-provider",
+    "allow-delete-provider",
+    "allow-save-model",
+    "allow-delete-model",
+    "allow-refresh-models",
+    "allow-select-model",
+    "allow-test-connection"
   ]
 }

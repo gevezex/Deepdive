@@ -1,7 +1,9 @@
+mod ai;
 mod engine;
 mod error;
 mod import;
 mod model;
+mod providers;
 mod snapshot;
 mod store;
 #[cfg(debug_assertions)]
@@ -9,6 +11,8 @@ mod testhook;
 
 use error::AppError;
 use model::{Block, Source, SourceSummary};
+use providers::{secrets::Keychain, ProviderStore};
+use std::sync::Arc;
 use store::Store;
 use tauri::http::{header, Response, StatusCode};
 use tauri::ipc::{InvokeBody, Request};
@@ -90,12 +94,36 @@ pub fn run() {
             }
             #[cfg(not(debug_assertions))]
             let _ = &mut root;
+            #[allow(unused_mut)]
+            let mut keychain_service = app.config().identifier.clone();
+            // Alleen voor tests: houdt de nepsleutels gescheiden van de sleutels die de app echt gebruikt.
+            #[cfg(debug_assertions)]
+            if let Ok(service) = std::env::var("DEEPDIVE_KEYCHAIN_SERVICE") {
+                keychain_service = service;
+            }
+            app.manage(ProviderStore::open(root.clone(), Arc::new(Keychain::new(keychain_service)))?);
             app.manage(Store::new(root)?);
             #[cfg(debug_assertions)]
             testhook::start(app.handle().clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![open_url, import_pdf, save_pdf_text, read_pdf, import_text, list_sources, get_source])
+        .invoke_handler(tauri::generate_handler![
+            open_url,
+            import_pdf,
+            save_pdf_text,
+            read_pdf,
+            import_text,
+            list_sources,
+            get_source,
+            providers::commands::list_providers,
+            providers::commands::save_provider,
+            providers::commands::delete_provider,
+            providers::commands::save_model,
+            providers::commands::delete_model,
+            providers::commands::refresh_models,
+            providers::commands::select_model,
+            providers::commands::test_connection,
+        ])
         .run(tauri::generate_context!())
         .expect("Deepdive kon niet starten");
 }

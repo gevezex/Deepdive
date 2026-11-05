@@ -55,8 +55,11 @@ button:disabled { opacity: 0.5; }
 #status-text { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .warnings { flex: 1; min-width: 0; color: #8a3f22; }
 
-.professor { padding: 40px 32px; background: var(--paper); color: var(--ink-soft); font-size: 17px; line-height: 1.6; overflow: auto; }
-.professor p { max-width: 24em; margin: 0; }
+.professor { display: flex; flex-direction: column; min-height: 0; background: var(--paper); color: var(--ink-soft); font-size: 17px; line-height: 1.6; }
+.model-bar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.model-bar select { flex: 1; min-width: 0; }
+.professor-body { flex: 1; min-height: 0; padding: 32px; overflow: auto; }
+.professor-body p { max-width: 24em; margin: 0; }
 
 .pdf-view { position: absolute; inset: 0; overflow: auto; padding: 16px; background: #5f5a52; }
 .pdf-page { position: relative; margin: 0 auto 16px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); }
@@ -72,3 +75,38 @@ dialog label { display: block; margin-bottom: 10px; font-size: 14px; }
 dialog input, dialog textarea { display: block; width: 100%; margin-top: 4px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fffdf8; }
 dialog textarea { resize: vertical; line-height: 1.5; font-size: 15px; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+.providers-dialog { width: min(980px, 94vw); max-height: 90vh; padding: 0; }
+.providers-dialog[open] { display: flex; flex-direction: column; }
+.providers-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+.providers-head h2 { margin: 0; }
+.providers-layout { flex: 1; display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.providers-nav { padding: 16px; border-right: 1px solid var(--line); overflow: auto; }
+.providers-nav ul { margin: 0 0 12px; padding: 0; list-style: none; }
+.provider-item { display: block; width: 100%; margin-bottom: 4px; overflow: hidden; border-color: transparent; background: none; text-align: left; text-overflow: ellipsis; }
+.provider-item.current { border-color: var(--line); background: #fffdf8; font-weight: 600; }
+#provider-new { width: 100%; }
+.providers-main { padding: 16px 24px 24px; overflow: auto; }
+dialog select { display: block; width: 100%; margin-top: 4px; }
+dialog p.hint, .hint { margin: 0 0 10px; color: var(--ink-soft); font-size: 13px; }
+.provider-actions, .models-head { display: flex; gap: 8px; align-items: center; }
+.spacer { flex: 1; }
+.notice { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; overflow-wrap: anywhere; }
+.notice-ok { border-color: #8aa77a; background: #e9efdc; }
+.notice-error { border-color: var(--error-line); background: var(--error-bg); }
+.notice-busy { color: var(--ink-soft); }
+.notice details { margin-top: 4px; font-size: 13px; color: var(--ink-soft); }
+.notice code { display: block; overflow-wrap: anywhere; }
+.models { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.models-head h3 { margin: 0; font-size: 17px; font-weight: 500; }
+.models-head .hint { margin: 0; }
+#models-filter { display: block; width: 100%; margin-top: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fffdf8; }
+.models table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 14px; }
+.models th { padding: 4px 8px 4px 0; font-size: 12px; font-weight: 500; color: var(--ink-soft); text-align: left; white-space: nowrap; }
+.models td { padding: 4px 8px 4px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.models td input[type="checkbox"] { display: inline; width: auto; margin: 0; }
+.models td select { margin: 0; padding: 3px 6px; }
+.models td input[type="text"] { width: 110px; margin: 0; padding: 3px 6px; }
+.model-name { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-add { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.model-add input, .model-add select { flex: 1; min-width: 0; margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fffdf8; }

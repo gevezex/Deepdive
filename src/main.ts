@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { initProviders } from "./providers";
 import type { AppError, Source, SourceSummary } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -273,7 +274,7 @@ for (const type of ["mousemove", "mousedown", "wheel"]) {
 // ---------- start ----------
 
 async function start() {
-  await refreshList();
+  await Promise.all([refreshList(), initProviders()]);
   const last = remembered();
   if (!last) return;
   try {

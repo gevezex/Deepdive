@@ -1,7 +1,7 @@
 # Deepdive
 Read any article with ai aid
 
-Zie [VISIE.md](VISIE.md) voor het idee, de functies en het bouwplan. Gebouwd is stap 1: bronnen openen.
+Zie [VISIE.md](VISIE.md) voor het idee, de functies en het bouwplan. Gebouwd zijn stap 1 (bronnen openen) en stap 2 (providers en modellen).
 
 ## Starten
 
@@ -46,10 +46,33 @@ Gewoon TypeScript met Vite, zonder framework. Stap 1 heeft maar een paar schermd
 | `src-tauri/src/store.rs` | Opslag per bron in de app-datamap. |
 | `src-tauri/src/import.rs` | Van invoer naar opgeslagen bron, en de beoordeling van wat er is opgehaald. |
 | `src/pdf.ts`, `src/pdfBlocks.ts` | Pdf tonen met pdf.js en de tekst omzetten naar blokken. |
+| `src-tauri/src/ai/` | De AI-laag: de enige plek die met een AI-dienst praat. Latere stappen gebruiken `ai::stream_chat` met een `Target` uit `ProviderStore::target`. |
+| `src-tauri/src/providers/` | Providers en modellen in `providers.json`, sleutels via `secrets.rs` in de sleutelhanger. `Selection.perAction` is de voorbereiding op "model per actie". |
+| `src/providers.ts`, `src/providerLogic.ts` | Het providerscherm en de modelkiezer. |
 
 **Afscherming:** de kopie staat in een iframe met `sandbox=""` en een CSP zonder scripts en zonder netwerk. Het verborgen venster heeft geen capability, dus een pagina kan de commando's van de app niet aanroepen.
 
 **Blokken in de kopie:** elk tekstblok heeft in de visuele kopie een attribuut `data-dd-n` met zijn alineanummer. Latere stappen kunnen tekst en beeld daarmee aan elkaar koppelen. Bij pdf's staan paginanummer en positie in het blok zelf.
+
+**API-sleutels:** alleen in de sleutelhanger. De frontend geeft een sleutel door aan Rust en krijgt alleen `hasKey` terug. `ApiKey` is niet te serialiseren, foutmeldingen gaan door `errors::redact`, doorverwijzingen worden niet gevolgd en een sleutel gaat alleen via https of naar deze computer. Na een nieuwe build kan macOS opnieuw om toegang tot de sleutelhanger vragen, omdat de app dan niet meer dezelfde handtekening heeft.
+
+## De end-to-endtest van de providers
+
+Bedient de echte app en de echte sleutelhanger met een nepsleutel onder een eigen dienstnaam, tegen de lokale nepserver in `tests/e2e/mock-ai.mjs`. Er is geen echte provider of sleutel voor nodig.
+
+```bash
+npm run tauri build -- --debug --no-bundle --features screenshots
+```
+
+```bash
+node tests/e2e/providers.e2e.mjs
+```
+
+De test met de echte sleutelhanger op Rust-niveau:
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored keychain
+```
 
 ## De site-test herhalen
 

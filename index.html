@@ -16,6 +16,7 @@
       <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
       <button id="paste-open" type="button">Tekst plakken</button>
       <select id="source-list" aria-label="Eerder geopende bronnen"></select>
+      <button id="providers-open" type="button">Providers</button>
     </header>
 
     <div id="error" class="error" role="alert" hidden>
@@ -46,7 +47,13 @@
         </footer>
       </section>
       <aside class="professor" aria-label="Professor">
-        <p>Hier komen straks de samenvatting en de blauwdruk van het stuk.</p>
+        <div class="model-bar">
+          <label for="model-picker">Model</label>
+          <select id="model-picker"></select>
+        </div>
+        <div class="professor-body">
+          <p>Hier komen straks de samenvatting en de blauwdruk van het stuk.</p>
+        </div>
       </aside>
     </main>
 
@@ -64,6 +71,66 @@
           <button id="paste-save" type="submit" class="primary">Bewaren en lezen</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="providers-dialog" class="providers-dialog" aria-labelledby="providers-title">
+      <header class="providers-head">
+        <h2 id="providers-title">Providers en modellen</h2>
+        <button id="providers-close" type="button">Sluiten</button>
+      </header>
+      <div class="providers-layout">
+        <nav class="providers-nav" aria-label="Providers">
+          <ul id="provider-list"></ul>
+          <button id="provider-new" type="button">Nieuwe provider</button>
+        </nav>
+        <div class="providers-main">
+          <form id="provider-form" autocomplete="off">
+            <label id="provider-preset-row">Voorinstelling<select id="provider-preset"></select></label>
+            <label>Naam<input id="provider-name" type="text" required /></label>
+            <label>Soort
+              <select id="provider-kind">
+                <option value="anthropic">Anthropic-API</option>
+                <option value="openai_compatible">OpenAI-compatibele API</option>
+              </select>
+            </label>
+            <label>Adres<input id="provider-url" type="text" spellcheck="false" required /></label>
+            <label>API-sleutel (optioneel)<input id="provider-key" type="password" spellcheck="false" autocomplete="new-password" /></label>
+            <p class="hint"><span id="provider-key-state"></span> <button id="provider-key-clear" type="button" class="link" hidden>Sleutel weghalen</button></p>
+            <div class="provider-actions">
+              <button id="provider-save" type="submit" class="primary">Opslaan</button>
+              <button id="provider-test" type="button">Test verbinding</button>
+              <span class="spacer"></span>
+              <button id="provider-delete" type="button" hidden>Provider verwijderen</button>
+            </div>
+          </form>
+          <div id="provider-result" role="status" hidden></div>
+
+          <section id="models-section" class="models" aria-labelledby="models-title" hidden>
+            <div class="models-head">
+              <h3 id="models-title">Modellen</h3>
+              <span id="models-count" class="hint"></span>
+              <span class="spacer"></span>
+              <button id="models-refresh" type="button">Modellen ophalen</button>
+            </div>
+            <div id="models-result" role="status" hidden></div>
+            <input id="models-filter" type="search" placeholder="Zoek een model" aria-label="Zoek een model" hidden />
+            <table>
+              <thead><tr><th>In kiezer</th><th>Model</th><th>Afbeeldingen</th><th>Context (tokens)</th><th></th></tr></thead>
+              <tbody id="models-body"></tbody>
+            </table>
+            <form id="model-add-form" class="model-add" autocomplete="off">
+              <input id="model-add-id" type="text" spellcheck="false" placeholder="Naam van het model" aria-label="Naam van het model" required />
+              <select id="model-add-images" aria-label="Kan afbeeldingen lezen">
+                <option value="">Afbeeldingen: onbekend</option>
+                <option value="yes">Afbeeldingen: ja</option>
+                <option value="no">Afbeeldingen: nee</option>
+              </select>
+              <input id="model-add-context" type="text" inputmode="numeric" placeholder="Context, bijv. 8192" aria-label="Context in tokens" />
+              <button type="submit">Toevoegen</button>
+            </form>
+          </section>
+        </div>
+      </div>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>

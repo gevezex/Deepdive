@@ -9,6 +9,14 @@ fn main() {
         "import_text",
         "list_sources",
         "get_source",
+        "list_providers",
+        "save_provider",
+        "delete_provider",
+        "save_model",
+        "delete_model",
+        "refresh_models",
+        "select_model",
+        "test_connection",
     ])))
     .expect("tauri-build mislukte");
 }
