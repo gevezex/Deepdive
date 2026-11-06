@@ -38,6 +38,7 @@ Beide aanroepen beginnen met dezelfde tekst, zodat de provider die kan hergebrui
 
 | Controle | Bij een fout |
 |---|---|
+| Onbekende waarde | Rol, doel en soort tekst worden `other`. Een relatie, een kritisch punt of een regel per onderdeel met een onbekende waarde gaat weg. Geen herstelpoging, wel een opmerking bij de blauwdruk (`repair.rs`) |
 | Schema | Eén herstelpoging, daarna een foutmelding |
 | Alinea's bestaan | Bereik wordt ingekort of weggehaald |
 | Relaties wijzen naar bestaande blokken, zonder kringen | Relatie wordt weggehaald |

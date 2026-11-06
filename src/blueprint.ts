@@ -361,7 +361,7 @@ function updateProgress() {
   const seconds = (Date.now() - job.startedAt) / 1000;
   // Een testbouw zonder vaste handtekening kan hier stilstaan op een melding van macOS, die niet altijd vooraan staat.
   const waiting = !job.local && seconds > KEYCHAIN_HINT_AFTER ? "Wachten op het model. Vraagt macOS om toegang tot de sleutelhanger? Kies dan Altijd toestaan" : "Wachten op het model";
-  const what = job.attempt > 1 ? "Tweede poging: het vorige antwoord klopte niet" : job.thinking ? "Het model denkt na" : job.chars ? "Het model schrijft" : waiting;
+  const what = job.attempt > 1 ? `${job.stage === "critique" ? "Kritische laag" : "Doel en diagram"}: tweede poging, het vorige antwoord was onbruikbaar` : job.thinking ? "Het model denkt na" : job.chars ? "Het model schrijft" : waiting;
   line.textContent = `${job.modelText ? `${job.modelText}: ` : ""}${what} · ${duration(seconds)}`;
 }
 

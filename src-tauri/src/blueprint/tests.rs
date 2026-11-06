@@ -92,11 +92,80 @@ fn geldige_structuur_blijft_ongewijzigd() {
     assert_eq!(checks.coverage, 1.0);
 }
 
-#[test]
-fn onbekende_rol_is_ongeldig_schema() {
+#[tokio::test]
+async fn onbekende_rol_wordt_overig_zonder_herkansing() {
+    let s = source(&TEXTS);
     let mut v = structure_json();
-    v["blocks"][0]["role"] = json!("verzonnen");
-    assert!(parse::<Structure>(&v.to_string()).is_err());
+    v["blocks"][0]["role"] = json!("reference");
+    let (result, report, _) = play(&s, vec![Ok(v.to_string()), Ok(critique_json().to_string())], None).await;
+    let b = result.unwrap();
+    assert_eq!(report.calls.len(), 2, "geen tweede poging");
+    assert_eq!(b.structure.blocks[0].role, BlockRole::Other);
+    assert_eq!(b.structure.blocks.len(), structure_json()["blocks"].as_array().unwrap().len());
+    let issue = b.issues.iter().find(|i| i.code == "value_replaced").unwrap();
+    assert!(issue.detail.contains("reference"), "{issue:?}");
+}
+
+#[tokio::test]
+async fn onbekende_categorie_haalt_alleen_dat_punt_weg() {
+    let s = source(&TEXTS);
+    let good = critique_json()["points"][0].clone();
+    let mut bad = good.clone();
+    bad["id"] = json!("k9");
+    bad["category"] = json!("concept");
+    let mut critique = critique_json();
+    critique["points"] = json!([good, bad]);
+    let (result, report, _) = play(&s, vec![Ok(structure_json().to_string()), Ok(critique.to_string())], None).await;
+    let b = result.unwrap();
+    assert_eq!(report.calls.len(), 2, "geen tweede poging");
+    let points = &b.critique.as_ref().unwrap().points;
+    assert_eq!(points.len(), 1);
+    assert_ne!(points[0].id, "k9");
+    assert!(codes(&b.issues).contains(&"point_removed"));
+}
+
+#[test]
+fn onbekend_soort_relatie_haalt_alleen_die_pijl_weg() {
+    let mut v = structure_json();
+    v["relations"] = json!([
+        { "id": "r1", "block": "b2", "dependsOn": "b1", "kind": "refutation", "explanation": "x" },
+        { "id": "r2", "block": "b2", "dependsOn": "b1", "kind": "builds_on", "explanation": "y" }
+    ]);
+    let issues = super::repair::repair_structure(&mut v);
+    assert_eq!(v["relations"].as_array().unwrap().len(), 1);
+    assert_eq!(v["relations"][0]["id"], "r2");
+    assert_eq!(codes(&issues), vec!["relation_removed"]);
+}
+
+#[test]
+fn alleen_schrijfwijze_anders_is_geen_afwijking() {
+    let mut v = structure_json();
+    v["blocks"][0]["role"] = json!("Thesis");
+    v["goal"]["main"]["kind"] = json!("report-research");
+    assert!(super::repair::repair_structure(&mut v).is_empty());
+    assert_eq!(v["blocks"][0]["role"], "thesis");
+    assert_eq!(v["goal"]["main"]["kind"], "report_research");
+}
+
+#[test]
+fn onbekende_soort_tekst_en_doel_worden_overig() {
+    let mut v = structure_json();
+    v["textKind"] = json!("blog");
+    v["goal"]["main"]["kind"] = json!("verzonnen");
+    assert_eq!(super::repair::repair_structure(&mut v).len(), 2);
+    let s: Structure = serde_json::from_value(v).unwrap();
+    assert_eq!(s.text_kind, TextKind::Other);
+    assert_eq!(s.goal.main.kind, GoalKind::Other);
+}
+
+#[tokio::test]
+async fn ontbrekend_veld_krijgt_nog_steeds_een_herkansing() {
+    let s = source(&TEXTS);
+    let mut v = structure_json();
+    v["blocks"][0].as_object_mut().unwrap().remove("role");
+    let (result, report, _) = play(&s, vec![Ok(v.to_string()), Ok(structure_json().to_string()), Ok(critique_json().to_string())], None).await;
+    assert!(result.is_ok());
+    assert_eq!(report.calls.iter().map(|c| c.schema_ok).collect::<Vec<_>>(), vec![false, true, true]);
 }
 
 #[test]

@@ -10,6 +10,7 @@
 //! doel en blokken uit het antwoord terwijl het nog binnenkomt.
 
 pub mod commands;
+mod repair;
 mod saved;
 mod schema;
 mod stream;
@@ -262,7 +263,9 @@ pub(crate) async fn run(
     let mut issues = vec![];
     let mut checks = Checks::default();
 
-    let mut structure: Structure = ask(&frame, frame.structure_task(), Stage::Structure, validate::structure_errors, report, caller).await?;
+    let (mut structure, repaired): (Structure, _) = ask(&frame, frame.structure_task(), Stage::Structure, repair::repair_structure, validate::structure_errors, report, caller).await?;
+    checks.relations_removed += repaired.iter().filter(|i| i.code == "relation_removed").count() as u32;
+    issues.extend(repaired);
     validate::check_structure(&mut structure, &index, &mut issues, &mut checks);
 
     let mut blueprint = Blueprint {
@@ -288,8 +291,9 @@ pub(crate) async fn run(
 /// De tweede aanroep. Mislukt die of breekt de lezer af, dan blijft de structuur gewoon staan, met een melding.
 async fn add_critique(frame: &Frame, blueprint: &mut Blueprint, index: &SourceIndex, report: &mut RunReport, caller: &mut impl Caller) -> Result<(), AppError> {
     let task = frame.critique_task(&blueprint.structure)?;
-    match ask::<Critique>(frame, task, Stage::Critique, |_| vec![], report, caller).await {
-        Ok(mut critique) => {
+    match ask::<Critique>(frame, task, Stage::Critique, repair::repair_critique, |_| vec![], report, caller).await {
+        Ok((mut critique, repaired)) => {
+            blueprint.issues.extend(repaired);
             validate::check_critique(&mut critique, &blueprint.structure, index, &mut blueprint.issues, &mut blueprint.checks);
             blueprint.critique = Some(critique);
         }
@@ -320,15 +324,16 @@ pub fn source_status(source: &Source) -> SourceStatus {
     }
 }
 
-/// Eén aanroep met hooguit één herkansing als het antwoord geen geldig schema heeft.
+/// Eén aanroep met hooguit één herkansing als het antwoord ook na `repair` geen geldig schema heeft.
 async fn ask<T: DeserializeOwned + Send>(
     frame: &Frame,
     task: String,
     stage: Stage,
+    repair: impl Fn(&mut serde_json::Value) -> Vec<Issue> + Send,
     extra_errors: impl Fn(&T) -> Vec<String> + Send,
     report: &mut RunReport,
     caller: &mut impl Caller,
-) -> Result<T, AppError> {
+) -> Result<(T, Vec<Issue>), AppError> {
     let mut request = frame.request(&task);
     for attempt in 1..=2 {
         let reply = match caller.call(request.clone(), stage, attempt).await {
@@ -338,9 +343,9 @@ async fn ask<T: DeserializeOwned + Send>(
                 return Err(e);
             }
         };
-        let parsed = parse::<T>(&reply.text).and_then(|value| {
+        let parsed = parse_repaired::<T>(&reply.text, &repair).and_then(|(value, repaired)| {
             let errors = extra_errors(&value);
-            if errors.is_empty() { Ok(value) } else { Err(errors.join(" ")) }
+            if errors.is_empty() { Ok((value, repaired)) } else { Err(errors.join(" ")) }
         });
         let (schema_ok, schema_error) = match &parsed {
             Ok(_) => (true, None),
@@ -360,8 +365,8 @@ async fn ask<T: DeserializeOwned + Send>(
     unreachable!("de lus eindigt altijd met een return")
 }
 
-/// Leest het JSON-object uit een antwoord. Sommige modellen zetten er ondanks de opdracht tekst of een codeblok omheen.
-pub fn parse<T: DeserializeOwned>(text: &str) -> Result<T, String> {
+/// Het JSON-object uit een antwoord. Sommige modellen zetten er ondanks de opdracht tekst of een codeblok omheen.
+fn json_body(text: &str) -> Result<&str, String> {
     let body = text.rsplit_once("</think>").map_or(text, |(_, rest)| rest);
     let (Some(start), Some(end)) = (body.find('{'), body.rfind('}')) else {
         return Err("Er staat geen JSON-object in het antwoord.".into());
@@ -369,7 +374,19 @@ pub fn parse<T: DeserializeOwned>(text: &str) -> Result<T, String> {
     if end < start {
         return Err("Er staat geen JSON-object in het antwoord.".into());
     }
-    serde_json::from_str(&body[start..=end]).map_err(|e| e.to_string())
+    Ok(&body[start..=end])
+}
+
+#[cfg(test)]
+pub fn parse<T: DeserializeOwned>(text: &str) -> Result<T, String> {
+    serde_json::from_str(json_body(text)?).map_err(|e| e.to_string())
+}
+
+fn parse_repaired<T: DeserializeOwned>(text: &str, repair: &impl Fn(&mut serde_json::Value) -> Vec<Issue>) -> Result<(T, Vec<Issue>), String> {
+    let mut value: serde_json::Value = serde_json::from_str(json_body(text)?).map_err(|e| e.to_string())?;
+    let repaired = repair(&mut value);
+    let parsed = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    Ok((parsed, repaired))
 }
 
 /// De vaste omlijsting van een aanroep: systeemtekst en bron, die voor beide aanroepen gelijk zijn.
