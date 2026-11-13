@@ -5,7 +5,7 @@ import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
 import { initSites, refreshSites } from "./sites";
 import type { PdfViewHandle } from "./pdf";
-import type { AppError, LoginClosed, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
+import type { AppError, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const urlInput = $<HTMLInputElement>("url-input");
@@ -22,6 +22,9 @@ let pdfHandle: PdfViewHandle | null = null;
 let opening = 0;
 let frameLoads = 0;
 let lastHighlight: string | null = null;
+let previewRequests = 0;
+let previewShownFor: string | null = null;
+let awaitingPreview: { request: string; token: number; url: string } | null = null;
 
 const snapshotBase = navigator.userAgent.includes("Windows") ? "http://deepdive-snapshot.localhost" : "deepdive-snapshot://localhost";
 
@@ -246,6 +249,7 @@ async function refreshList() {
 // ---------- tonen ----------
 
 function hideViews() {
+  $("show-saved").hidden = true;
   pdfHandle?.destroy();
   pdfHandle = null;
   frame.hidden = true;
@@ -303,6 +307,7 @@ async function show(source: Source) {
 
 /** `reload`: een adres dat alleen in het anker verschilt, laadt de iframe niet opnieuw. Daarom krijgt het dan een eigen nummer. */
 function loadFrame(id: string, reload = false) {
+  $("show-saved").hidden = true;
   const query = [lastHighlight ? `hl=${lastHighlight}` : null, reload ? `v=${++frameLoads}` : null].filter(Boolean).join("&");
   frame.src = `${snapshotBase}/${id}/index.html${query ? `?${query}` : ""}${lastHighlight ? "#dd-doel" : ""}`;
 }
@@ -339,19 +344,88 @@ function jumpToParagraphs(ranges: ParagraphRange[]) {
   loadFrame(current.id);
 }
 
+// ---------- voorvertoning ----------
+
+function renderPreviewStatus(text: string) {
+  $("status").hidden = false;
+  $("status-text").textContent = text;
+  $("status-text").title = "";
+  $("status-warnings").textContent = "";
+  $("refresh").hidden = true;
+  $("hide-floating").hidden = true;
+}
+
+/** Alvast de pagina tonen. Er is nog geen bron, dus alles wat een vaste kopie nodig heeft staat uit tot die er is. */
+function showPreview(preview: PagePreview, url: string) {
+  hideViews();
+  current = null;
+  clearNotice();
+  void setBlueprintSource(null);
+  document.title = `${preview.title} – Deepdive`;
+  urlInput.value = url;
+  $("empty").hidden = true;
+  renderPreviewStatus("Voorbeeld · wordt op de achtergrond opgeslagen…");
+  setBusy(null);
+  frame.hidden = false;
+  frame.src = `${snapshotBase}/preview/${preview.id}/index.html`;
+}
+
+/**
+ * De kopie staat op schijf. De lezer is intussen misschien al aan het lezen, en de afgeschermde iframe kan zijn
+ * scrollpositie niet doorgeven. Daarom blijft het voorbeeld staan tot de lezer zelf de kopie kiest of ergens heen springt.
+ */
+async function adoptSaved(source: Source) {
+  current = source;
+  remember(source.id);
+  document.title = `${source.title} – Deepdive`;
+  renderStatus(source);
+  renderSourceNotice(source);
+  void setBlueprintSource(source);
+  $("show-saved").hidden = source.kind === "pdf";
+  await refreshList();
+}
+
+void listen<PagePreview>("page-preview", ({ payload }) => {
+  if (awaitingPreview?.request !== payload.request || awaitingPreview.token !== opening) return;
+  showPreview(payload, awaitingPreview.url);
+  awaitingPreview = null;
+  previewShownFor = payload.request;
+});
+
 // ---------- invoer ----------
 
 async function openUrl(url: string, refresh = false) {
   const trimmed = url.trim();
   if (!trimmed) return;
   clearError();
-  setBusy("De pagina wordt opgehaald en vastgelegd. Dit duurt meestal 10 tot 30 seconden…");
+  const token = ++opening;
+  const request = String(++previewRequests);
+  awaitingPreview = { request, token, url: trimmed };
+  setBusy("De pagina wordt geladen…");
   try {
-    await show(await invoke<Source>("open_url", { url: trimmed, refresh }));
+    const source = await invoke<Source>("open_url", { url: trimmed, refresh, previewRequest: request });
+    if (token !== opening) {
+      // De lezer is alweer verder. De kopie staat wel in de lijst.
+      await refreshList();
+      return;
+    }
+    if (previewShownFor === request) {
+      await adoptSaved(source);
+    } else {
+      // Nu al: `show` begint een nieuwe opening, en dan slaat het opruimen hieronder over.
+      setBusy(null);
+      awaitingPreview = null;
+      await show(source);
+    }
   } catch (err) {
+    if (token !== opening) return;
+    if (previewShownFor === request) renderPreviewStatus("Voorbeeld · niet opgeslagen");
     showError(err, trimmed);
   } finally {
-    setBusy(null);
+    if (token === opening) {
+      setBusy(null);
+      awaitingPreview = null;
+    }
   }
 }
 
@@ -401,6 +475,9 @@ $("url-form").addEventListener("submit", (e) => {
   void openUrl(urlInput.value);
 });
 $("hide-floating").addEventListener("click", () => void toggleFloating());
+$("show-saved").addEventListener("click", () => {
+  if (current) loadFrame(current.id);
+});
 $("refresh").addEventListener("click", () => {
   if (current?.url) void refetch(current);
 });

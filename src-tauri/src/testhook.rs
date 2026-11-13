@@ -53,7 +53,7 @@ async fn run_site_test(app: AppHandle, list: String, out: String) {
         let (label, url) = line.split_once(' ').unwrap_or(("", line));
         let start = Instant::now();
         let store = app.state::<Store>();
-        let result = import::open_url(&app, &store, url.trim(), true).await;
+        let result = import::open_url(&app, &store, url.trim(), true, None).await;
         let seconds = start.elapsed().as_secs_f32();
         let entry = match result {
             Ok(s) => json!({
@@ -119,7 +119,7 @@ async fn run_blueprint_test(app: AppHandle, plan: String, out: String) {
         let start = Instant::now();
         let result = match (&piece.url, &piece.fixture) {
             (_, Some(path)) => open_fixture(&store, &piece.label, path),
-            (Some(url), _) => match import::open_url(&app, &store, url, false).await {
+            (Some(url), _) => match import::open_url(&app, &store, url, false, None).await {
                 Ok(source) if !source.text_ready => read_pdf_in_window(&app, url, &source.id).await,
                 other => other,
             },

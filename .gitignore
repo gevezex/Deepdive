@@ -8,3 +8,6 @@ public/pdfjs/
 
 # Testuitvoer van de blauwdruk: bevat kopieën van artikelen en modeluitvoer. Nooit committen.
 .blauwdruk-test/
+
+# Opgehaalde webpagina's van firecrawl, geen projectbestanden.
+.firecrawl/

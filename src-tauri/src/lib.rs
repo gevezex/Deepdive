@@ -6,6 +6,7 @@ mod engine;
 mod error;
 mod import;
 mod model;
+mod preview;
 mod providers;
 mod sessions;
 mod snapshot;
@@ -24,8 +25,8 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
-async fn open_url(app: AppHandle, store: State<'_, Store>, url: String, refresh: Option<bool>) -> Result<Source, AppError> {
-    import::open_url(&app, &store, &url, refresh.unwrap_or(false)).await
+async fn open_url(app: AppHandle, store: State<'_, Store>, url: String, refresh: Option<bool>, preview_request: Option<String>) -> Result<Source, AppError> {
+    import::open_url(&app, &store, &url, refresh.unwrap_or(false), preview_request.as_deref()).await
 }
 
 #[tauri::command]
@@ -94,6 +95,15 @@ async fn get_source(store: State<'_, Store>, id: String) -> Result<Source, AppEr
 fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Response<Vec<u8>> {
     let origin_is_opaque = request.headers().get(header::ORIGIN).is_some_and(|o| o == "null");
     let not_found = || Response::builder().status(StatusCode::NOT_FOUND).body(Vec::new()).unwrap();
+    if let Some(html) = app.state::<preview::Previews>().file(request.uri().path()) {
+        return Response::builder()
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .header(header::CONTENT_SECURITY_POLICY, snapshot::PREVIEW_CSP)
+            .header("X-Content-Type-Options", "nosniff")
+            .header(header::REFERRER_POLICY, "no-referrer")
+            .body(html)
+            .unwrap();
+    }
     let store = app.state::<Store>();
     let Some(path) = store.snapshot_file(request.uri().path()) else { return not_found() };
     let Ok(bytes) = std::fs::read(&path) else { return not_found() };
@@ -152,6 +162,7 @@ pub fn run() {
             app.manage(SiteSessions::open(root.clone()));
             app.manage(blueprint::commands::Jobs::default());
             app.manage(Store::new(root)?);
+            app.manage(preview::Previews::default());
             sessions::finish_pending_wipes(app.handle().clone());
             #[cfg(debug_assertions)]
             testhook::start(app.handle().clone());

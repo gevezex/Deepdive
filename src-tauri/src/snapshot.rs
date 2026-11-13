@@ -23,6 +23,14 @@ style-src deepdive-snapshot: http://deepdive-snapshot.localhost 'unsafe-inline';
 font-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; \
 form-action 'none'; base-uri 'none'; frame-src 'none'";
 
+/// De voorvertoning komt nog niet uit de opslag: afbeeldingen, CSS en fonts komen rechtstreeks van de site, net als in
+/// het verborgen venster dat dezelfde pagina net laadde. Scripts, frames en formulieren blijven even dicht als bij de kopie.
+pub const PREVIEW_CSP: &str = "default-src 'none'; \
+img-src http: https: data:; \
+style-src http: https: 'unsafe-inline'; \
+font-src http: https: data:; \
+form-action 'none'; base-uri 'none'; frame-src 'none'";
+
 const MAX_ASSET: u64 = 40 * 1024 * 1024;
 const MAX_TOTAL: u64 = 500 * 1024 * 1024;
 const MAX_CSS_DEPTH: usize = 5;
@@ -154,10 +162,20 @@ fn is_dangerous_url(value: &str) -> bool {
 /// Sanitair: haalt alles eruit wat kan uitvoeren of het netwerk op kan, en verwijst bronnen om via `map`.
 /// `map` krijgt het adres zoals het in de HTML staat. None betekent: niet beschikbaar.
 pub fn sanitize(html: &str, page_url: &Url, map: impl FnMut(&str, AssetKind) -> Option<String>) -> Result<String, String> {
+    sanitize_with(html, page_url, CSP, map)
+}
+
+/// De voorvertoning: dezelfde opschoning als de kopie, maar de bestanden blijven op de site staan.
+pub fn preview_html(html: &str, page_url: &Url) -> Result<String, String> {
+    let page_is_private = is_private(page_url);
+    sanitize_with(html, page_url, PREVIEW_CSP, |raw, _| resolve_asset(raw, page_url, page_is_private).map(|u| u.to_string()))
+}
+
+fn sanitize_with(html: &str, page_url: &Url, csp: &str, map: impl FnMut(&str, AssetKind) -> Option<String>) -> Result<String, String> {
     let map = RefCell::new(map);
     let style_buf = RefCell::new(String::new());
     let head_meta = format!(
-        "<meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{CSP}\">\
+        "<meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{csp}\">\
 <style>[data-dd-embed]{{box-sizing:border-box;display:flex;align-items:center;justify-content:center;max-width:100%;\
 padding:1em;background:#f4efe6;border:1px dashed #b9ad98;color:#5d5546;font:14px/1.4 Georgia,serif;text-align:center}}</style>"
     );

@@ -34,7 +34,7 @@ export async function startSite(password) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, "http://x");
     const path = url.pathname;
-    log.push({ server: "main", path: req.url, cookie: req.headers.cookie ?? null, method: req.method });
+    log.push({ server: "main", path: req.url, cookie: req.headers.cookie ?? null, method: req.method, referer: req.headers.referer ?? null });
     const html = (body, status = 200, headers = {}) => {
       res.writeHead(status, { "content-type": "text/html; charset=utf-8", ...headers });
       res.end(body);
@@ -114,6 +114,21 @@ export async function startSite(password) {
     }
     if (path === "/popup-menu") {
       return html(shell("Menu", stuk("Menu") + `<nav style="position:fixed;top:0;left:0;right:0;height:50px"><a href="/">MENUTEKST</a> <a href="/abonneren">Subscribe</a></nav>`));
+    }
+    // Een afbeelding die lang duurt, zodat de pagina pas laat "klaar" is en het opslaan lang loopt.
+    const GIF = Buffer.from("R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==", "base64");
+    if (path === "/traag.gif") return void setTimeout(() => res.writeHead(200, { "content-type": "image/gif" }).end(GIF), 5000);
+    if (path === "/voorbeeld.gif") return void res.writeHead(200, { "content-type": "image/gif", "cache-control": "no-store" }).end(GIF);
+    if (path === "/los.pdf") return void res.writeHead(200, { "content-type": "application/pdf" }).end("%PDF-1.4\n%%EOF\n");
+    if (path === "/traag") return html(shell("Traag stuk", `${stuk("Traag stuk")}<img src="/traag.gif" alt=""><img src="/voorbeeld.gif" alt="">`));
+    if (path === "/later-opgebouwd") {
+      return html(shell("Later opgebouwd", `<div id="app"></div><script>setTimeout(() => { document.getElementById("app").innerHTML = ${JSON.stringify(stuk("Later opgebouwd"))} }, 1500)</script>`));
+    }
+    if (path === "/mislukt-na-voorbeeld") {
+      return html(shell("Eerst tekst", `${stuk("Eerst tekst")}<img src="/traag.gif" alt=""><script>addEventListener("load", () => { document.body.innerHTML = "<h1>Just a moment</h1><p>Verify you are human</p>" })</script>`));
+    }
+    if (path === "/robotcontrole") {
+      return html(shell("Just a moment...", `<h1>Just a moment</h1><p>Verify you are human by completing the action below. ${"Dit is de controle van de site op robots en dus niet het stuk zelf. ".repeat(12)}</p><img src="/traag.gif" alt="">`));
     }
     if (path === "/kort") {
       return html(shell("Kort bericht", `<article><h1>Kort bericht</h1><p>Vandaag ging de brug weer open, nadat die een week dicht was geweest. De gemeente verwacht geen nieuwe hinder.</p><p>De werkzaamheden zijn klaar. Fietsers kunnen er vanaf vanmiddag weer langs, en ook de bus rijdt weer zijn gewone route door het centrum van de stad.</p></article>`));

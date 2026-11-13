@@ -1,8 +1,9 @@
 //! Van invoer naar opgeslagen bron: website, pdf of geplakte tekst.
 
 use crate::completeness;
-use crate::engine::{webview::{self, WebviewEngine}, PageEngine, RenderedPage};
+use crate::engine::{webview::{self, WebviewEngine}, PageEngine, PreviewSink, RenderedPage};
 use crate::error::AppError;
+use crate::preview;
 use crate::model::{word_count, AssetStats, Block, Completeness, CompletenessVerdict, Source, SourceKind, SCHEMA_VERSION};
 use crate::sessions::{cookie_header, ActiveSession, SessionCookie, SiteSessions};
 use crate::snapshot;
@@ -76,6 +77,29 @@ const CONSENT_PHRASES: &[&str] = &[
     "cookie", "privacy-instellingen", "privacyinstellingen", "toestemming", "consent", "we value your privacy", "akkoord",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wall {
+    Blocked,
+    Consent,
+}
+
+/// Staat er een robotcontrole of cookiemuur in plaats van het stuk? `text` is in kleine letters.
+fn wall_in(text: &str, host: &str, words: u32) -> Option<Wall> {
+    if words >= SUSPECT_WORDS {
+        return None;
+    }
+    if BLOCK_PHRASES.iter().any(|p| text.contains(p)) {
+        return Some(Wall::Blocked);
+    }
+    let consent_host = host.contains("consent") || host.contains("privacy") || host.starts_with("cmp.");
+    (consent_host || (words < 120 && CONSENT_PHRASES.iter().any(|p| text.contains(p)))).then_some(Wall::Consent)
+}
+
+/// Zo'n muur tonen we niet als voorvertoning: de echte pagina komt er vaak nog achteraan.
+pub fn is_wall(text: &str, host: &str, words: u32) -> bool {
+    wall_in(text, host, words).is_some()
+}
+
 fn lower_join(page: &RenderedPage) -> String {
     let mut text = page.document_title.clone().unwrap_or_default();
     for b in page.blocks.iter().take(40) {
@@ -96,14 +120,10 @@ pub fn classify(page: &RenderedPage, http_status: Option<u16>, judged: &Complete
     let host = Url::parse(&page.final_url).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
     let detail = format!("{words} woorden, status {http_status:?}, adres {}", page.final_url);
 
-    if words < SUSPECT_WORDS {
-        if BLOCK_PHRASES.iter().any(|p| text.contains(p)) {
-            return Err(AppError::new("blocked", "Deze site blokkeert het automatisch ophalen (bijvoorbeeld met een robotcontrole). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail));
-        }
-        let consent_host = host.contains("consent") || host.contains("privacy") || host.starts_with("cmp.");
-        if consent_host || (words < 120 && CONSENT_PHRASES.iter().any(|p| text.contains(p))) {
-            return Err(AppError::new("consent", "Deze site toont eerst een cookiemuur, en die kan de app niet zelf beantwoorden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail));
-        }
+    match wall_in(&text, &host, words) {
+        Some(Wall::Blocked) => return Err(AppError::new("blocked", "Deze site blokkeert het automatisch ophalen (bijvoorbeeld met een robotcontrole). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail)),
+        Some(Wall::Consent) => return Err(AppError::new("consent", "Deze site toont eerst een cookiemuur, en die kan de app niet zelf beantwoorden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail)),
+        None => {}
     }
     if let Some(status) = http_status {
         if words < SUSPECT_WORDS && (status == 404 || status == 410) {
@@ -188,18 +208,19 @@ async fn preflight(url: &Url, user_agent: &str, cookies: &[SessionCookie]) -> Re
     Ok(Preflight::Pdf { bytes, name })
 }
 
-pub async fn open_url(app: &AppHandle, store: &Store, raw: &str, refresh: bool) -> Result<Source, AppError> {
+/// `preview_request`: het kenmerk waarmee de interface de voorvertoning van dit verzoek herkent. Zonder kenmerk komt die er niet.
+pub async fn open_url(app: &AppHandle, store: &Store, raw: &str, refresh: bool, preview_request: Option<&str>) -> Result<Source, AppError> {
     let url = parse_url(raw)?;
     if !refresh {
         if let Some(existing) = store.find_by_url(url.as_str()) {
             return Ok(existing);
         }
     }
-    fetch(app, store, &url).await
+    fetch(app, store, &url, preview_request).await
 }
 
 /// Haalt het adres op en slaat het op als nieuwe bron. Met een bewaarde sessie voor deze site gebruikt het die.
-async fn fetch(app: &AppHandle, store: &Store, url: &Url) -> Result<Source, AppError> {
+async fn fetch(app: &AppHandle, store: &Store, url: &Url, preview_request: Option<&str>) -> Result<Source, AppError> {
     let engine = WebviewEngine::new(app.clone());
     let sessions = app.state::<SiteSessions>();
     let session = sessions.active(url);
@@ -211,7 +232,23 @@ async fn fetch(app: &AppHandle, store: &Store, url: &Url) -> Result<Source, AppE
         }
         None => vec![],
     };
-    match preflight(url, engine.user_agent(), &cookies).await? {
+    let sink = preview_request.map(|request| {
+        let (app, request) = (app.clone(), request.to_string());
+        move |page| preview::publish(&app, &request, page)
+    });
+    // De webview start meteen, zodat wachten op de voorcontrole de pagina niet ophoudt. Is het een pdf, dan stopt hij weer.
+    let render = engine.render(url, session.as_ref().map(|s| s.store), sink.as_ref().map(|s| s as &PreviewSink));
+    let check = preflight(url, engine.user_agent(), &cookies);
+    tokio::pin!(render, check);
+    let mut rendered = None;
+    let checked = tokio::select! {
+        checked = &mut check => checked?,
+        page = &mut render => {
+            rendered = Some(page);
+            check.await?
+        }
+    };
+    match checked {
         Preflight::Pdf { bytes, name } => {
             let mut source = save_pdf(store, &bytes, &name, Some(url.as_str()))?;
             if session.is_some() && !source.fetched_with_session {
@@ -220,12 +257,17 @@ async fn fetch(app: &AppHandle, store: &Store, url: &Url) -> Result<Source, AppE
             }
             Ok(source)
         }
-        Preflight::Page { status } => capture_page(store, &engine, url, status, session.as_ref()).await,
+        Preflight::Page { status } => {
+            let page = match rendered {
+                Some(page) => page?,
+                None => render.await?,
+            };
+            capture_page(store, &engine, url, status, session.as_ref(), page).await
+        }
     }
 }
 
-async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status: Option<u16>, session: Option<&ActiveSession>) -> Result<Source, AppError> {
-    let page = engine.render(url, session.map(|s| s.store)).await?;
+async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status: Option<u16>, session: Option<&ActiveSession>, page: RenderedPage) -> Result<Source, AppError> {
     #[cfg(debug_assertions)]
     crate::testhook::dump_signals(url, &page);
     let judged = completeness::judge(&page, session.is_some());
@@ -306,7 +348,7 @@ pub async fn refetch(app: &AppHandle, store: &Store, id: &str) -> Result<Refetch
     }
     let raw = old.url.clone().or_else(|| old.final_url.clone()).ok_or_else(|| AppError::new("refetch", "Van deze bron is geen webadres bekend."))?;
     let url = parse_url(&raw)?;
-    let mut new = fetch(app, store, &url).await?;
+    let mut new = fetch(app, store, &url, None).await?;
     let (old_words, new_words) = (old.word_count, new.word_count);
     if new.id == old.id {
         return Ok(RefetchOutcome { status: RefetchStatus::Unchanged, current: old, old_words, new_words, candidate_id: None });

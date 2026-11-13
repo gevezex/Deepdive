@@ -54,7 +54,7 @@ const invoke = window.__TAURI_INTERNALS__.invoke;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const notice = () => ({ hidden: $("source-notice").hidden, title: $("source-notice-title").textContent, text: $("source-notice-text").textContent, actions: [...$("source-notice-actions").children].map((b) => b.textContent) });
 const clickNotice = (label) => { const b = [...$("source-notice-actions").children].find((x) => x.textContent === label); if (!b) throw "geen knop " + label; b.click(); };
-const idle = async () => { for (let i = 0; i < 1800; i++) { await wait(50); if ($("busy").hidden) return; } throw "bleef bezig"; };
+const idle = async () => { for (let i = 0; i < 1800; i++) { await wait(50); if ($("busy").hidden && !$("status-text").textContent.includes("op de achtergrond")) return; } throw "bleef bezig"; };
 const openUrl = async (u) => { $("url-input").value = u; $("url-form").requestSubmit(); await wait(50); await idle(); };
 `;
 

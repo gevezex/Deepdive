@@ -2,20 +2,24 @@
 // de pagina kan dit script en de uitvoer beïnvloeden. Rust saneert de HTML daarom opnieuw.
 (function (NS) {
   if (window[NS]) return;
-  const state = (window[NS] = { phase: "wachten", done: false, error: null, payload: null, offset: 0 });
+  const state = (window[NS] = { phase: "wachten", started: false, done: false, error: null, payload: null, offset: 0, previewPayload: null, previewOffset: 0 });
 
   // Geeft de uitvoer in stukken terug, zonder een emoji (surrogaatpaar) door te knippen.
-  state.next = function () {
-    const CHUNK = 1 << 21;
-    const p = state.payload || "";
-    if (state.offset >= p.length) return "";
-    let end = Math.min(state.offset + CHUNK, p.length);
-    const code = p.charCodeAt(end - 1);
-    if (code >= 0xd800 && code <= 0xdbff && end < p.length) end -= 1;
-    const out = p.slice(state.offset, end);
-    state.offset = end;
-    return out;
-  };
+  function reader(payload, offset) {
+    return function () {
+      const CHUNK = 1 << 21;
+      const p = state[payload] || "";
+      if (state[offset] >= p.length) return "";
+      let end = Math.min(state[offset] + CHUNK, p.length);
+      const code = p.charCodeAt(end - 1);
+      if (code >= 0xd800 && code <= 0xdbff && end < p.length) end -= 1;
+      const out = p.slice(state[offset], end);
+      state[offset] = end;
+      return out;
+    };
+  }
+  state.next = reader("payload", "offset");
+  state.nextPreview = reader("previewPayload", "previewOffset");
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -680,6 +684,28 @@
     return null;
   }
 
+  function pageTitle() {
+    const h1 = document.querySelector("h1");
+    return meta("og:title", "twitter:title") || (h1 && textOf(h1)) || norm(document.title) || null;
+  }
+
+  // Een eerste versie om alvast te tonen. Leest de pagina alleen: het vastleggen hierna ziet er niets van.
+  state.preview = function (minChars) {
+    if (document.readyState === "loading" || !document.body || !/^https?:$/.test(location.protocol)) return false;
+    const text = norm(document.body.innerText);
+    if (text.length < minChars) return false;
+    state.previewPayload = JSON.stringify({
+      html: serializeDocument(),
+      finalUrl: location.href,
+      title: pageTitle(),
+      documentTitle: norm(document.title),
+      sample: text.slice(0, 4000),
+      words: text.split(" ").length,
+    });
+    state.previewOffset = 0;
+    return true;
+  };
+
   async function run() {
     state.phase = "opbouwen";
     await waitQuiet(1200, 12000);
@@ -692,11 +718,10 @@
     removeOverlays();
     const blocks = extract();
     const signals = finishSignals(sig, candidates, blocks);
-    const h1 = document.querySelector("h1");
     state.payload = JSON.stringify({
       html: serializeDocument(),
       finalUrl: location.href,
-      title: meta("og:title", "twitter:title") || (h1 && textOf(h1)) || norm(document.title) || null,
+      title: pageTitle(),
       documentTitle: norm(document.title),
       author: meta("author", "article:author", "parsely-author"),
       siteName: meta("og:site_name", "application-name"),
@@ -709,8 +734,13 @@
     state.done = true;
   }
 
-  run().catch((e) => {
-    state.error = String((e && e.stack) || e);
-    state.done = true;
-  });
+  // Pas als de pagina helemaal is geladen. Het script zelf staat er eerder, voor de voorvertoning.
+  state.begin = function () {
+    if (state.started) return;
+    state.started = true;
+    run().catch((e) => {
+      state.error = String((e && e.stack) || e);
+      state.done = true;
+    });
+  };
 })("__NS__");

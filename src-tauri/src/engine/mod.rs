@@ -29,6 +29,22 @@ pub struct RenderedPage {
     pub session_cookies: Vec<SessionCookie>,
 }
 
+/// Een eerste versie van de pagina, om alvast te tonen terwijl het vastleggen doorloopt. De inhoud is onbetrouwbaar.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagePreview {
+    pub html: String,
+    pub final_url: String,
+    pub title: Option<String>,
+    pub document_title: Option<String>,
+    /// Het begin van de zichtbare tekst.
+    pub sample: String,
+    pub words: u32,
+}
+
+/// Krijgt de eerste versie. Met `false` is die nog niet te tonen en probeert de engine het later opnieuw.
+pub type PreviewSink = dyn Fn(PagePreview) -> bool + Send + Sync;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PageSignals {
@@ -71,7 +87,8 @@ pub struct RawBlock {
 pub trait PageEngine {
     /// Laadt `url`, wacht tot de pagina is opgebouwd en geeft de DOM en tekstblokken terug.
     /// Met `session` draait de pagina in de eigen opslag van die site, anders in de gedeelde.
-    async fn render(&self, url: &Url, session: Option<[u8; 16]>) -> Result<RenderedPage, AppError>;
+    /// `on_preview` krijgt zo vroeg mogelijk een eerste versie, terwijl het vastleggen doorloopt.
+    async fn render(&self, url: &Url, session: Option<[u8; 16]>, on_preview: Option<&PreviewSink>) -> Result<RenderedPage, AppError>;
     /// De user-agent die ook voor het ophalen van afbeeldingen en CSS wordt gebruikt.
     fn user_agent(&self) -> &'static str;
 }

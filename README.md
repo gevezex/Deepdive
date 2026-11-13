@@ -62,6 +62,8 @@ Gewoon TypeScript met Vite, zonder framework. De schermdelen zijn klein en pdf.j
 
 **Afscherming:** de kopie staat in een iframe met `sandbox=""` en een CSP zonder scripts en zonder netwerk. Het verborgen venster heeft geen capability, dus een pagina kan de commando's van de app niet aanroepen.
 
+**Voorvertoning:** zodra er tekst staat, toont de app de pagina al terwijl de kopie op de achtergrond wordt gemaakt. Die voorvertoning krijgt dezelfde opschoning en sandbox, zonder scripts, maar laadt afbeeldingen, CSS en fonts nog rechtstreeks van de site. Ze staat alleen in het geheugen.
+
 **Blokken in de kopie:** elk tekstblok heeft in de visuele kopie een attribuut `data-dd-n` met zijn alineanummer. Latere stappen kunnen tekst en beeld daarmee aan elkaar koppelen. Bij pdf's staan paginanummer en positie in het blok zelf.
 
 **Popups in de kopie:** zonder scripts is een laag niet weg te klikken. Daarom gebeurt er twee dingen. Bij het vastleggen haalt `capture.js` cookielagen en inschrijf-, nieuwsbrief- en app-lagen weg, en zet het scrollen weer aan als de pagina dat had uitgezet. Een laag die zonder sluitknop vraagt om in te loggen of te betalen blijft staan. Blijft er toch iets hinderen, dan is er de knop **Popup weghalen** onder de kopie. De keuze staat als `hideFloating` in `source.json`. Bij het serveren voegt de app dan een stijl toe die verbergt wat volgens de CSS van de kopie zweeft (`position: fixed`, dialogen, en `position: absolute` met een z-index vanaf 1000). Elementen met of rond een genummerde alinea blijven altijd staan. De kopie op schijf, de tekst en het oordeel over de volledigheid veranderen niet, en de afscherming blijft gelijk. De kopie laadt opnieuw en begint dan bovenaan. Opnieuw ophalen neemt de keuze mee naar de nieuwe kopie.

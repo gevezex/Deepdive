@@ -259,3 +259,10 @@ export type JobEvent =
   | { type: "field"; name: string; value: unknown }
   | { type: "block"; value: DiagramBlock }
   | { type: "structure"; blueprint: Blueprint };
+
+/** Een eerste versie van een webpagina, die alvast wordt getoond terwijl de vaste kopie wordt gemaakt. */
+export interface PagePreview {
+  request: string;
+  id: string;
+  title: string;
+}
