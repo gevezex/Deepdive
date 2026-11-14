@@ -106,13 +106,19 @@ The public key may stay next to it; it is not secret. The public key is built in
 TAURI_SIGNING_PRIVATE_KEY=~/.tauri/deepdive-updater.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npm run tauri build -- --bundles app,dmg
 ```
 
-3. Write `latest.json` next to the update:
+3. Hide the volume icon in the dmg (Tauri leaves `.VolumeIcon.icns` visible in Finder):
+
+```bash
+node scripts/hide-dmg-icon.mjs
+```
+
+4. Write `latest.json` next to the update:
 
 ```bash
 node scripts/latest-json.mjs --notes "What is new"
 ```
 
-4. Make a GitHub release with the tag `v<version>` (for example `v1.1.0`) and upload from `src-tauri/target/release/bundle/` the dmg, `macos/Deepdive.app.tar.gz` and `macos/latest.json`. The release must be the latest one and not a draft or prerelease.
+5. Make a GitHub release with the tag `v<version>` (for example `v1.1.0`) and upload from `src-tauri/target/release/bundle/` the dmg, `macos/Deepdive.app.tar.gz` and `macos/latest.json`. The release must be the latest one and not a draft or prerelease.
 
 **Testing an update locally.** Without publishing anything: build an old and a new version that look for updates at a local address, serve the new one and click the button in the old one. `--config` only changes these builds, not `tauri.conf.json`.
 
