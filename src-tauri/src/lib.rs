@@ -18,6 +18,7 @@ mod engine;
 mod error;
 mod i18n;
 mod import;
+mod markdown;
 mod model;
 mod preview;
 mod professor;
@@ -97,8 +98,8 @@ async fn read_pdf(store: State<'_, Store>, id: String) -> Result<tauri::ipc::Res
 }
 
 #[tauri::command]
-async fn import_text(store: State<'_, Store>, title: Option<String>, url: Option<String>, text: String) -> Result<Source, AppError> {
-    import::import_text(&store, title, url, &text)
+async fn import_text(store: State<'_, Store>, title: Option<String>, url: Option<String>, text: String, markdown: Option<bool>) -> Result<Source, AppError> {
+    import::import_text(&store, title, url, &text, markdown)
 }
 
 #[tauri::command]

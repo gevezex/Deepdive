@@ -516,6 +516,34 @@ async function openPdfFile(file: File) {
   }
 }
 
+const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd)$/i;
+const isPdf = (file: File) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+const isTextFile = (file: File) => MARKDOWN_EXT.test(file.name) || file.name.toLowerCase().endsWith(".txt") || file.type === "text/markdown";
+
+// Een .md-bestand is altijd markdown; bij .txt kijkt de app zelf. Zonder kop in het stuk wordt de bestandsnaam de titel.
+async function openTextFile(file: File) {
+  clearError();
+  setBusy(t("app.savingText"));
+  try {
+    const text = await file.text();
+    const markdown = MARKDOWN_EXT.test(file.name) || file.type === "text/markdown" ? true : null;
+    const fallback = file.name.replace(/\.[^.]+$/, "");
+    const hasTitle = /^#\s+\S/m.test(text) || /^---\r?\n[\s\S]*?^title:/m.test(text);
+    const source = await invoke<Source>("import_text", { title: hasTitle ? null : fallback, url: null, text, markdown });
+    await show(source);
+  } catch (err) {
+    showError(err);
+  } finally {
+    setBusy(null);
+  }
+}
+
+function openFile(file: File) {
+  if (isPdf(file)) void openPdfFile(file);
+  else if (isTextFile(file)) void openTextFile(file);
+  else showError({ kind: "pdf", message: t("app.notPdf", { name: file.name }), detail: null });
+}
+
 function openPasteDialog(url?: string) {
   $<HTMLInputElement>("paste-url").value = url ?? "";
   $<HTMLInputElement>("paste-title").value = "";
@@ -558,7 +586,7 @@ $<HTMLInputElement>("pdf-input").addEventListener("change", (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (file) void openPdfFile(file);
+  if (file) openFile(file);
 });
 $("new-url").addEventListener("click", () => focusUrl());
 
@@ -627,8 +655,7 @@ window.addEventListener("drop", (e) => {
   if (!data) return;
   const file = data.files[0];
   if (file) {
-    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) void openPdfFile(file);
-    else showError({ kind: "pdf", message: t("app.notPdf", { name: file.name }), detail: null });
+    openFile(file);
     return;
   }
   const url = droppedUrl(data);

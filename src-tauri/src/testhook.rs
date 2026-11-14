@@ -170,7 +170,7 @@ fn open_fixture(store: &Store, label: &str, path: &str) -> Result<Source, crate:
     }
     let text = std::fs::read_to_string(path).map_err(crate::error::AppError::storage)?;
     let (title, body) = text.split_once('\n').unwrap_or(("", &text));
-    import::import_text(store, Some(title.trim_start_matches("# ").to_string()), Some(url), body)
+    import::import_text(store, Some(title.trim_start_matches("# ").to_string()), Some(url), body, Some(false))
 }
 
 /// Bij een pdf leest de voorkant de tekst met pdf.js. Dus openen we het adres in het hoofdvenster, als een gebruiker.

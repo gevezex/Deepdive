@@ -522,28 +522,40 @@ pub fn split_paragraphs(text: &str) -> Vec<String> {
     parts.into_iter().map(|p| p.split_whitespace().collect::<Vec<_>>().join(" ")).filter(|p| !p.is_empty()).collect()
 }
 
-pub fn import_text(store: &Store, title: Option<String>, url: Option<String>, text: &str) -> Result<Source, AppError> {
-    let paragraphs = split_paragraphs(text);
-    if paragraphs.is_empty() {
-        return Err(AppError::new("empty_text", tr("No text was pasted.", "Er is geen tekst geplakt.", "Hiçbir metin yapıştırılmadı.")));
-    }
-    let title = title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).unwrap_or_else(|| {
-        let first = &paragraphs[0];
-        if first.chars().count() <= 90 { first.clone() } else { format!("{}…", first.chars().take(90).collect::<String>()) }
-    });
-    let blocks: Vec<Block> = paragraphs
-        .into_iter()
-        .enumerate()
-        .map(|(i, text)| Block { n: i as u32 + 1, kind: "paragraph".into(), level: None, text, page: None, bbox: None })
-        .collect();
+/// Geplakte tekst of een tekstbestand. `markdown`: `Some(true)` voor een .md-bestand, `None` laat de app het zelf zien.
+pub fn import_text(store: &Store, title: Option<String>, url: Option<String>, text: &str, markdown: Option<bool>) -> Result<Source, AppError> {
+    let is_markdown = markdown.unwrap_or_else(|| crate::markdown::looks_like_markdown(text));
+    let given = title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
+    let shorten = |first: &str| if first.chars().count() <= 90 { first.to_string() } else { format!("{}…", first.chars().take(90).collect::<String>()) };
 
-    let mut body = format!("<h1>{}</h1>", escape(&title));
-    for b in &blocks {
-        body.push_str(&format!("<p data-dd-n=\"{}\">{}</p>", b.n, escape(&b.text)));
-    }
+    let (title, blocks, body, style) = if is_markdown {
+        let r = crate::markdown::render(text);
+        if r.blocks.is_empty() {
+            return Err(AppError::new("empty_text", tr("No text was pasted.", "Er is geen tekst geplakt.", "Hiçbir metin yapıştırılmadı.")));
+        }
+        let title = given.or(r.title).unwrap_or_else(|| shorten(&r.blocks[0].text));
+        let body = if r.starts_with_title { r.body } else { format!("<h1>{}</h1>\n{}", escape(&title), r.body) };
+        (title, r.blocks, body, crate::markdown::CSS.to_string())
+    } else {
+        let paragraphs = split_paragraphs(text);
+        if paragraphs.is_empty() {
+            return Err(AppError::new("empty_text", tr("No text was pasted.", "Er is geen tekst geplakt.", "Hiçbir metin yapıştırılmadı.")));
+        }
+        let title = given.unwrap_or_else(|| shorten(&paragraphs[0]));
+        let blocks: Vec<Block> = paragraphs
+            .into_iter()
+            .enumerate()
+            .map(|(i, text)| Block { n: i as u32 + 1, kind: "paragraph".into(), level: None, text, page: None, bbox: None })
+            .collect();
+        let mut body = format!("<h1>{}</h1>", escape(&title));
+        for b in &blocks {
+            body.push_str(&format!("<p data-dd-n=\"{}\">{}</p>", b.n, escape(&b.text)));
+        }
+        let style = "body{max-width:38em;margin:3em auto;padding:0 1.5em;font:18px/1.6 Georgia,'Iowan Old Style',serif;color:#2b2620;background:#fff}h1{font-size:1.5em;line-height:1.25}".to_string();
+        (title, blocks, body, style)
+    };
     let html = format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{}\"><title>{}</title>\
-<style>body{{max-width:38em;margin:3em auto;padding:0 1.5em;font:18px/1.6 Georgia,'Iowan Old Style',serif;color:#2b2620;background:#fff}}h1{{font-size:1.5em;line-height:1.25}}</style></head><body>{body}</body></html>",
+        "<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{}\"><title>{}</title><style>{style}</style></head><body>{body}</body></html>",
         snapshot::CSP,
         escape(&title)
     );

@@ -31,6 +31,7 @@ jsonwebtoken = "9"
 base64 = "0.22"
 psl = "2.1.247"
 tauri-plugin-updater = "2.14.1"
+pulldown-cmark = { version = "0.13", default-features = false }
 
 [features]
 # Alleen voor tests op macOS: schermafdruk van het hoofdvenster via de testhaak.

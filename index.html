@@ -16,10 +16,10 @@
         <button id="new-open" type="button" class="new-btn" aria-haspopup="menu" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="side.new">New article</span><kbd>⌘N</kbd></button>
         <div id="new-menu" class="pop-menu" role="menu" hidden>
           <button id="new-url" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span data-i18n="side.openUrl">Open web address</span><kbd>⌘L</kbd></button>
-          <label class="menu-item" for="pdf-input" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span data-i18n="app.choosePdf">Choose PDF</span><kbd>⌘O</kbd></label>
+          <label class="menu-item" for="pdf-input" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span data-i18n="app.choosePdf">Choose PDF or Markdown</span><kbd>⌘O</kbd></label>
           <button id="paste-open" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg><span data-i18n="app.pasteText">Paste text</span><kbd>⇧⌘V</kbd></button>
         </div>
-        <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+        <input id="pdf-input" type="file" accept="application/pdf,.pdf,.md,.markdown,.mdown,.mkd,.txt,text/markdown,text/plain" hidden />
       </div>
       <div class="search">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg>
@@ -69,7 +69,7 @@
         <div id="source-view" class="source-view">
           <div id="empty" class="empty">
             <h1 data-i18n="app.emptyTitle">What do you want to understand?</h1>
-            <p data-i18n="app.emptyText">Paste or drop a web address or a PDF here. Deepdive keeps a fixed copy on this computer, so you can read it later without internet too.</p>
+            <p data-i18n="app.emptyText">Paste or drop a web address, a PDF or a Markdown file here. Deepdive keeps a fixed copy on this computer, so you can read it later without internet too.</p>
           </div>
           <div id="busy" class="busy" role="status" hidden><div class="spinner"></div><p id="busy-text"></p></div>
           <iframe id="source-frame" title="Fixed copy of the source" data-i18n-title="app.frameTitle" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
