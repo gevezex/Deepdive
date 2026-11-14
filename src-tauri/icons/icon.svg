@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <title>Deepdive</title>
+  <desc>Abstract duikershoofd met duikbril en snorkel op een warm papierkleurig macOS-appicoon.</desc>
+  <defs>
+    <linearGradient id="paper" x1="100" y1="60" x2="910" y2="980" gradientUnits="userSpaceOnUse"><stop stop-color="#FBF5E9"/><stop offset=".55" stop-color="#F0E5D4"/><stop offset="1" stop-color="#E8D9C2"/></linearGradient>
+    <linearGradient id="brown" x1="300" y1="240" x2="790" y2="860" gradientUnits="userSpaceOnUse"><stop stop-color="#805329"/><stop offset="1" stop-color="#704820"/></linearGradient>
+    <linearGradient id="lens" x1="350" y1="460" x2="650" y2="640" gradientUnits="userSpaceOnUse"><stop stop-color="#423125"/><stop offset="1" stop-color="#302720"/></linearGradient>
+    <linearGradient id="amber" x1="302" y1="470" x2="451" y2="562" gradientUnits="userSpaceOnUse"><stop stop-color="#E2B56F"/><stop offset="1" stop-color="#CA9655"/></linearGradient>
+  </defs>
+  <g id="tile"><rect x="40" y="52" width="944" height="932" rx="204" fill="url(#paper)" stroke="#D8C5A7" stroke-width="2"/><rect x="44" y="56" width="936" height="924" rx="200" stroke="#FFF9EE" stroke-opacity=".65" stroke-width="3"/></g>
+  <g id="diver" fill="url(#brown)">
+    <path id="head" d="M280 433C282 310 366 226 496 226C626 226 709 309 716 433C669 404 610 394 498 394C385 394 323 404 280 433Z"/>
+    <path id="face" d="M308 675C355 693 416 701 497 701C578 701 635 691 678 673C664 716 635 751 598 790L579 821C552 856 526 881 497 881C420 876 349 786 308 675Z"/>
+    <path id="mask" d="M260 475C287 431 338 412 497 412C647 412 703 433 730 475C746 472 756 483 756 500V563C756 580 744 591 728 589C712 643 674 676 620 676C559 676 537 643 511 612C504 604 496 601 488 612C458 648 436 676 381 676C325 676 281 645 265 590C245 593 223 582 223 563V505C223 484 239 473 260 475Z"/>
+  </g>
+  <path id="glass" fill="url(#lens)" d="M283 529C291 470 338 453 496 453C649 453 700 470 708 524C719 598 683 640 623 640C575 640 556 616 531 580C511 551 484 543 462 571C430 613 420 640 378 640C315 640 274 600 283 529Z"/>
+  <path id="reflection" fill="url(#amber)" d="M303 550C306 490 357 463 443 469C468 472 441 490 416 499C369 515 340 537 313 560C306 567 301 564 303 550Z"/>
+  <path id="snorkel" d="M716 203L778 242C787 248 788 254 788 267V605C788 702 737 769 644 769H560" stroke="url(#brown)" stroke-width="68" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect id="mouthpiece" x="428" y="723" width="158" height="85" rx="42.5" fill="url(#brown)" stroke="#F3E8D7" stroke-width="5"/>
+</svg>
