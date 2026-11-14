@@ -3,6 +3,7 @@ fn main() {
     // verborgen venster ze niet aanroepen: alleen het hoofdvenster heeft een capability.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
         "open_url",
+        "open_project_page",
         "import_pdf",
         "save_pdf_text",
         "read_pdf",

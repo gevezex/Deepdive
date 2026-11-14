@@ -168,6 +168,10 @@ mark.hit { padding: 0 1px; border-radius: 2px; background: rgba(242, 194, 48, 0.
 .aa { font-family: Georgia, "Iowan Old Style", serif; font-weight: 600; line-height: 1; }
 .aa-small { font-size: 12px; }
 .aa-large { font-size: 17px; }
+.about { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.about h3 { margin: 0 0 6px; font-size: 14px; }
+.about p { margin: 0 0 6px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.about-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .update-pill { padding: 4px 11px; border-radius: 99px; background: var(--accent-soft); border: 0; color: var(--accent); font-size: 12px; font-weight: 600; }
 .update-pill:hover { background: var(--accent); color: var(--accent-ink); }
 

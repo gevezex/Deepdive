@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ask, initAnswers, setAnswersSource } from "./answers";
@@ -81,6 +82,16 @@ function initSettings() {
   const textSize = $<HTMLSelectElement>("settings-text-size");
   textSize.replaceChildren(...TEXT_SCALES.map((scale, i) => new Option(`${Math.round(scale * 100)}%`, String(i))));
   textSize.addEventListener("change", () => setDefaultTextSize(Number(textSize.value)));
+  let version = "";
+  const renderAbout = () => {
+    $("about-version").textContent = version ? t("settings.version", { version }) : "";
+  };
+  void getVersion().then((v) => {
+    version = v;
+    renderAbout();
+  });
+  onLanguageChange(renderAbout);
+  $("about-github").addEventListener("click", () => void invoke("open_project_page").catch(showError));
   $("settings-open").addEventListener("click", () => {
     select.value = lang();
     theme.value = themeChoice();

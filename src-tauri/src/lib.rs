@@ -102,6 +102,14 @@ async fn import_text(store: State<'_, Store>, title: Option<String>, url: Option
     import::import_text(&store, title, url, &text, markdown)
 }
 
+/// Opent de projectpagina op GitHub in de gewone browser. Het adres staat vast; de voorkant geeft niets mee.
+#[tauri::command]
+async fn open_project_page() -> Result<(), AppError> {
+    let failed = |detail: String| AppError::new("browser", i18n::tr("The browser could not be opened.", "De browser kon niet worden geopend.", "Tarayıcı açılamadı.")).with_detail(detail);
+    let status = std::process::Command::new("open").arg("https://github.com/gevezex/Deepdive").status().map_err(|e| failed(e.to_string()))?;
+    status.success().then_some(()).ok_or_else(|| failed(status.to_string()))
+}
+
 #[tauri::command]
 async fn list_sources(store: State<'_, Store>) -> Result<Vec<SourceSummary>, AppError> {
     Ok(store.summaries())
@@ -201,6 +209,7 @@ pub fn run() {
             save_pdf_text,
             read_pdf,
             import_text,
+            open_project_page,
             list_sources,
             get_source,
             refetch_source,
