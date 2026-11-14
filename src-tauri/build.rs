@@ -43,6 +43,8 @@ fn main() {
         "list_highlights",
         "save_highlight",
         "delete_highlight",
+        "check_update",
+        "install_update",
     ])))
     .expect("tauri-build mislukte");
 }

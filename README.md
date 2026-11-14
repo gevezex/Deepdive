@@ -20,13 +20,15 @@ Deepdive is open source under the [MIT license](LICENSE).
 3. It says there that Deepdive was blocked. Click **Open Anyway** and confirm with your password or Touch ID.
 4. Click **Open Anyway** once more in the next message.
 
-After that Deepdive opens normally, also after a restart. After a new version you may have to do this again.
+After that Deepdive opens normally, also after a restart.
 
 If that does not work, you can also use Terminal. This only removes the "downloaded from the internet" mark from the app:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Deepdive.app
 ```
+
+**Updates.** When Deepdive starts, it checks once on GitHub whether there is a newer version. If there is, an **Update available** button appears at the top right. Click it: Deepdive downloads the new version, checks its signature, installs it and restarts. You do not have to do the steps above again for an update installed this way. Version 1.0.0 does not have this button yet, so install the next version once by hand.
 
 **Getting started.** Click **Providers** and add an AI service: Anthropic, an OpenAI-compatible service (also local, such as Ollama or LM Studio) or your own ChatGPT subscription. Then choose a model at the top of the right-hand panel. Paste a web address, choose a PDF or paste text. Select a piece of text to ask the professor something or to highlight it.
 
@@ -79,6 +81,63 @@ npx tsc --noEmit
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+## Publishing a new version
+
+The in-app updater reads `latest.json` from the latest GitHub release (`plugins.updater` in `tauri.conf.json`) and only installs an update signed with the updater key. That key is separate from Apple signing. The private key is in `~/.tauri/deepdive-updater.key`, outside the repository; the public key is in `tauri.conf.json`. Keep a backup of the private key: without it no installed copy can be updated any more.
+
+**The key.** The private key has no password, so whoever has it can make an update that every installed copy accepts. It never goes in the repository, a chat or a plain note. Keep a copy in a password manager (the Passwords app or 1Password): the file is one line of text, so it fits in the notes of an item. Copy it with the command below, paste it into the item and then copy something else, so the key does not stay on the clipboard:
+
+```bash
+pbcopy < ~/.tauri/deepdive-updater.key
+```
+
+To put it back on another Mac, paste the text into `~/.tauri/deepdive-updater.key` and make the file readable for you only:
+
+```bash
+chmod 600 ~/.tauri/deepdive-updater.key
+```
+
+The public key may stay next to it; it is not secret. The public key is built into every installed copy, so a new key pair means installed copies no longer accept updates and have to be reinstalled by hand once.
+
+1. Raise the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
+2. Build with the key:
+
+```bash
+TAURI_SIGNING_PRIVATE_KEY=~/.tauri/deepdive-updater.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npm run tauri build -- --bundles app,dmg
+```
+
+3. Write `latest.json` next to the update:
+
+```bash
+node scripts/latest-json.mjs --notes "What is new"
+```
+
+4. Make a GitHub release with the tag `v<version>` (for example `v1.1.0`) and upload from `src-tauri/target/release/bundle/` the dmg, `macos/Deepdive.app.tar.gz` and `macos/latest.json`. The release must be the latest one and not a draft or prerelease.
+
+**Testing an update locally.** Without publishing anything: build an old and a new version that look for updates at a local address, serve the new one and click the button in the old one. `--config` only changes these builds, not `tauri.conf.json`.
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY=~/.tauri/deepdive-updater.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+```
+
+```bash
+LOCAL='"plugins":{"updater":{"endpoints":["http://127.0.0.1:18765/latest.json"],"dangerousInsecureTransportProtocol":true}}'
+```
+
+```bash
+npm run tauri build -- --bundles app --config "{$LOCAL}" && mkdir -p /tmp/dd-upd/old /tmp/dd-upd/serve && cp -R src-tauri/target/release/bundle/macos/Deepdive.app /tmp/dd-upd/old/
+```
+
+```bash
+npm run tauri build -- --bundles app --config "{\"version\":\"9.9.9\",$LOCAL}" && cp src-tauri/target/release/bundle/macos/Deepdive.app.tar.gz* /tmp/dd-upd/serve/ && node scripts/latest-json.mjs --version 9.9.9 --target /tmp/dd-upd/serve --base-url http://127.0.0.1:18765
+```
+
+```bash
+python3 -m http.server 18765 --bind 127.0.0.1 --directory /tmp/dd-upd/serve
+```
+
+Then open `/tmp/dd-upd/old/Deepdive.app` and click **Update available**. After the restart the app is version 9.9.9 and the button is gone. These test builds use your normal app data.
+
 ## Frontend
 
 Plain TypeScript with Vite, without a framework. The parts of the screen are small and pdf.js works directly on the DOM, so a framework adds nothing for now.
@@ -105,6 +164,7 @@ Plain TypeScript with Vite, without a framework. The parts of the screen are sma
 | `src-tauri/src/professor/` | Selecting and asking: the prompt (`prompts/system.md`, the task per action in `mod.rs`), conversations per source in `threads/` and highlights in `highlights.json` (`highlights.rs`). |
 | `src/reading.ts`, `src/answers.ts`, `src/readingLogic.ts` | The selection bar with the ⋯ menu, highlighting with a note, and the answers in the Questions tab. |
 | `src/i18n/`, `src-tauri/src/i18n.rs` | Languages: interface texts, the interface language and the per-article AI language. |
+| `src-tauri/src/update.rs`, `src/update.ts` | Updates: one check on GitHub at start, the button, downloading, installing and restarting. Debug builds do not check. |
 
 **Isolation:** the copy is in an iframe with `sandbox="allow-scripts"`, without `allow-same-origin`, and a CSP without network. The site's scripts are not in the copy. When serving it, the app adds one script of its own (`engine/bridge.js`). The CSP in the header only allows that script, by its sha-256 hash: no other inline script, no handlers in attributes and no script from an address. The CSP in the saved page is removed when serving, because it forbids all scripts. The script has its own opaque origin and only talks to the main window via `postMessage`. The main window only accepts messages from that iframe and only uses text and numbers from them. The hidden window has no capability, so a page cannot call the app's commands.
 

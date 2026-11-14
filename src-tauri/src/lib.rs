@@ -25,6 +25,7 @@ mod providers;
 mod sessions;
 mod snapshot;
 mod store;
+mod update;
 #[cfg(debug_assertions)]
 mod testhook;
 
@@ -156,6 +157,7 @@ fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Re
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("deepdive-snapshot", |ctx, request, responder| {
             // Alleen het hoofdvenster: een pagina in een inlog- of ophaalvenster komt niet bij opgeslagen kopieën.
             if ctx.webview_label() != "main" {
@@ -186,6 +188,7 @@ pub fn run() {
             app.manage(professor::commands::Asks::default());
             app.manage(Store::new(root)?);
             app.manage(preview::Previews::default());
+            app.manage(update::Pending::default());
             sessions::finish_pending_wipes(app.handle().clone());
             #[cfg(debug_assertions)]
             testhook::start(app.handle().clone());
@@ -233,6 +236,8 @@ pub fn run() {
             providers::commands::chatgpt_logout,
             providers::commands::chatgpt_welcome_seen,
             providers::commands::open_chatgpt_usage,
+            update::check_update,
+            update::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("Deepdive kon niet starten");

@@ -45,6 +45,8 @@
     "allow-delete-thread",
     "allow-list-highlights",
     "allow-save-highlight",
-    "allow-delete-highlight"
+    "allow-delete-highlight",
+    "allow-check-update",
+    "allow-install-update"
   ]
 }

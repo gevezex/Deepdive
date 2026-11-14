@@ -6,6 +6,7 @@ import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
 import { frameLoading, initReading, jumpInFrame, pdfReady, setReadingSource } from "./reading";
 import { initSites, refreshSites } from "./sites";
+import { initUpdate } from "./update";
 import { formatDate, formatNumber, initLanguage, isLang, lang, LANGUAGES, onLanguageChange, plural, setLanguage, t } from "./i18n";
 import type { PdfViewHandle } from "./pdf";
 import type { AppError, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
@@ -95,7 +96,7 @@ onLanguageChange(() => {
 
 function showError(err: unknown, pasteUrl?: string) {
   const e = normalizeError(err);
-  const canPaste = !["invalid_url", "pdf", "storage", "not_found_page", "empty_text", "not_found"].includes(e.kind);
+  const canPaste = !["invalid_url", "pdf", "storage", "not_found_page", "empty_text", "not_found", "update"].includes(e.kind);
   $("error-message").textContent = e.message;
   $("error-detail").textContent = e.detail ?? "";
   $("error-details").hidden = !e.detail;
@@ -633,6 +634,7 @@ $("tab-answers").addEventListener("click", () => showPanel("answers"));
 async function start() {
   await initLanguage();
   initSettings();
+  initUpdate((err) => showError(err));
   renderAiLanguage(null);
   initSites();
   initBlueprint(jumpToParagraphs);
