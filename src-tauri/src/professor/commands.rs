@@ -48,7 +48,7 @@ impl Asks {
 }
 
 fn no_model() -> AppError {
-    AppError::new("no_model", "Er is nog geen model gekozen. Kies er een bovenaan dit paneel.")
+    AppError::new("no_model", crate::i18n::tr("No model has been chosen yet. Choose one at the top of this panel.", "Er is nog geen model gekozen. Kies er een bovenaan dit paneel.", "Henüz bir model seçilmedi. Bu panelin üst kısmından bir model seçin."))
 }
 
 /// Een nieuwe vraag over een selectie (`action` en `selection`), of een vervolgvraag in een gesprek (`thread_id`).
@@ -74,19 +74,19 @@ pub async fn ask_professor(
     let mut thread = match thread_id {
         Some(id) => {
             let mut thread = load(&store, &source_id, &id)?;
-            let q = question.clone().ok_or_else(|| AppError::new("empty_question", "Typ eerst een vraag."))?;
+            let q = question.clone().ok_or_else(|| AppError::new("empty_question", crate::i18n::tr("Type a question first.", "Typ eerst een vraag.", "Önce bir soru yazın.")))?;
             // Een gestopt antwoord blijft staan zoals het was; de vervolgvraag komt erachter.
             if thread.turns.last().is_some_and(|t| t.role == Role::User) {
-                thread.turns.push(Turn { role: Role::Assistant, text: "(geen antwoord)".into() });
+                thread.turns.push(Turn { role: Role::Assistant, text: crate::i18n::tr("(no answer)", "(geen antwoord)", "(yanıt yok)") });
             }
             thread.turns.push(Turn { role: Role::User, text: q });
             thread
         }
         None => {
-            let action = action.ok_or_else(|| AppError::new("internal", "Er is geen actie gekozen."))?;
-            let selection = selection.ok_or_else(|| AppError::new("empty_selection", "Selecteer eerst een stuk tekst."))?.cleaned()?;
+            let action = action.ok_or_else(|| AppError::new("internal", crate::i18n::tr("No action was chosen.", "Er is geen actie gekozen.", "Hiçbir eylem seçilmedi.")))?;
+            let selection = selection.ok_or_else(|| AppError::new("empty_selection", crate::i18n::tr("Select a piece of text first.", "Selecteer eerst een stuk tekst.", "Önce bir metin parçası seçin.")))?.cleaned()?;
             if action == Action::Ask && question.is_none() {
-                return Err(AppError::new("empty_question", "Typ eerst een vraag."));
+                return Err(AppError::new("empty_question", crate::i18n::tr("Type a question first.", "Typ eerst een vraag.", "Önce bir soru yazın.")));
             }
             let at = now();
             Thread {
@@ -140,7 +140,7 @@ pub async fn ask_professor(
         _ => {}
     }
     if answer.trim().is_empty() && !stopped {
-        return Err(AppError::new("empty_answer", "Het model gaf geen antwoord. Probeer het opnieuw of kies een ander model."));
+        return Err(AppError::new("empty_answer", crate::i18n::tr("The model gave no answer. Try again or choose another model.", "Het model gaf geen antwoord. Probeer het opnieuw of kies een ander model.", "Model yanıt vermedi. Tekrar deneyin ya da başka bir model seçin.")));
     }
     thread.turns.push(Turn { role: Role::Assistant, text: answer });
     thread.stopped = stopped;

@@ -12,13 +12,15 @@ fn dir(store: &Store, source_id: &str) -> Result<PathBuf, AppError> {
     Ok(store.source_dir(source_id)?.join("blueprints"))
 }
 
-fn file_name(provider_id: &str, model: &str, prompt_version: u32) -> String {
+/// One file per model, prompt version and language: the same piece in Turkish does not replace it in Dutch.
+fn file_name(provider_id: &str, model: &str, prompt_version: u32, language: &str) -> String {
     let hash = Sha256::digest(format!("{provider_id}\0{model}").as_bytes());
-    format!("{}-p{prompt_version}.json", hex::encode(&hash[..8]))
+    let language: String = language.chars().filter(char::is_ascii_alphanumeric).take(8).collect();
+    format!("{}-p{prompt_version}-{language}.json", hex::encode(&hash[..8]))
 }
 
-pub fn find(store: &Store, source_id: &str, provider_id: &str, model: &str, prompt_version: u32) -> Option<Blueprint> {
-    let path = dir(store, source_id).ok()?.join(file_name(provider_id, model, prompt_version));
+pub fn find(store: &Store, source_id: &str, provider_id: &str, model: &str, prompt_version: u32, language: &str) -> Option<Blueprint> {
+    let path = dir(store, source_id).ok()?.join(file_name(provider_id, model, prompt_version, language));
     let blueprint: Blueprint = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     (blueprint.schema_version == SCHEMA_VERSION).then_some(blueprint)
 }
@@ -27,12 +29,12 @@ pub fn find(store: &Store, source_id: &str, provider_id: &str, model: &str, prom
 /// maken" mag niets kapotmaken. Geeft terug of hij is weggeschreven.
 pub fn save(store: &Store, blueprint: &Blueprint) -> Result<bool, AppError> {
     let source_id = &blueprint.source.source_id;
-    if blueprint.critique.is_none() && find(store, source_id, &blueprint.provider_id, &blueprint.model, blueprint.prompt_version).is_some_and(|old| old.critique.is_some()) {
+    if blueprint.critique.is_none() && find(store, source_id, &blueprint.provider_id, &blueprint.model, blueprint.prompt_version, &blueprint.language).is_some_and(|old| old.critique.is_some()) {
         return Ok(false);
     }
     let dir = dir(store, source_id)?;
     std::fs::create_dir_all(&dir).map_err(AppError::storage)?;
-    let path = dir.join(file_name(&blueprint.provider_id, &blueprint.model, blueprint.prompt_version));
+    let path = dir.join(file_name(&blueprint.provider_id, &blueprint.model, blueprint.prompt_version, &blueprint.language));
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, serde_json::to_vec_pretty(blueprint).map_err(AppError::storage)?).map_err(AppError::storage)?;
     std::fs::rename(tmp, path).map_err(AppError::storage)?;

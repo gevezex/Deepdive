@@ -34,6 +34,8 @@ export interface Source {
   supersededBy: string | null;
   previousId: string | null;
   hideFloating: boolean;
+  /** The language the model writes in for this source ("en", "nl", "tr"). Null follows the interface language. */
+  aiLanguage?: string | null;
 }
 
 export type CompletenessVerdict = "complete" | "likely_incomplete" | "unknown";

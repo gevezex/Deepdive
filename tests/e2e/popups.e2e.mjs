@@ -23,7 +23,7 @@ function check(name, ok, extra = "") {
   if (!ok) failures++;
 }
 function startApp() {
-  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_KEYCHAIN_SERVICE: "app.deepdive.reader.e2e-popups" }, stdio: "ignore" });
+  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_LANGUAGE: "nl", DEEPDIVE_KEYCHAIN_SERVICE: "app.deepdive.reader.e2e-popups" }, stdio: "ignore" });
 }
 async function stopApp() {
   const done = new Promise((r) => app.once("exit", r));

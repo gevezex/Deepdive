@@ -20,7 +20,7 @@ function check(name, ok, extra = "") {
   console.log(`${ok ? "ok  " : "FOUT"} ${name}${!ok && extra ? ` — ${extra}` : ""}`);
   if (!ok) failures++;
 }
-const app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_KEYCHAIN_SERVICE: "app.deepdive.reader.e2e-preview" }, stdio: "ignore" });
+const app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_LANGUAGE: "nl", DEEPDIVE_KEYCHAIN_SERVICE: "app.deepdive.reader.e2e-preview" }, stdio: "ignore" });
 async function raw(js) {
   const out = join(ctl, "out.json");
   rmSync(out, { force: true });

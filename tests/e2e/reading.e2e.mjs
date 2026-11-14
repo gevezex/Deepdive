@@ -30,7 +30,7 @@ function check(name, ok, extra = "") {
 }
 
 function startApp() {
-  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_KEYCHAIN_SERVICE: SERVICE }, stdio: ["ignore", "pipe", "pipe"] });
+  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_LANGUAGE: "nl", DEEPDIVE_KEYCHAIN_SERVICE: SERVICE }, stdio: ["ignore", "pipe", "pipe"] });
   app.stdout.on("data", (d) => (appOutput += d));
   app.stderr.on("data", (d) => (appOutput += d));
 }
@@ -197,7 +197,7 @@ async function main() {
   check("antwoord: kern vet, verwijzing klikbaar, lijstje", answer.kern === "Dit is de kern van het antwoord." && answer.refs.includes("¶4") && answer.items === 2, JSON.stringify(answer));
   check("antwoord: actie, plek en selectie staan erboven", answer.head.includes("Leg uit") && answer.head.includes("¶4") && answer.quote.startsWith("Alinea 4"), JSON.stringify(answer));
   const sent = bp.asks.at(-1);
-  check("verzoek: bron, selectie met plek en opdracht", sent.includes("<selectie-") && sent.includes("(in ¶4)") && sent.includes("Opdracht: Leg uit") && sent.includes("¶30 [paragraph]"));
+  check("verzoek: bron, selectie met plek en opdracht", sent.includes("<selection-") && sent.includes("(in ¶4)") && sent.includes("Task: Explain") && sent.includes("¶30 [paragraph]"));
   check("gesprek is bewaard", threadsOf(sourceId).length === 1 && threadsOf(sourceId)[0].turns.length === 2);
   await shot("2-antwoord");
 
@@ -218,7 +218,7 @@ async function main() {
   const typed = await run(`return { value: $("sel-ask").value, focus: document.activeElement === $("sel-ask") }`);
   check("typen tijdens een selectie gaat naar het vraagveld", typed.value === "Wa" && typed.focus, JSON.stringify(typed));
   await run(`$("sel-ask").value = "Wat bedoelt de auteur?"; $("sel-ask-form").requestSubmit(); await until(() => cards().length === 2 && cards()[0].querySelector(".ans-follow"), "eigen vraag");`);
-  check("eigen vraag: staat in de kaart en in het verzoek", (await run(`return cards()[0].querySelector(".ans-question")?.textContent`)) === "Wat bedoelt de auteur?" && bp.asks.at(-1).includes("Vraag van de lezer: Wat bedoelt de auteur?"));
+  check("eigen vraag: staat in de kaart en in het verzoek", (await run(`return cards()[0].querySelector(".ans-question")?.textContent`)) === "Wat bedoelt de auteur?" && bp.asks.at(-1).includes("The reader's question: Wat bedoelt de auteur?"));
 
   // Een actie uit het menu, en stoppen.
   bp.holdAsk = true;
@@ -311,7 +311,7 @@ async function main() {
     document.querySelector('#sel-bar [data-action="simplify"]').click();
     await until(() => cards().length === 1 && cards()[0].querySelector(".ans-follow"), "antwoord bij pdf");
   `);
-  check("pdf: vragen werkt ook, met de alinea", bp.asks.at(-1).includes("(in ¶1)") && bp.asks.at(-1).includes("Opdracht: Zeg hetzelfde idee"));
+  check("pdf: vragen werkt ook, met de alinea", bp.asks.at(-1).includes("(in ¶1)") && bp.asks.at(-1).includes("Task: Say the same idea"));
   await shot("5-pdf");
 
   check("geen paniek in de app", !appOutput.includes("panicked"), appOutput.slice(-500));

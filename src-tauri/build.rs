@@ -14,6 +14,8 @@ fn main() {
         "discard_candidate",
         "accept_incomplete",
         "set_hide_floating",
+        "set_ai_language",
+        "set_ui_language",
         "site_login_open",
         "site_login_close",
         "list_site_sessions",

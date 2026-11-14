@@ -316,7 +316,7 @@ async fn missing_key_gets_its_own_message() {
     t.endpoint.api_key = None;
     let err = collect(&t).await.unwrap_err();
     assert_eq!(err.kind, "auth");
-    assert!(err.message.contains("nog geen"));
+    assert!(err.message.contains("none has been set"));
 }
 
 #[tokio::test]
@@ -347,7 +347,7 @@ async fn a_silent_server_times_out() {
     t.endpoint.idle_timeout = Duration::from_millis(200);
     let err = collect(&t).await.unwrap_err();
     assert_eq!(err.kind, "timeout");
-    assert!(err.message.contains("laden"), "bij een lokale server wordt het laden van het model genoemd");
+    assert!(err.message.contains("loading"), "bij een lokale server wordt het laden van het model genoemd");
 }
 
 #[tokio::test]
@@ -518,7 +518,8 @@ mod isolation {
         assert!(csp.starts_with("default-src 'none'"));
         assert!(!csp.contains("script-src"), "geen scripts");
         assert!(!csp.contains("connect-src"), "geen netwerk");
-        assert!(INDEX.contains(r#"id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts""#), "de iframe mag alleen het eigen script draaien");
+        let frame = INDEX.lines().find(|l| l.contains(r#"id="source-frame""#)).expect("de iframe staat in index.html");
+        assert!(frame.contains(r#"sandbox="allow-scripts""#), "de iframe mag alleen het eigen script draaien");
         assert!(!INDEX.contains("allow-same-origin"), "het script in de kopie komt nooit bij de app");
         // De pagina zelf: alleen het eigen script, op hash, en nog steeds geen netwerk.
         let page = crate::snapshot::page_csp();

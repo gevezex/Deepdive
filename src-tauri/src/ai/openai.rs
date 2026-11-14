@@ -45,7 +45,7 @@ pub fn chat_request(client: &reqwest::Client, ep: &Endpoint, model: &str, reques
 pub async fn list_models(client: &reqwest::Client, ep: &Endpoint, ctx: &ErrorContext<'_>) -> Result<Vec<FetchedModel>, AppError> {
     let page = super::get_json(authorized(client.get(ep.url("models")), ep), ctx).await?;
     if page.get("data").and_then(Value::as_array).is_none() {
-        return Err(errors::bad_response("Geen lijst met modellen in het antwoord.", ctx));
+        return Err(errors::bad_response(crate::i18n::tr("No list of models in the response.", "Geen lijst met modellen in het antwoord.", "Yanıtta model listesi yok."), ctx));
     }
     Ok(parse_models(&page))
 }

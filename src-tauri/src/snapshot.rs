@@ -2,6 +2,7 @@
 //! CSS en fonts lokaal. Onafhankelijk van de engine en onafhankelijk van wat de pagina zelf deed.
 
 use crate::error::AppError;
+use crate::i18n::{tr, ui, Lang};
 use crate::model::AssetStats;
 use crate::sessions::{cookie_header, site_key, SessionCookie};
 use futures_util::{stream, StreamExt};
@@ -179,6 +180,7 @@ fn sanitize_with(html: &str, page_url: &Url, csp: &str, map: impl FnMut(&str, As
 <style>[data-dd-embed]{{box-sizing:border-box;display:flex;align-items:center;justify-content:center;max-width:100%;\
 padding:1em;background:#f4efe6;border:1px dashed #b9ad98;color:#5d5546;font:14px/1.4 Georgia,serif;text-align:center}}</style>"
     );
+    let embed_label = tr("Embedded content was not saved in the copy", "Ingesloten inhoud is niet bewaard in de kopie", "Gömülü içerik kopyaya kaydedilmedi");
     let page_no_frag = {
         let mut u = page_url.clone();
         u.set_fragment(None);
@@ -216,7 +218,7 @@ padding:1em;background:#f4efe6;border:1px dashed #b9ad98;color:#5d5546;font:14px
                             let (w, h) = (dim("width", "640"), dim("height", "360"));
                             let href = u.as_str().replace('&', "&amp;").replace('"', "&quot;");
                             el.replace(
-                                &format!("<div data-dd-embed style=\"width:{w}px;height:{h}px\"><a href=\"{href}\" target=\"_blank\">Ingesloten inhoud is niet bewaard in de kopie</a></div>"),
+                                &format!("<div data-dd-embed style=\"width:{w}px;height:{h}px\"><a href=\"{href}\" target=\"_blank\">{embed_label}</a></div>"),
                                 ContentType::Html,
                             );
                         }
@@ -439,6 +441,14 @@ async fn fetch_once(client: &reqwest::Client, url: Url, kind: AssetKind, referer
 }
 
 /// Legt de pagina vast in `dir`: `index.html` en de map `assets`. Wat niet lukt, wordt geteld in de statistiek.
+fn html_error(e: impl std::fmt::Display) -> String {
+    match ui() {
+        Lang::En => format!("Could not process the HTML: {e}"),
+        Lang::Nl => format!("HTML niet te verwerken: {e}"),
+        Lang::Tr => format!("HTML işlenemedi: {e}"),
+    }
+}
+
 pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str, login: Option<Login<'_>>) -> Result<AssetStats, AppError> {
     let page_is_private = is_private(page_url);
     let client = reqwest::Client::builder()
@@ -469,7 +479,7 @@ pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str, log
         }
         None
     })
-    .map_err(|e| AppError::engine(format!("HTML niet te verwerken: {e}")))?;
+    .map_err(|e| AppError::engine(html_error(e)))?;
 
     let referer = page_url.as_str().to_string();
     let mut names: HashMap<String, String> = HashMap::new();
@@ -527,7 +537,7 @@ pub async fn build(html: &str, page_url: &Url, dir: &Path, user_agent: &str, log
         let u = resolve_asset(raw, page_url, page_is_private)?;
         names.get(u.as_str()).map(|n| format!("assets/{n}"))
     })
-    .map_err(|e| AppError::engine(format!("HTML niet te verwerken: {e}")))?;
+    .map_err(|e| AppError::engine(html_error(e)))?;
     std::fs::write(dir.join("index.html"), out).map_err(AppError::storage)?;
     Ok(stats)
 }
@@ -905,7 +915,8 @@ mod tests {
     fn the_shield_stays_as_it_is() {
         assert_eq!(CSP, "default-src 'none'; img-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; style-src deepdive-snapshot: http://deepdive-snapshot.localhost 'unsafe-inline'; font-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; form-action 'none'; base-uri 'none'; frame-src 'none'");
         let index = include_str!("../../index.html");
-        assert!(index.contains(r#"<iframe id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>"#));
+        let frame = index.lines().find(|l| l.contains(r#"<iframe id="source-frame""#)).expect("source frame");
+        assert!(frame.contains(r#" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>"#), "{frame}");
     }
 
     fn clean(html: &str) -> String {

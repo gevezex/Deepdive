@@ -9,7 +9,7 @@ pub const SCHEMA_VERSION: u32 = 2;
 
 /// Omhoog bij elke inhoudelijke wijziging van de opdrachten in `prompts/`. Een blauwdruk wordt per bron, model en
 /// promptversie bewaard, dus een nieuwe versie overschrijft niets.
-pub const PROMPT_VERSION: u32 = 2;
+pub const PROMPT_VERSION: u32 = 3;
 
 /// Eerste en laatste alineanummer, allebei inbegrepen. In JSON: `[3, 5]`.
 pub type ParagraphRange = (u32, u32);

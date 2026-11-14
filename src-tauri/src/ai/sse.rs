@@ -30,7 +30,7 @@ impl Parser {
         }
         self.buffer.drain(..start);
         if self.buffer.len() > MAX_BUFFER {
-            return Err("Eén regel in de stream is onredelijk lang.".into());
+            return Err(crate::i18n::tr("One line in the stream is unreasonably long.", "Eén regel in de stream is onredelijk lang.", "Akıştaki bir satır makul olmayacak kadar uzun."));
         }
         Ok(events)
     }

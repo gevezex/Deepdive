@@ -73,13 +73,14 @@ impl Checker<'_> {
             let (lo, hi) = (a.min(b), a.max(b));
             if hi < min || lo > max || self.index.numbers.range(lo..=hi).next().is_none() {
                 self.checks.ranges_fixed += 1;
-                self.issue("range_removed", path, format!("¶{a}–{b} bestaat niet in de bron en is weggehaald."));
+                self.issue("range_removed", path, tr_fmt!("¶{a}–{b} does not exist in the source and was removed.", "¶{a}–{b} bestaat niet in de bron en is weggehaald.", "¶{a}–{b} kaynakta yok ve kaldırıldı."));
                 continue;
             }
             let fixed = (lo.max(min), hi.min(max));
             if fixed != (a, b) {
                 self.checks.ranges_fixed += 1;
-                self.issue("range_fixed", path, format!("¶{a}–{b} is ingekort tot ¶{}–{}.", fixed.0, fixed.1));
+                let (lo, hi) = fixed;
+                self.issue("range_fixed", path, tr_fmt!("¶{a}–{b} was shortened to ¶{lo}–{hi}.", "¶{a}–{b} is ingekort tot ¶{lo}–{hi}.", "¶{a}–{b}, ¶{lo}–{hi} olarak kısaltıldı."));
             }
             kept.push(fixed);
         }
@@ -103,7 +104,7 @@ impl Checker<'_> {
         let needle = normalize(&quote.text);
         if needle.is_empty() {
             self.checks.quotes.removed += 1;
-            self.issue("quote_removed", path, "Leeg citaat weggehaald.".into());
+            self.issue("quote_removed", path, crate::i18n::tr("Empty quote removed.", "Leeg citaat weggehaald.", "Boş alıntı kaldırıldı."));
             return false;
         }
         let matches = |n: u32| self.index.normalized.iter().any(|(m, text)| *m == n && text.contains(&needle));
@@ -114,35 +115,38 @@ impl Checker<'_> {
         }
         if let Some((n, _)) = self.index.normalized.iter().find(|(_, text)| text.contains(&needle)) {
             let n = *n;
-            self.issue("quote_moved", path, format!("Citaat stond niet in ¶{} maar in ¶{n}. Verwijzing verbeterd.", quote.paragraph));
+            let was = quote.paragraph;
+            self.issue("quote_moved", path, tr_fmt!("The quote was not in ¶{was} but in ¶{n}. Reference corrected.", "Citaat stond niet in ¶{was} maar in ¶{n}. Verwijzing verbeterd.", "Alıntı ¶{was} içinde değil, ¶{n} içindeydi. Gönderme düzeltildi."));
             quote.paragraph = n;
             quote.verified = true;
             self.checks.quotes.moved += 1;
             return true;
         }
         self.checks.quotes.removed += 1;
-        self.issue("quote_removed", path, format!("Citaat bij ¶{} staat niet letterlijk in de bron en is weggehaald.", quote.paragraph));
+        let at = quote.paragraph;
+        self.issue("quote_removed", path, tr_fmt!("The quote at ¶{at} is not in the source word for word and was removed.", "Citaat bij ¶{at} staat niet letterlijk in de bron en is weggehaald.", "¶{at} konumundaki alıntı kaynakta kelimesi kelimesine geçmiyor ve kaldırıldı."));
         false
     }
 }
 
 /// Fouten waarvoor het model een tweede kans krijgt: zonder deze velden is er geen blauwdruk.
+/// In English: they go back to the model with the retry.
 pub fn structure_errors(s: &Structure) -> Vec<String> {
     let mut errors = vec![];
     if s.message.trim().is_empty() {
-        errors.push("`message` is leeg.".to_string());
+        errors.push("`message` is empty.".to_string());
     }
     if s.summary.trim().is_empty() {
-        errors.push("`summary` is leeg.".to_string());
+        errors.push("`summary` is empty.".to_string());
     }
     if s.goal.main.description.trim().is_empty() {
-        errors.push("`goal.main.description` is leeg.".to_string());
+        errors.push("`goal.main.description` is empty.".to_string());
     }
     if s.blocks.is_empty() {
-        errors.push("`blocks` is leeg.".to_string());
+        errors.push("`blocks` is empty.".to_string());
     }
     if s.blocks.iter().any(|b| b.content.trim().is_empty() || b.title.trim().is_empty()) {
-        errors.push("Elk blok heeft een `title` en `content` nodig.".to_string());
+        errors.push("Every block needs a `title` and `content`.".to_string());
     }
     errors
 }
@@ -151,7 +155,7 @@ pub fn check_structure(s: &mut Structure, index: &SourceIndex, issues: &mut Vec<
     let mut c = Checker { index, issues, checks };
 
     if s.message.chars().count() > 400 {
-        c.issue("message_long", "message", "De boodschap is langer dan één zin hoort te zijn.".into());
+        c.issue("message_long", "message", crate::i18n::tr("The message is longer than one sentence should be.", "De boodschap is langer dan één zin hoort te zijn.", "Ana fikir, tek bir cümlenin olması gerekenden daha uzun."));
     }
     if let Some(occasion) = &mut s.occasion {
         c.ranges(&mut occasion.paragraphs, "occasion");
@@ -170,11 +174,11 @@ pub fn check_structure(s: &mut Structure, index: &SourceIndex, issues: &mut Vec<
     for mut block in std::mem::take(&mut s.blocks) {
         let path = format!("blocks.{}", block.id);
         if !seen.insert(block.id.clone()) {
-            c.issue("block_duplicate", &path, "Dubbel blok-id; het tweede blok is weggehaald.".into());
+            c.issue("block_duplicate", &path, crate::i18n::tr("Duplicate block id; the second block was removed.", "Dubbel blok-id; het tweede blok is weggehaald.", "Yinelenen blok kimliği; ikinci blok kaldırıldı."));
             continue;
         }
         if !c.ranges(&mut block.paragraphs, &path) {
-            c.issue("block_without_source", &path, "Dit blok verwijst naar geen enkele bestaande alinea.".into());
+            c.issue("block_without_source", &path, crate::i18n::tr("This block does not refer to any existing paragraph.", "Dit blok verwijst naar geen enkele bestaande alinea.", "Bu blok mevcut hiçbir paragrafa atıfta bulunmuyor."));
         }
         if let Some(mut quote) = block.quote.take() {
             if c.quote(&mut quote, &path) {
@@ -191,20 +195,23 @@ pub fn check_structure(s: &mut Structure, index: &SourceIndex, issues: &mut Vec<
     for relation in std::mem::take(&mut s.relations) {
         let path = format!("relations.{}", relation.id);
         let reason = if !seen.contains(&relation.block) || !seen.contains(&relation.depends_on) {
-            Some("wijst naar een blok dat niet bestaat")
+            Some(["points to a block that does not exist", "wijst naar een blok dat niet bestaat", "var olmayan bir bloğu gösteriyor"])
         } else if relation.block == relation.depends_on {
-            Some("wijst naar zichzelf")
+            Some(["points to itself", "wijst naar zichzelf", "kendisini gösteriyor"])
         } else if !seen_relations.insert((relation.block.clone(), relation.depends_on.clone())) {
-            Some("staat er dubbel in")
+            Some(["is listed twice", "staat er dubbel in", "iki kez geçiyor"])
         } else if !seen_ids.insert(relation.id.clone()) {
-            Some("heeft een dubbel id")
+            Some(["has a duplicate id", "heeft een dubbel id", "yinelenen bir kimliğe sahip"])
         } else {
             None
         };
         match reason {
             Some(reason) => {
                 c.checks.relations_removed += 1;
-                c.issue("relation_removed", &path, format!("{} → {} {reason} en is weggehaald.", relation.depends_on, relation.block));
+                let [en, nl, tr] = reason;
+                let reason = crate::i18n::tr(en, nl, tr);
+                let (from, to) = (&relation.depends_on, &relation.block);
+                c.issue("relation_removed", &path, tr_fmt!("{from} → {to} {reason} and was removed.", "{from} → {to} {reason} en is weggehaald.", "{from} → {to} {reason}, bu yüzden kaldırıldı."));
             }
             None => relations.push(relation),
         }
@@ -212,7 +219,7 @@ pub fn check_structure(s: &mut Structure, index: &SourceIndex, issues: &mut Vec<
     s.relations = relations;
 
     if let Some(path) = find_cycle(&s.relations) {
-        c.issue("relation_cycle", "relations", format!("Kringredenering in de pijlen: {path}."));
+        c.issue("relation_cycle", "relations", tr_fmt!("Circular reasoning in the arrows: {path}.", "Kringredenering in de pijlen: {path}.", "Oklarda döngüsel akıl yürütme: {path}."));
     }
 
     let article: Vec<u32> = index.numbers.range(s.article_paragraphs.0..=s.article_paragraphs.1).copied().collect();
@@ -256,7 +263,7 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
     for (i, point) in critique.points.iter_mut().enumerate() {
         if !ids.insert(point.id.clone()) {
             let fresh = format!("{}-{}", point.id, i + 1);
-            c.issue("point_duplicate", &format!("points.{}", point.id), format!("Dubbel id, hernoemd naar {fresh}."));
+            c.issue("point_duplicate", &format!("points.{}", point.id), tr_fmt!("Duplicate id, renamed to {fresh}.", "Dubbel id, hernoemd naar {fresh}.", "Yinelenen kimlik, {fresh} olarak yeniden adlandırıldı."));
             point.id = fresh.clone();
             ids.insert(fresh);
         }
@@ -264,19 +271,19 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
         if let Some(anchor) = &point.anchor {
             if !anchors.contains(anchor.as_str()) {
                 c.checks.anchors_removed += 1;
-                c.issue("anchor_removed", &path, format!("Het punt hing aan \"{anchor}\", dat niet bestaat. Het staat nu los."));
+                c.issue("anchor_removed", &path, tr_fmt!("The point was attached to \"{anchor}\", which does not exist. It now stands on its own.", "Het punt hing aan \"{anchor}\", dat niet bestaat. Het staat nu los.", "Nokta, var olmayan \"{anchor}\" öğesine bağlıydı. Artık bağımsız duruyor."));
                 point.anchor = None;
             }
         } else {
-            c.issue("anchor_missing", &path, "Het punt hangt aan geen blok of relatie.".into());
+            c.issue("anchor_missing", &path, crate::i18n::tr("The point is not attached to any block or relation.", "Het punt hangt aan geen blok of relatie.", "Nokta hiçbir bloğa veya ilişkiye bağlı değil."));
         }
         if !c.ranges(&mut point.paragraphs, &path) {
-            c.issue("point_without_source", &path, "Dit punt verwijst naar geen enkele bestaande alinea.".into());
+            c.issue("point_without_source", &path, crate::i18n::tr("This point does not refer to any existing paragraph.", "Dit punt verwijst naar geen enkele bestaande alinea.", "Bu nokta mevcut hiçbir paragrafa atıfta bulunmuyor."));
         }
         point.broad = c.is_broad(&point.paragraphs, s.article_paragraphs);
         if point.broad {
             c.checks.broad_points += 1;
-            c.issue("range_broad", &path, "Dit punt wijst naar te veel alinea's om na te zoeken. Springen gaat naar de eerste.".into());
+            c.issue("range_broad", &path, crate::i18n::tr("This point refers to too many paragraphs to check. Jumping goes to the first one.", "Dit punt wijst naar te veel alinea's om na te zoeken. Springen gaat naar de eerste.", "Bu nokta kontrol edilemeyecek kadar çok paragrafa atıfta bulunuyor. Atlama ilkine gider."));
         }
         let mut quotes = vec![];
         for mut quote in std::mem::take(&mut point.quotes) {
@@ -286,7 +293,7 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
         }
         point.quotes = quotes;
         if point.origin == Origin::Stated && point.quotes.is_empty() {
-            c.issue("stated_without_quote", &path, "Volgens het model staat dit in de tekst, maar er is geen controleerbaar citaat.".into());
+            c.issue("stated_without_quote", &path, crate::i18n::tr("According to the model this is in the text, but there is no verifiable quote.", "Volgens het model staat dit in de tekst, maar er is geen controleerbaar citaat.", "Modele göre bu metinde geçiyor, ancak doğrulanabilir bir alıntı yok."));
         }
     }
 
@@ -308,15 +315,15 @@ pub fn check_critique(critique: &mut Critique, s: &Structure, index: &SourceInde
         match checked.iter_mut().find(|k| k.category == category) {
             Some(check) => {
                 if has_points && check.result != CheckResult::Found {
-                    c.issue("check_contradiction", "checked", format!("{category:?} had punten maar stond niet als gevonden. Gecorrigeerd."));
+                    c.issue("check_contradiction", "checked", tr_fmt!("{category:?} had points but was not marked as found. Corrected.", "{category:?} had punten maar stond niet als gevonden. Gecorrigeerd.", "{category:?} için noktalar vardı ama bulundu olarak işaretlenmemişti. Düzeltildi."));
                     check.result = CheckResult::Found;
                 } else if !has_points && check.result == CheckResult::Found {
-                    c.issue("check_contradiction", "checked", format!("{category:?} stond als gevonden maar heeft geen punten. Gecorrigeerd."));
+                    c.issue("check_contradiction", "checked", tr_fmt!("{category:?} was marked as found but has no points. Corrected.", "{category:?} stond als gevonden maar heeft geen punten. Gecorrigeerd.", "{category:?} bulundu olarak işaretlenmişti ama hiç noktası yok. Düzeltildi."));
                     check.result = CheckResult::NothingFound;
                 }
             }
             None => {
-                c.issue("check_missing", "checked", format!("{category:?} ontbrak in de lijst."));
+                c.issue("check_missing", "checked", tr_fmt!("{category:?} was missing from the list.", "{category:?} ontbrak in de lijst.", "{category:?} listede yoktu."));
                 if has_points {
                     checked.push(CategoryCheck { category, result: CheckResult::Found, note: None });
                 }

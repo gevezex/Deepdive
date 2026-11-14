@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,198 +9,207 @@
   <body>
     <header class="toolbar">
       <form id="url-form" class="url-form" autocomplete="off">
-        <input id="url-input" type="text" spellcheck="false" placeholder="Plak of sleep een webadres of pdf-link" aria-label="Webadres" />
-        <button id="url-open" type="submit" class="primary">Openen</button>
+        <input id="url-input" type="text" spellcheck="false" placeholder="Paste or drop a web address or PDF link" aria-label="Web address" data-i18n-placeholder="app.urlPlaceholder" data-i18n-aria-label="app.urlLabel" />
+        <button id="url-open" type="submit" class="primary" data-i18n="app.open">Open</button>
       </form>
-      <label class="button" for="pdf-input">Pdf kiezen</label>
+      <label class="button" for="pdf-input" data-i18n="app.choosePdf">Choose PDF</label>
       <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
-      <button id="paste-open" type="button">Tekst plakken</button>
-      <select id="source-list" aria-label="Eerder geopende bronnen"></select>
-      <button id="sites-open" type="button">Sites</button>
-      <button id="providers-open" type="button">Providers</button>
+      <button id="paste-open" type="button" data-i18n="app.pasteText">Paste text</button>
+      <select id="source-list" aria-label="Previously opened sources" data-i18n-aria-label="app.sourceListLabel"></select>
+      <button id="sites-open" type="button" data-i18n="app.sites">Sites</button>
+      <button id="providers-open" type="button" data-i18n="app.providers">Providers</button>
+      <button id="settings-open" type="button" data-i18n="app.settings">Settings</button>
     </header>
 
     <div id="error" class="error" role="alert" hidden>
       <div class="error-text">
         <strong id="error-message"></strong>
-        <details id="error-details" hidden><summary>Technische details</summary><code id="error-detail"></code></details>
+        <details id="error-details" hidden><summary data-i18n="common.technicalDetails">Technical details</summary><code id="error-detail"></code></details>
       </div>
-      <button id="error-login" type="button" class="primary" hidden>Inloggen</button>
-      <button id="error-paste" type="button" class="primary" hidden>Tekst plakken</button>
-      <button id="error-close" type="button" aria-label="Melding sluiten">Sluiten</button>
+      <button id="error-login" type="button" class="primary" hidden data-i18n="app.logIn">Log in</button>
+      <button id="error-paste" type="button" class="primary" hidden data-i18n="app.pasteText">Paste text</button>
+      <button id="error-close" type="button" aria-label="Close message" data-i18n="common.close" data-i18n-aria-label="app.closeMessage">Close</button>
     </div>
 
     <main class="panels">
-      <section class="source-panel" aria-label="Bron">
+      <section class="source-panel" aria-label="Source" data-i18n-aria-label="app.source">
         <div id="source-notice" class="source-notice" role="status" hidden>
           <div class="source-notice-text"><strong id="source-notice-title"></strong> <span id="source-notice-text"></span></div>
           <div id="source-notice-actions" class="source-notice-actions"></div>
         </div>
         <div id="source-view" class="source-view">
           <div id="empty" class="empty">
-            <h1>Wat wil je begrijpen?</h1>
-            <p>Plak of sleep een webadres of een pdf hierheen. Deepdive bewaart een vaste kopie op deze computer, zodat je die later ook zonder internet kunt lezen.</p>
+            <h1 data-i18n="app.emptyTitle">What do you want to understand?</h1>
+            <p data-i18n="app.emptyText">Paste or drop a web address or a PDF here. Deepdive keeps a fixed copy on this computer, so you can read it later without internet too.</p>
           </div>
           <div id="busy" class="busy" role="status" hidden><div class="spinner"></div><p id="busy-text"></p></div>
-          <iframe id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+          <iframe id="source-frame" title="Fixed copy of the source" data-i18n-title="app.frameTitle" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
           <div id="pdf-view" class="pdf-view" hidden></div>
           <div id="frame-shield" class="frame-shield" hidden></div>
         </div>
         <footer id="status" class="status" hidden>
           <span id="status-text"></span>
           <span id="status-warnings" class="warnings"></span>
-          <button id="hide-floating" type="button" class="link" title="Verbergt zwevende lagen in deze kopie. De kopie zelf en de tekst veranderen niet." hidden>Popup weghalen</button>
-          <button id="show-saved" type="button" class="link" title="Vervangt het voorbeeld door de opgeslagen kopie. De pagina springt dan terug naar boven." hidden>Opgeslagen kopie tonen</button>
-          <button id="refresh" type="button" class="link" hidden>Opnieuw ophalen</button>
+          <button id="hide-floating" type="button" class="link" title="Hides floating layers in this copy. The copy itself and the text do not change." data-i18n-title="app.hideFloatingTitle" hidden>Remove popup</button>
+          <button id="show-saved" type="button" class="link" title="Replaces the preview with the saved copy. The page then jumps back to the top." data-i18n-title="app.showSavedTitle" data-i18n="app.showSaved" hidden>Show saved copy</button>
+          <button id="refresh" type="button" class="link" data-i18n="app.refetch" hidden>Fetch again</button>
         </footer>
       </section>
-      <aside class="professor" aria-label="Professor">
+      <aside class="professor" aria-label="Professor" data-i18n-aria-label="app.professor">
         <div class="model-bar">
-          <label for="model-picker">Model</label>
+          <label for="model-picker" data-i18n="app.model">Model</label>
           <select id="model-picker"></select>
-          <p id="chatgpt-plan-badge" class="chatgpt-badge" hidden>Using ChatGPT plan <button id="chatgpt-plan-manage" type="button" class="link">Manage usage</button></p>
+          <select id="ai-language" class="ai-language" title="Language of the blueprint and answers for this article" aria-label="Language of the blueprint and answers for this article" data-i18n-title="app.aiLanguageTitle" data-i18n-aria-label="app.aiLanguageTitle" disabled></select>
+          <p id="chatgpt-plan-badge" class="chatgpt-badge" hidden><span data-i18n="providers.usingPlan">Using ChatGPT plan</span> <button id="chatgpt-plan-manage" type="button" class="link" data-i18n="providers.manageUsage">Manage usage</button></p>
         </div>
-        <div class="prof-tabs" role="tablist" aria-label="Paneel">
-          <button id="tab-blueprint" type="button" role="tab" aria-selected="true" aria-controls="blueprint">Blauwdruk</button>
-          <button id="tab-answers" type="button" role="tab" aria-selected="false" aria-controls="answers">Vragen <span id="answers-count" class="tab-count"></span></button>
+        <div class="prof-tabs" role="tablist" aria-label="Panel" data-i18n-aria-label="app.panel">
+          <button id="tab-blueprint" type="button" role="tab" aria-selected="true" aria-controls="blueprint" data-i18n="app.tabBlueprint">Blueprint</button>
+          <button id="tab-answers" type="button" role="tab" aria-selected="false" aria-controls="answers"><span data-i18n="app.tabQuestions">Questions</span> <span id="answers-count" class="tab-count"></span></button>
         </div>
         <div id="blueprint" class="professor-body" role="tabpanel" aria-labelledby="tab-blueprint"></div>
         <div id="answers" class="professor-body answers" role="tabpanel" aria-labelledby="tab-answers" hidden></div>
       </aside>
     </main>
 
-    <div id="sel-bar" class="sel-bar" role="toolbar" aria-label="Selectie" hidden>
+    <div id="sel-bar" class="sel-bar" role="toolbar" aria-label="Selection" data-i18n-aria-label="reading.selection" hidden>
       <form id="sel-ask-form" class="sel-ask" autocomplete="off">
-        <input id="sel-ask" type="text" spellcheck="true" placeholder="Vraag…" aria-label="Eigen vraag over de selectie" />
+        <input id="sel-ask" type="text" spellcheck="true" placeholder="Ask…" aria-label="Your own question about the selection" data-i18n-placeholder="reading.askPlaceholder" data-i18n-aria-label="reading.askLabel" />
       </form>
       <span class="sel-sep" aria-hidden="true"></span>
-      <button type="button" class="sel-btn" data-action="explain" title="Wat het hier betekent en waarom het hier staat"><span class="sel-icon" data-icon="bulb"></span>Leg uit</button>
-      <button type="button" class="sel-btn" data-action="simplify" title="Hetzelfde in gewone woorden"><span class="sel-icon" data-icon="feather"></span>Eenvoudiger</button>
-      <button id="sel-more" type="button" class="sel-btn sel-round" aria-haspopup="menu" aria-expanded="false" title="Meer acties"><span class="sel-icon" data-icon="dots"></span></button>
+      <button type="button" class="sel-btn" data-action="explain" title="What it means here and why it is here" data-i18n-title="reading.explainHint"><span class="sel-icon" data-icon="bulb"></span><span data-i18n="reading.action.explain">Explain</span></button>
+      <button type="button" class="sel-btn" data-action="simplify" title="The same in plain words" data-i18n-title="reading.simplifyHint"><span class="sel-icon" data-icon="feather"></span><span data-i18n="reading.action.simplify">Simpler</span></button>
+      <button id="sel-more" type="button" class="sel-btn sel-round" aria-haspopup="menu" aria-expanded="false" title="More actions" data-i18n-title="reading.moreActions"><span class="sel-icon" data-icon="dots"></span></button>
       <span class="sel-sep" aria-hidden="true"></span>
-      <button id="sel-mark" type="button" class="sel-btn sel-round" title="Markeren"><span class="sel-icon" data-icon="marker"></span><span id="sel-mark-dot" class="sel-dot"></span></button>
-      <button id="sel-note" type="button" class="sel-btn sel-round" title="Markeren met notitie"><span class="sel-icon" data-icon="pencil"></span></button>
+      <button id="sel-mark" type="button" class="sel-btn sel-round" title="Highlight" data-i18n-title="reading.highlight"><span class="sel-icon" data-icon="marker"></span><span id="sel-mark-dot" class="sel-dot"></span></button>
+      <button id="sel-note" type="button" class="sel-btn sel-round" title="Highlight with note" data-i18n-title="reading.highlightWithNote"><span class="sel-icon" data-icon="pencil"></span></button>
     </div>
     <div id="sel-menu" class="sel-menu" role="menu" hidden></div>
-    <div id="mark-menu" class="sel-bar mark-menu" role="toolbar" aria-label="Markering" hidden></div>
-    <div id="note-pop" class="note-pop" role="dialog" aria-label="Notitie" hidden>
-      <textarea id="note-text" rows="4" placeholder="In je eigen woorden…" aria-label="Notitie"></textarea>
+    <div id="mark-menu" class="sel-bar mark-menu" role="toolbar" aria-label="Highlight" data-i18n-aria-label="reading.highlight" hidden></div>
+    <div id="note-pop" class="note-pop" role="dialog" aria-label="Note" data-i18n-aria-label="reading.note" hidden>
+      <textarea id="note-text" rows="4" placeholder="In your own words…" aria-label="Note" data-i18n-placeholder="reading.notePlaceholder" data-i18n-aria-label="reading.note"></textarea>
       <div class="note-actions">
-        <button id="note-cancel" type="button">Annuleren</button>
-        <button id="note-save" type="button" class="primary">Bewaren</button>
+        <button id="note-cancel" type="button" data-i18n="common.cancel">Cancel</button>
+        <button id="note-save" type="button" class="primary" data-i18n="common.save">Save</button>
       </div>
     </div>
     <div id="toast" class="toast" role="status" hidden></div>
 
-    <div id="drop-hint" class="drop-hint" hidden><p>Laat los om te openen</p></div>
+    <div id="drop-hint" class="drop-hint" hidden><p data-i18n="app.dropHint">Release to open</p></div>
 
     <dialog id="paste-dialog">
       <form id="paste-form" method="dialog">
-        <h2>Tekst plakken</h2>
-        <p>Kopieer het stuk uit je browser en plak het hier. Lege regels scheiden de alinea's.</p>
-        <label>Titel (mag leeg blijven)<input id="paste-title" type="text" /></label>
-        <label>Webadres (mag leeg blijven)<input id="paste-url" type="text" spellcheck="false" /></label>
-        <label>Tekst<textarea id="paste-text" rows="14" required></textarea></label>
+        <h2 data-i18n="app.pasteText">Paste text</h2>
+        <p data-i18n="app.pasteIntro">Copy the piece from your browser and paste it here. Blank lines separate the paragraphs.</p>
+        <label><span data-i18n="app.pasteTitle">Title (may stay empty)</span><input id="paste-title" type="text" /></label>
+        <label><span data-i18n="app.pasteUrl">Web address (may stay empty)</span><input id="paste-url" type="text" spellcheck="false" /></label>
+        <label><span data-i18n="app.pasteBody">Text</span><textarea id="paste-text" rows="14" required></textarea></label>
         <div class="dialog-buttons">
-          <button id="paste-cancel" type="button">Annuleren</button>
-          <button id="paste-save" type="submit" class="primary">Bewaren en lezen</button>
+          <button id="paste-cancel" type="button" data-i18n="common.cancel">Cancel</button>
+          <button id="paste-save" type="submit" class="primary" data-i18n="app.pasteSave">Save and read</button>
         </div>
       </form>
     </dialog>
 
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
+      <label class="settings-row"><span data-i18n="settings.language">Language</span><select id="settings-language"></select></label>
+      <p class="hint" data-i18n="settings.languageHint">Changes menus, buttons and messages. The language of the blueprint and answers can be set per article with the flag next to the model.</p>
+      <div class="dialog-buttons"><button id="settings-close" type="button" data-i18n="common.close">Close</button></div>
+    </dialog>
+
     <dialog id="sites-dialog" aria-labelledby="sites-title">
-      <h2 id="sites-title">Sites waar je bent ingelogd</h2>
-      <p>Hier bewaart de app een sessie, zodat ze dezelfde tekst kan ophalen als jij ziet. Wachtwoorden ziet en bewaart de app nooit.</p>
+      <h2 id="sites-title" data-i18n="sites.title">Sites you are logged in to</h2>
+      <p data-i18n="sites.intro">The app keeps a session here, so it can fetch the same text you see. The app never sees or stores passwords.</p>
       <ul id="sites-list" class="sites-list"></ul>
-      <p id="sites-empty" class="hint">Je bent nog op geen enkele site ingelogd. Dat doe je vanuit de melding bij een onvolledig stuk.</p>
-      <p class="hint">"Uitloggen en wissen" verwijdert alle cookies en opslag van die site uit de app. De site zelf kan de sessie dan nog even als geldig zien; wil je ook daar uitloggen, doe dat dan eerst zelf via "Site openen". Kopieën die je al hebt opgehaald blijven staan en kunnen persoonsgegevens bevatten. Ze blijven op deze computer.</p>
+      <p id="sites-empty" class="hint" data-i18n="sites.empty">You are not logged in to any site yet. You do that from the notice on an incomplete piece.</p>
+      <p class="hint" data-i18n="sites.wipeHint">"Log out and wipe" removes all cookies and storage of that site from the app. The site itself may still consider the session valid for a while; if you also want to log out there, do that yourself first via "Open site". Copies you already fetched stay and may contain personal data. They stay on this computer.</p>
       <div id="sites-result" role="status" hidden></div>
-      <div class="dialog-buttons"><button id="sites-close" type="button">Sluiten</button></div>
+      <div class="dialog-buttons"><button id="sites-close" type="button" data-i18n="common.close">Close</button></div>
     </dialog>
 
     <dialog id="chatgpt-welcome" aria-labelledby="chatgpt-welcome-title">
-      <h2 id="chatgpt-welcome-title">You're using your ChatGPT plan</h2>
-      <p>Geschikte AI-verzoeken in Deepdive gebruiken nu je ChatGPT-abonnement. Je gebruik bekijk en beheer je in je ChatGPT-instellingen.</p>
-      <div class="dialog-buttons"><button id="chatgpt-welcome-ok" type="button" class="primary">Got it</button></div>
+      <h2 id="chatgpt-welcome-title" data-i18n="providers.welcomeTitle">You're using your ChatGPT plan</h2>
+      <p data-i18n="providers.welcomeText">Suitable AI requests in Deepdive now use your ChatGPT subscription. You can view and manage your usage in your ChatGPT settings.</p>
+      <div class="dialog-buttons"><button id="chatgpt-welcome-ok" type="button" class="primary" data-i18n="providers.gotIt">Got it</button></div>
     </dialog>
 
     <dialog id="providers-dialog" class="providers-dialog" aria-labelledby="providers-title">
       <header class="providers-head">
-        <h2 id="providers-title">Providers en modellen</h2>
-        <button id="providers-close" type="button">Sluiten</button>
+        <h2 id="providers-title" data-i18n="providers.title">Providers and models</h2>
+        <button id="providers-close" type="button" data-i18n="common.close">Close</button>
       </header>
       <div class="providers-layout">
-        <nav class="providers-nav" aria-label="Providers">
+        <nav class="providers-nav" aria-label="Providers" data-i18n-aria-label="app.providers">
           <ul id="provider-list"></ul>
-          <button id="provider-new" type="button">Nieuwe provider</button>
+          <button id="provider-new" type="button" data-i18n="providers.new">New provider</button>
         </nav>
         <div class="providers-main">
           <section id="chatgpt-offer" class="chatgpt-card" aria-labelledby="chatgpt-offer-title">
-            <h3 id="chatgpt-offer-title">Use your ChatGPT plan</h3>
-            <p class="hint">Laat AI-verzoeken in Deepdive meetellen in je eigen ChatGPT-abonnement of tegoed. Je logt in bij OpenAI in je browser; Deepdive rekent hier zelf niets voor en krijgt geen toegang tot je gesprekken.</p>
+            <h3 id="chatgpt-offer-title" data-i18n="providers.offerTitle">Use your ChatGPT plan</h3>
+            <p class="hint" data-i18n="providers.offerText">Let AI requests in Deepdive count towards your own ChatGPT subscription or credit. You log in to OpenAI in your browser; Deepdive charges nothing for this itself and gets no access to your conversations.</p>
             <div class="provider-actions">
-              <button id="chatgpt-continue" type="button" class="chatgpt-button">Continue with ChatGPT</button>
-              <button id="chatgpt-cancel" type="button" hidden>Stoppen met wachten</button>
+              <button id="chatgpt-continue" type="button" class="chatgpt-button" data-i18n="providers.continueWithChatgpt">Continue with ChatGPT</button>
+              <button id="chatgpt-cancel" type="button" hidden data-i18n="providers.stopWaiting">Stop waiting</button>
             </div>
           </section>
           <section id="chatgpt-account" class="chatgpt-card" aria-labelledby="chatgpt-account-title" hidden>
-            <h3 id="chatgpt-account-title">ChatGPT-account</h3>
+            <h3 id="chatgpt-account-title" data-i18n="providers.accountTitle">ChatGPT account</h3>
             <p id="chatgpt-account-status"></p>
             <div class="provider-actions">
-              <button id="chatgpt-signin" type="button" class="chatgpt-button">Continue with ChatGPT</button>
-              <button id="chatgpt-enable" type="button" class="primary" hidden>Abonnement inschakelen</button>
-              <button id="chatgpt-signout" type="button">Uitloggen</button>
-              <button id="chatgpt-account-cancel" type="button" hidden>Stoppen met wachten</button>
+              <button id="chatgpt-signin" type="button" class="chatgpt-button" data-i18n="providers.continueWithChatgpt">Continue with ChatGPT</button>
+              <button id="chatgpt-enable" type="button" class="primary" hidden data-i18n="providers.enablePlan">Enable subscription</button>
+              <button id="chatgpt-signout" type="button" data-i18n="providers.signOut">Log out</button>
+              <button id="chatgpt-account-cancel" type="button" hidden data-i18n="providers.stopWaiting">Stop waiting</button>
               <span class="spacer"></span>
-              <button id="chatgpt-manage" type="button" class="link">Manage usage</button>
+              <button id="chatgpt-manage" type="button" class="link" data-i18n="providers.manageUsage">Manage usage</button>
             </div>
           </section>
           <form id="provider-form" autocomplete="off">
-            <label id="provider-preset-row">Voorinstelling<select id="provider-preset"></select></label>
-            <label>Naam<input id="provider-name" type="text" required /></label>
+            <label id="provider-preset-row"><span data-i18n="providers.preset">Preset</span><select id="provider-preset"></select></label>
+            <label><span data-i18n="providers.name">Name</span><input id="provider-name" type="text" required /></label>
             <div id="provider-api-fields">
-            <label>Soort
+            <label><span data-i18n="providers.kind">Type</span>
               <select id="provider-kind">
-                <option value="anthropic">Anthropic-API</option>
-                <option value="openai_compatible">OpenAI-compatibele API</option>
-                <option value="chatgpt_plan" hidden>ChatGPT-abonnement</option>
+                <option value="anthropic" data-i18n="providers.kindAnthropic">Anthropic API</option>
+                <option value="openai_compatible" data-i18n="providers.kindOpenai">OpenAI-compatible API</option>
+                <option value="chatgpt_plan" hidden data-i18n="providers.kindChatgpt">ChatGPT subscription</option>
               </select>
             </label>
-            <label>Adres<input id="provider-url" type="text" spellcheck="false" required /></label>
-            <label>API-sleutel (optioneel)<input id="provider-key" type="password" spellcheck="false" autocomplete="new-password" /></label>
-            <p class="hint"><span id="provider-key-state"></span> <button id="provider-key-clear" type="button" class="link" hidden>Sleutel weghalen</button></p>
+            <label><span data-i18n="providers.address">Address</span><input id="provider-url" type="text" spellcheck="false" required /></label>
+            <label><span data-i18n="providers.apiKey">API key (optional)</span><input id="provider-key" type="password" spellcheck="false" autocomplete="new-password" /></label>
+            <p class="hint"><span id="provider-key-state"></span> <button id="provider-key-clear" type="button" class="link" hidden data-i18n="providers.removeKey">Remove key</button></p>
             </div>
             <div class="provider-actions">
-              <button id="provider-save" type="submit" class="primary">Opslaan</button>
-              <button id="provider-test" type="button">Test verbinding</button>
+              <button id="provider-save" type="submit" class="primary" data-i18n="providers.save">Save</button>
+              <button id="provider-test" type="button" data-i18n="providers.test">Test connection</button>
               <span class="spacer"></span>
-              <button id="provider-delete" type="button" hidden>Provider verwijderen</button>
+              <button id="provider-delete" type="button" hidden data-i18n="providers.delete">Delete provider</button>
             </div>
           </form>
           <div id="provider-result" role="status" hidden></div>
 
           <section id="models-section" class="models" aria-labelledby="models-title" hidden>
             <div class="models-head">
-              <h3 id="models-title">Modellen</h3>
+              <h3 id="models-title" data-i18n="providers.models">Models</h3>
               <span id="models-count" class="hint"></span>
               <span class="spacer"></span>
-              <button id="models-refresh" type="button">Modellen ophalen</button>
+              <button id="models-refresh" type="button" data-i18n="providers.fetchModels">Fetch models</button>
             </div>
             <div id="models-result" role="status" hidden></div>
-            <input id="models-filter" type="search" placeholder="Zoek een model" aria-label="Zoek een model" hidden />
+            <input id="models-filter" type="search" placeholder="Search for a model" aria-label="Search for a model" data-i18n-placeholder="providers.searchModel" data-i18n-aria-label="providers.searchModel" hidden />
             <table>
-              <thead><tr><th>In kiezer</th><th>Model</th><th>Afbeeldingen</th><th>Context (tokens)</th><th></th></tr></thead>
+              <thead><tr><th data-i18n="providers.colInPicker">In picker</th><th data-i18n="providers.colModel">Model</th><th data-i18n="providers.colImages">Images</th><th data-i18n="providers.colContext">Context (tokens)</th><th></th></tr></thead>
               <tbody id="models-body"></tbody>
             </table>
             <form id="model-add-form" class="model-add" autocomplete="off">
-              <input id="model-add-id" type="text" spellcheck="false" placeholder="Naam van het model" aria-label="Naam van het model" required />
-              <select id="model-add-images" aria-label="Kan afbeeldingen lezen">
-                <option value="">Afbeeldingen: onbekend</option>
-                <option value="yes">Afbeeldingen: ja</option>
-                <option value="no">Afbeeldingen: nee</option>
+              <input id="model-add-id" type="text" spellcheck="false" placeholder="Model name" aria-label="Model name" data-i18n-placeholder="providers.modelName" data-i18n-aria-label="providers.modelName" required />
+              <select id="model-add-images" aria-label="Can read images" data-i18n-aria-label="providers.canReadImages">
+                <option value="" data-i18n="providers.imagesUnknown">Images: unknown</option>
+                <option value="yes" data-i18n="providers.imagesYes">Images: yes</option>
+                <option value="no" data-i18n="providers.imagesNo">Images: no</option>
               </select>
-              <input id="model-add-context" type="text" inputmode="numeric" placeholder="Context, bijv. 8192" aria-label="Context in tokens" />
-              <button type="submit">Toevoegen</button>
+              <input id="model-add-context" type="text" inputmode="numeric" placeholder="Context, e.g. 8192" aria-label="Context in tokens" data-i18n-placeholder="providers.contextPlaceholder" data-i18n-aria-label="providers.contextLabel" />
+              <button type="submit" data-i18n="providers.add">Add</button>
             </form>
           </section>
         </div>

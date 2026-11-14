@@ -17,6 +17,8 @@
     "allow-discard-candidate",
     "allow-accept-incomplete",
     "allow-set-hide-floating",
+    "allow-set-ai-language",
+    "allow-set-ui-language",
     "allow-site-login-open",
     "allow-site-login-close",
     "allow-list-site-sessions",

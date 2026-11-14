@@ -1,42 +1,55 @@
 # Deepdive
-Read any article with ai aid
+Read any article with AI aid
 
-Zie [VISIE.md](VISIE.md) voor het idee, de functies en het bouwplan. Gebouwd zijn stap 1 (bronnen openen), stap 2 (providers en modellen, met daarbij optioneel inloggen met ChatGPT), stap 3 (de blauwdruk) en stap 4 (selecteren, vragen en markeren).
+See [VISIE.md](VISIE.md) (in Dutch) for the idea, the features and the build plan. Built so far: step 1 (opening sources), step 2 (providers and models, with optional sign-in with ChatGPT), step 3 (the blueprint) and step 4 (selecting, asking and highlighting).
 
-Deepdive is open source onder de [MIT-licentie](LICENSE).
+Deepdive is open source under the [MIT license](LICENSE).
 
-## Installeren op macOS
+## Installing on macOS
 
-**Nodig:** een Mac met Apple Silicon (M1 of nieuwer). Voor Intel-Macs en Windows is er nog geen versie.
+**Required:** a Mac with Apple Silicon (M1 or newer). There is no version for Intel Macs or Windows yet.
 
-1. Download `Deepdive_1.0.0_aarch64.dmg` bij de [nieuwste release](https://github.com/gevezex/Deepdive/releases/latest).
-2. Open het bestand en sleep **Deepdive** naar de map **Programma's**.
-3. Open Deepdive vanuit Programma's.
+1. Download `Deepdive_1.0.0_aarch64.dmg` from the [latest release](https://github.com/gevezex/Deepdive/releases/latest).
+2. Open the file and drag **Deepdive** to the **Applications** folder.
+3. Open Deepdive from Applications.
 
-**De eerste keer openen.** Deepdive is niet ondertekend bij Apple. Daarom zegt macOS bij de eerste keer dat de app niet geopend kan worden, of dat Apple niet kan controleren of hij vrij is van malware. Dat is te verwachten. Zo open je hem toch:
+**Opening it the first time.** Deepdive is not signed with Apple. That is why macOS says the first time that the app cannot be opened, or that Apple cannot check it for malware. That is expected. This is how you open it anyway:
 
-1. Klik in de melding op **OK** of **Gereed**, niet op "Verplaats naar prullenmand".
-2. Open **Systeeminstellingen → Privacy en beveiliging** en scrol naar **Beveiliging**.
-3. Daar staat dat Deepdive is geblokkeerd. Klik op **Open toch** (Engels: *Open Anyway*) en bevestig met je wachtwoord of Touch ID.
-4. Klik in de volgende melding nog een keer op **Open toch**.
+1. Click **OK** or **Done** in the message, not "Move to Trash".
+2. Open **System Settings → Privacy & Security** and scroll to **Security**.
+3. It says there that Deepdive was blocked. Click **Open Anyway** and confirm with your password or Touch ID.
+4. Click **Open Anyway** once more in the next message.
 
-Daarna opent Deepdive gewoon, ook na een herstart. Na een nieuwe versie kan het nodig zijn dit nog een keer te doen.
+After that Deepdive opens normally, also after a restart. After a new version you may have to do this again.
 
-Lukt het zo niet, dan kan het ook in Terminal. Dit haalt alleen de markering "gedownload van internet" van de app af:
+If that does not work, you can also use Terminal. This only removes the "downloaded from the internet" mark from the app:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Deepdive.app
 ```
 
-**Aan de slag.** Klik op **Providers** en voeg een AI-dienst toe: Anthropic, een OpenAI-compatibele dienst (ook lokaal, zoals Ollama of LM Studio) of je eigen ChatGPT-abonnement. Kies daarna bovenaan het rechterpaneel een model. Plak een webadres, kies een pdf of plak tekst. Selecteer een stuk tekst om de professor iets te vragen of om te markeren.
+**Getting started.** Click **Providers** and add an AI service: Anthropic, an OpenAI-compatible service (also local, such as Ollama or LM Studio) or your own ChatGPT subscription. Then choose a model at the top of the right-hand panel. Paste a web address, choose a PDF or paste text. Select a piece of text to ask the professor something or to highlight it.
 
-**Waar je gegevens staan.** Alles blijft op je eigen computer. Kopieën, blauwdrukken, gesprekken en markeringen staan in `~/Library/Application Support/app.deepdive.reader`. API-sleutels en de ChatGPT-login staan in de sleutelhanger van macOS.
+**Where your data is.** Everything stays on your own computer. Copies, blueprints, conversations and highlights are in `~/Library/Application Support/app.deepdive.reader`. API keys and the ChatGPT login are in the macOS keychain.
 
-**Verwijderen.** Sleep Deepdive uit Programma's naar de prullenmand. Wil je ook je gegevens kwijt, verwijder dan de map hierboven. De sleutels haal je eerst weg in de app, bij Providers.
+**Uninstalling.** Drag Deepdive from Applications to the Trash. If you also want your data gone, delete the folder above. Remove the keys in the app first, under Providers.
 
-## Zelf bouwen
+## Languages
 
-Nodig: Node, Rust en de systeemvereisten van [Tauri 2](https://tauri.app/start/prerequisites/).
+The interface is in English by default. Under **Settings** you can switch it to Dutch or Turkish: menus, the selection bar and its ⋯ menu, the highlight menu, notices and the messages from the backend all follow.
+
+The language the AI writes in is a separate choice per article. The flag next to the model picker sets it for the article that is open, so you can read a Turkish website with the blueprint and answers in Turkish while the rest of the app stays in English. An article without its own choice follows the interface language. Quotes always stay in the language of the source.
+
+How it works:
+
+- **Frontend:** `src/i18n/` has one file per area with the texts in all three languages side by side. English leads; a missing Dutch or Turkish key fails the type check. Static texts in `index.html` carry `data-i18n` attributes, code calls `t()`.
+- **Backend:** `src-tauri/src/i18n.rs` keeps the interface language (the frontend sets it with `set_ui_language`). Messages are written in place with `tr(en, nl, tr)` or `tr_fmt!`. Texts that are stored, such as the completeness verdict of a copy, keep the language they were made in.
+- **Prompts:** all prompts are in English and name the output language (`{{LANGUAGE}}`). The article's choice is `aiLanguage` in `source.json`. Blueprints are saved per model, prompt version and language, so a Turkish blueprint does not replace a Dutch one.
+- **Adding a language:** add it to `LANGUAGES` in `src/i18n/index.ts`, to every file in `src/i18n/`, to `Lang` in `i18n.rs` and to every `tr(...)` call.
+
+## Building it yourself
+
+Required: Node, Rust and the system requirements of [Tauri 2](https://tauri.app/start/prerequisites/).
 
 ```bash
 npm install
@@ -46,7 +59,7 @@ npm install
 npm run tauri dev
 ```
 
-Een app bouwen op macOS:
+Building an app on macOS:
 
 ```bash
 npm run tauri build -- --bundles app
@@ -68,59 +81,60 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## Frontend
 
-Gewoon TypeScript met Vite, zonder framework. De schermdelen zijn klein en pdf.js werkt direct op de DOM, dus een framework voegt nu niets toe.
+Plain TypeScript with Vite, without a framework. The parts of the screen are small and pdf.js works directly on the DOM, so a framework adds nothing for now.
 
-## Opbouw
+## Structure
 
-| Onderdeel | Taak |
+| Part | Job |
 |---|---|
-| `src-tauri/src/engine/` | Laden van pagina's achter de trait `PageEngine`. Een andere engine, zoals CEF, hoeft alleen deze te implementeren. |
-| `src-tauri/src/engine/capture.js` | Draait in de verborgen webview: wacht tot de pagina is opgebouwd, scrolt erdoorheen, haalt cookielagen weg en leest de DOM en tekstblokken uit. |
-| `src-tauri/src/snapshot.rs` | Maakt de visuele kopie: saneert de HTML opnieuw en slaat afbeeldingen, CSS en fonts lokaal op. |
-| `src-tauri/src/model.rs` | Het gezamenlijke bronmodel: blokken met vaste nummers, voor website, pdf en geplakte tekst. |
-| `src-tauri/src/store.rs` | Opslag per bron in de app-datamap. |
-| `src-tauri/src/import.rs` | Van invoer naar opgeslagen bron, en de beoordeling van wat er is opgehaald. |
-| `src/pdf.ts`, `src/pdfBlocks.ts` | Pdf tonen met pdf.js en de tekst omzetten naar blokken. |
-| `src-tauri/src/ai/` | De AI-laag: de enige plek die met een AI-dienst praat. Latere stappen gebruiken `ai::stream_chat` met een `Target` uit `ProviderStore::target`. |
-| `src-tauri/src/providers/` | Providers en modellen in `providers.json`, sleutels via `secrets.rs` in de sleutelhanger. `Selection.perAction` is de voorbereiding op "model per actie". |
-| `src-tauri/src/chatgpt/` | Inloggen met ChatGPT: login, ID-token, vernieuwen en uitloggen. De tokens staan alleen in de sleutelhanger. |
-| `src-tauri/src/ai/responses.rs` | De Responses API voor het ChatGPT-abonnement, achter dezelfde ingang `ai::stream_chat`. |
-| `src/providers.ts`, `src/providerLogic.ts` | Het providerscherm en de modelkiezer. |
-| `src-tauri/src/blueprint/` | De blauwdruk: schema, prompts en controles (`schema.rs`, `prompts/`, `validate.rs`), de twee aanroepen (`mod.rs`), het lezen van een antwoord terwijl het binnenkomt (`stream.rs`), de opslag (`saved.rs`) en de opdrachten voor de interface (`commands.rs`). |
-| `src/blueprint.ts`, `src/blueprintLogic.ts` | Het paneel: knop, voortgang, de drie lagen en het eigen diagram. |
-| `src-tauri/src/engine/bridge.js` | Het enige script in de websitekopie: geeft de selectie door, tekent markeringen en springt naar alinea's. |
-| `src-tauri/src/professor/` | Selecteren en vragen: de prompt (`prompts/system.md`, de opdracht per actie in `mod.rs`), gesprekken per bron in `threads/` en markeringen in `highlights.json` (`highlights.rs`). |
-| `src/reading.ts`, `src/answers.ts`, `src/readingLogic.ts` | De selectiebalk met het ⋯-menu, markeren met notitie, en de antwoorden in het tabblad Vragen. |
+| `src-tauri/src/engine/` | Loading pages behind the trait `PageEngine`. Another engine, such as CEF, only has to implement this. |
+| `src-tauri/src/engine/capture.js` | Runs in the hidden webview: waits until the page is built, scrolls through it, removes cookie layers and reads out the DOM and text blocks. |
+| `src-tauri/src/snapshot.rs` | Makes the visual copy: sanitises the HTML again and stores images, CSS and fonts locally. |
+| `src-tauri/src/model.rs` | The shared source model: blocks with fixed numbers, for websites, PDFs and pasted text. |
+| `src-tauri/src/store.rs` | Storage per source in the app data folder. |
+| `src-tauri/src/import.rs` | From input to saved source, and the assessment of what was fetched. |
+| `src/pdf.ts`, `src/pdfBlocks.ts` | Showing a PDF with pdf.js and turning the text into blocks. |
+| `src-tauri/src/ai/` | The AI layer: the only place that talks to an AI service. Later steps use `ai::stream_chat` with a `Target` from `ProviderStore::target`. |
+| `src-tauri/src/providers/` | Providers and models in `providers.json`, keys via `secrets.rs` in the keychain. `Selection.perAction` prepares for "a model per action". |
+| `src-tauri/src/chatgpt/` | Signing in with ChatGPT: login, ID token, refreshing and logging out. The tokens are only in the keychain. |
+| `src-tauri/src/ai/responses.rs` | The Responses API for the ChatGPT subscription, behind the same entry point `ai::stream_chat`. |
+| `src/providers.ts`, `src/providerLogic.ts` | The providers screen and the model picker. |
+| `src-tauri/src/blueprint/` | The blueprint: schema, prompts and checks (`schema.rs`, `prompts/`, `validate.rs`), the two calls (`mod.rs`), reading an answer while it comes in (`stream.rs`), storage (`saved.rs`) and the commands for the interface (`commands.rs`). |
+| `src/blueprint.ts`, `src/blueprintLogic.ts` | The panel: button, progress, the three layers and the diagram. |
+| `src-tauri/src/engine/bridge.js` | The only script in the website copy: passes on the selection, draws highlights and jumps to paragraphs. |
+| `src-tauri/src/professor/` | Selecting and asking: the prompt (`prompts/system.md`, the task per action in `mod.rs`), conversations per source in `threads/` and highlights in `highlights.json` (`highlights.rs`). |
+| `src/reading.ts`, `src/answers.ts`, `src/readingLogic.ts` | The selection bar with the ⋯ menu, highlighting with a note, and the answers in the Questions tab. |
+| `src/i18n/`, `src-tauri/src/i18n.rs` | Languages: interface texts, the interface language and the per-article AI language. |
 
-**Afscherming:** de kopie staat in een iframe met `sandbox="allow-scripts"`, zonder `allow-same-origin`, en een CSP zonder netwerk. De scripts van de site zitten niet in de kopie. Bij het serveren zet de app er één eigen script in (`engine/bridge.js`). De CSP in de kop laat alleen dat script toe, op zijn sha-256-hash: geen ander inline script, geen handlers in attributen en geen script van een adres. De CSP die in de opgeslagen pagina staat, gaat bij het serveren weg, want die verbiedt alle scripts. Het script heeft een eigen, ondoorzichtige origin en praat alleen via `postMessage` met het hoofdvenster. Het hoofdvenster neemt alleen berichten van die iframe aan en gebruikt daaruit alleen tekst en getallen. Het verborgen venster heeft geen capability, dus een pagina kan de commando's van de app niet aanroepen.
+**Isolation:** the copy is in an iframe with `sandbox="allow-scripts"`, without `allow-same-origin`, and a CSP without network. The site's scripts are not in the copy. When serving it, the app adds one script of its own (`engine/bridge.js`). The CSP in the header only allows that script, by its sha-256 hash: no other inline script, no handlers in attributes and no script from an address. The CSP in the saved page is removed when serving, because it forbids all scripts. The script has its own opaque origin and only talks to the main window via `postMessage`. The main window only accepts messages from that iframe and only uses text and numbers from them. The hidden window has no capability, so a page cannot call the app's commands.
 
-**Voorvertoning:** zodra er tekst staat, toont de app de pagina al terwijl de kopie op de achtergrond wordt gemaakt. Die voorvertoning krijgt dezelfde opschoning en sandbox, zonder scripts, maar laadt afbeeldingen, CSS en fonts nog rechtstreeks van de site. Ze staat alleen in het geheugen.
+**Preview:** as soon as there is text, the app shows the page while the copy is made in the background. The preview gets the same cleaning and sandbox, without scripts, but still loads images, CSS and fonts directly from the site. It only lives in memory.
 
-**Blokken in de kopie:** elk tekstblok heeft in de visuele kopie een attribuut `data-dd-n` met zijn alineanummer. Latere stappen kunnen tekst en beeld daarmee aan elkaar koppelen. Bij pdf's staan paginanummer en positie in het blok zelf.
+**Blocks in the copy:** every text block has an attribute `data-dd-n` with its paragraph number in the visual copy. Later steps can use it to link text and image. For PDFs the page number and position are in the block itself.
 
-**Popups in de kopie:** zonder scripts is een laag niet weg te klikken. Daarom gebeurt er twee dingen. Bij het vastleggen haalt `capture.js` cookielagen en inschrijf-, nieuwsbrief- en app-lagen weg, en zet het scrollen weer aan als de pagina dat had uitgezet. Een laag die zonder sluitknop vraagt om in te loggen of te betalen blijft staan. Blijft er toch iets hinderen, dan is er de knop **Popup weghalen** onder de kopie. De keuze staat als `hideFloating` in `source.json`. Bij het serveren voegt de app dan een stijl toe die verbergt wat volgens de CSS van de kopie zweeft (`position: fixed`, dialogen, en `position: absolute` met een z-index vanaf 1000). Elementen met of rond een genummerde alinea blijven altijd staan. De kopie op schijf, de tekst en het oordeel over de volledigheid veranderen niet, en de afscherming blijft gelijk. De kopie laadt opnieuw en begint dan bovenaan. Opnieuw ophalen neemt de keuze mee naar de nieuwe kopie.
+**Popups in the copy:** without scripts a layer cannot be clicked away. So two things happen. While capturing, `capture.js` removes cookie layers and sign-up, newsletter and app layers, and turns scrolling back on if the page had turned it off. A layer that asks you to log in or pay without a close button stays. If something still gets in the way, there is the **Remove popup** button under the copy. The choice is stored as `hideFloating` in `source.json`. When serving, the app then adds a style that hides what floats according to the copy's CSS (`position: fixed`, dialogs, and `position: absolute` with a z-index of 1000 or more). Elements with or around a numbered paragraph always stay. The copy on disk, the text and the completeness verdict do not change, and the isolation stays the same. The copy reloads and starts at the top. Fetching again carries the choice over to the new copy.
 
-**Springen in de kopie:** het eigen script scrolt naar de alinea's en laat ze oplichten, zonder dat de pagina opnieuw laadt. Het laatste doel staat in `data-jump` op de iframe. Is het script er nog niet, bijvoorbeeld tijdens de voorvertoning, dan vraagt de iframe een nieuw adres op: `index.html?hl=31-40#dd-doel`. De server zet dan een stijl in de pagina en de browser scrolt zelf naar het anker. Uit de query komen alleen getallen. Een pdf staat niet in een iframe: daar komt een markering op de pagina, op de plek uit het blok.
+**Jumping in the copy:** the app's own script scrolls to the paragraphs and makes them light up, without reloading the page. The last target is in `data-jump` on the iframe. If the script is not there yet, for example during the preview, the iframe requests a new address: `index.html?hl=31-40#dd-doel`. The server then puts a style in the page and the browser scrolls to the anchor itself. Only numbers are taken from the query. A PDF is not in an iframe: there a highlight is drawn on the page, at the position from the block.
 
-**Selecteren en vragen:** bij een selectie verschijnt een balk met een vraagveld, Leg uit, Eenvoudiger, ⋯ (Wat betekent dit woord?, Klopt dit nog?, Waar komt dit nog terug?, Tegenargument, Citaat kopiëren), Markeren en Notitie. Typ je terwijl er iets geselecteerd is, dan gaan de letters naar het vraagveld. De vraag gaat met de hele bron, de selectie en de alineanummers naar het model dat bij Model is gekozen (`model_for_action("ask")`). Het antwoord komt in het tabblad Vragen en wordt per bron bewaard, met vervolgvragen. "Klopt dit nog?" zoekt nog niet op het web: het model zegt wat het weet en dat het niet is nagezocht.
+**Selecting and asking:** when you select something, a bar appears with a question field, Explain, Simpler, ⋯ (What does this word mean?, Is this still true?, Where else does this come up?, Counterargument, Copy quote), Highlight and Note. If you type while something is selected, the letters go to the question field. The question goes with the whole source, the selection and the paragraph numbers to the model chosen under Model (`model_for_action("ask")`). The answer appears in the Questions tab and is saved per source, with follow-up questions. "Is this still true?" does not search the web yet: the model says what it knows and that it was not checked.
 
-**Markeren:** vier kleuren. Klik op een markering voor een andere kleur, een notitie, Leg uit of weghalen. De kopie verandert nooit, dus een plek ligt vast: bij een website als tekenpositie in de tekst van de pagina, bij een pdf als rechthoeken op de pagina.
+**Highlighting:** four colours. Click a highlight for another colour, a note, Explain or removing it. The copy never changes, so a place is fixed: for a website as a character position in the page's text, for a PDF as rectangles on the page.
 
-**Blauwdrukken:** per bron, model en promptversie één bestand in `sources/<id>/blueprints/`. De iframe kan die map niet opvragen. Opnieuw openen roept geen model aan. Een onvolledige blauwdruk vervangt nooit een volledige van hetzelfde model.
+**Blueprints:** one file per source, model, prompt version and language in `sources/<id>/blueprints/`. The iframe cannot request that folder. Opening again does not call a model. An incomplete blueprint never replaces a complete one of the same model.
 
-**API-sleutels:** alleen in de sleutelhanger. `CachedSecrets` leest elk item één keer per sessie en houdt het daarna alleen in het geheugen van de app. De frontend geeft een sleutel door aan Rust en krijgt alleen `hasKey` terug. `ApiKey` is niet te serialiseren, foutmeldingen gaan door `errors::redact`, doorverwijzingen worden niet gevolgd en een sleutel gaat alleen via https of naar deze computer. Na een nieuwe build kan macOS opnieuw om toegang tot de sleutelhanger vragen, omdat de app dan niet meer dezelfde handtekening heeft.
+**API keys:** only in the keychain. `CachedSecrets` reads each item once per session and then keeps it only in the app's memory. The frontend passes a key to Rust and only gets `hasKey` back. `ApiKey` cannot be serialised, error messages go through `errors::redact`, redirects are not followed and a key is only sent over https or to this computer. After a new build macOS may ask for keychain access again, because the app no longer has the same signature.
 
-**ChatGPT-tokens:** één item per koppeling in de sleutelhanger, onder `chatgpt:<provider-id>`. De frontend krijgt alleen het e-mailadres en de status. De adressen van OpenAI staan in een release-build vast; alleen debug-builds kunnen naar een lokale nepserver wijzen. In `chatgpt-host-id` in de app-datamap staat de anonieme ID van deze installatie, die geen geheim is.
+**ChatGPT tokens:** one item per link in the keychain, under `chatgpt:<provider-id>`. The frontend only gets the email address and the status. The OpenAI addresses are fixed in a release build; only debug builds can point to a local mock server. `chatgpt-host-id` in the app data folder holds the anonymous ID of this installation, which is not a secret.
 
-## Inloggen met ChatGPT
+## Signing in with ChatGPT
 
-Dit volgt [OpenAI's beschrijving voor open-source apps](https://developers.openai.com/siwc/token-sharing-open-source), die nog in preview is. Elke gebruiker koppelt een eigen account en abonnement. Er zit geen gedeelde sleutel in de app en er is geen server.
+This follows [OpenAI's description for open-source apps](https://developers.openai.com/siwc/token-sharing-open-source), which is still in preview. Every user links their own account and subscription. There is no shared key in the app and there is no server.
 
-Zelf proberen: open **Providers**, kies **Nieuwe provider** en klik op **Continue with ChatGPT**. Log in je browser in en geef toestemming. Daarna kies je een model bovenin het rechterpaneel. Uitloggen kan via de provider.
+To try it: open **Providers**, choose **New provider** and click **Continue with ChatGPT**. Log in in your browser and give permission. Then choose a model at the top of the right-hand panel. You can log out via the provider.
 
-## De end-to-endtest van de providers
+## The end-to-end test of the providers
 
-Bedient de echte app en de echte sleutelhanger met een nepsleutel onder een eigen dienstnaam, tegen de lokale nepserver in `tests/e2e/mock-ai.mjs`. Er is geen echte provider of sleutel voor nodig.
+Drives the real app and the real keychain with a fake key under its own service name, against the local mock server in `tests/e2e/mock-ai.mjs`. No real provider or key is needed. The end-to-end tests run the interface in Dutch (`DEEPDIVE_LANGUAGE=nl`, debug builds only), so their text checks do not depend on the language chosen in your own app.
 
 ```bash
 npm run tauri build -- --debug --no-bundle --features screenshots
@@ -130,37 +144,37 @@ npm run tauri build -- --debug --no-bundle --features screenshots
 node tests/e2e/providers.e2e.mjs
 ```
 
-De test van inloggen met ChatGPT werkt net zo, tegen een lokale nep van OpenAI in `tests/e2e/mock-chatgpt.mjs`. Hij gebruikt geen echt account:
+The test of signing in with ChatGPT works the same way, against a local fake of OpenAI in `tests/e2e/mock-chatgpt.mjs`. It does not use a real account:
 
 ```bash
 node tests/e2e/chatgpt.e2e.mjs
 ```
 
-De test met de echte sleutelhanger op Rust-niveau:
+The test with the real keychain at Rust level:
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored keychain
 ```
 
-## De end-to-endtest van de blauwdruk
+## The end-to-end test of the blueprint
 
-Bedient de echte app tegen de lokale nepserver: knop, stap voor stap tonen, springen, afbreken, meldingen, bewaren en opnieuw openen. Er is geen echt model of sleutel voor nodig. Bouwen gaat zoals hierboven.
+Drives the real app against the local mock server: button, showing step by step, jumping, cancelling, notices, saving and opening again. No real model or key is needed. Building works as above.
 
 ```bash
 node tests/e2e/blueprint.e2e.mjs
 ```
 
-## De end-to-endtest van selecteren en markeren
+## The end-to-end test of selecting and highlighting
 
-Bedient de echte app tegen de lokale nepserver. In de websitekopie kan de test niet zelf selecteren, omdat de iframe is afgeschermd. De test controleert daarom dat het eigen script daar draait, en speelt daarna zijn berichten na. In de pdf selecteert de test echt. Bouwen gaat zoals hierboven.
+Drives the real app against the local mock server. In the website copy the test cannot select itself, because the iframe is isolated. So the test checks that the app's own script runs there, and then replays its messages. In the PDF the test really selects. Building works as above.
 
 ```bash
 node tests/e2e/reading.e2e.mjs
 ```
 
-## De end-to-endtest van de popups
+## The end-to-end test of the popups
 
-Bedient de echte app tegen de lokale testsite `tests/e2e/mock-site.mjs`, zonder echte sites of accounts:
+Drives the real app against the local test site `tests/e2e/mock-site.mjs`, without real sites or accounts:
 
 ```bash
 npm run tauri build -- --debug --no-bundle --features screenshots
@@ -170,9 +184,9 @@ npm run tauri build -- --debug --no-bundle --features screenshots
 node tests/e2e/popups.e2e.mjs
 ```
 
-## De site-test herhalen
+## Repeating the site test
 
-De testhaak zit alleen in debug-builds. `docs/site-test-urls.txt` bevat de adressen, die na verloop van tijd kunnen verouderen.
+The test hook is only in debug builds. `docs/site-test-urls.txt` contains the addresses, which can go out of date over time.
 
 ```bash
 npm run tauri build -- --debug --no-bundle

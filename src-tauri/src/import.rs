@@ -3,6 +3,7 @@
 use crate::completeness;
 use crate::engine::{webview::{self, WebviewEngine}, PageEngine, PreviewSink, RenderedPage};
 use crate::error::AppError;
+use crate::i18n::{tr, ui, Lang};
 use crate::preview;
 use crate::model::{word_count, AssetStats, Block, Completeness, CompletenessVerdict, Source, SourceKind, SCHEMA_VERSION};
 use crate::sessions::{cookie_header, ActiveSession, SessionCookie, SiteSessions};
@@ -62,6 +63,7 @@ fn base_source(id: String, kind: SourceKind, title: String) -> Source {
         superseded_by: None,
         previous_id: None,
         hide_floating: false,
+        ai_language: None,
     }
 }
 
@@ -118,24 +120,32 @@ pub fn classify(page: &RenderedPage, http_status: Option<u16>, judged: &Complete
     let words: u32 = page.blocks.iter().map(|b| b.text.split_whitespace().count() as u32).sum();
     let text = lower_join(page);
     let host = Url::parse(&page.final_url).ok().and_then(|u| u.host_str().map(String::from)).unwrap_or_default();
-    let detail = format!("{words} woorden, status {http_status:?}, adres {}", page.final_url);
+    let detail = match ui() {
+        Lang::En => format!("{words} words, status {http_status:?}, address {}", page.final_url),
+        Lang::Nl => format!("{words} woorden, status {http_status:?}, adres {}", page.final_url),
+        Lang::Tr => format!("{words} kelime, durum {http_status:?}, adres {}", page.final_url),
+    };
 
     match wall_in(&text, &host, words) {
-        Some(Wall::Blocked) => return Err(AppError::new("blocked", "Deze site blokkeert het automatisch ophalen (bijvoorbeeld met een robotcontrole). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail)),
-        Some(Wall::Consent) => return Err(AppError::new("consent", "Deze site toont eerst een cookiemuur, en die kan de app niet zelf beantwoorden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail)),
+        Some(Wall::Blocked) => return Err(AppError::new("blocked", tr("This site blocks automatic fetching (for example with a robot check). Nothing was saved. Copy the text from your browser and paste it here.", "Deze site blokkeert het automatisch ophalen (bijvoorbeeld met een robotcontrole). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.", "Bu site otomatik indirmeyi engelliyor (örneğin bir robot denetimiyle). Hiçbir şey kaydedilmedi. Metni tarayıcınızdan kopyalayıp buraya yapıştırın.")).with_detail(detail)),
+        Some(Wall::Consent) => return Err(AppError::new("consent", tr("This site first shows a cookie wall, which the app cannot answer by itself. Nothing was saved. Copy the text from your browser and paste it here.", "Deze site toont eerst een cookiemuur, en die kan de app niet zelf beantwoorden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.", "Bu site önce bir çerez duvarı gösteriyor ve uygulama bunu kendi başına yanıtlayamıyor. Hiçbir şey kaydedilmedi. Metni tarayıcınızdan kopyalayıp buraya yapıştırın.")).with_detail(detail)),
         None => {}
     }
     if let Some(status) = http_status {
         if words < SUSPECT_WORDS && (status == 404 || status == 410) {
-            return Err(AppError::new("not_found_page", "Deze pagina bestaat niet (fout 404). Controleer het adres.").with_detail(detail));
+            return Err(AppError::new("not_found_page", tr("This page does not exist (error 404). Check the address.", "Deze pagina bestaat niet (fout 404). Controleer het adres.", "Bu sayfa mevcut değil (hata 404). Adresi kontrol edin.")).with_detail(detail));
         }
         if words < SUSPECT_WORDS && !shows_paywall && (status == 401 || status == 403 || status == 429 || status == 451 || status == 503) {
-            return Err(AppError::new("blocked", format!("De site weigert het ophalen (fout {status}). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.")).with_detail(detail));
+            return Err(AppError::new("blocked", match ui() {
+                Lang::En => format!("The site refuses the request (error {status}). Nothing was saved. Copy the text from your browser and paste it here."),
+                Lang::Nl => format!("De site weigert het ophalen (fout {status}). Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier."),
+                Lang::Tr => format!("Site isteği reddediyor (hata {status}). Hiçbir şey kaydedilmedi. Metni tarayıcınızdan kopyalayıp buraya yapıştırın."),
+            }).with_detail(detail));
         }
     }
     // Een betaalmuur met bijna geen tekst is geen lege pagina: die kopie geeft de keuze om in te loggen.
     if words < EMPTY_WORDS && verdict != CompletenessVerdict::LikelyIncomplete {
-        return Err(AppError::new("empty", "Op deze pagina is geen leesbare tekst gevonden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.").with_detail(detail));
+        return Err(AppError::new("empty", tr("No readable text was found on this page. Nothing was saved. Copy the text from your browser and paste it here.", "Op deze pagina is geen leesbare tekst gevonden. Er is niets opgeslagen. Kopieer de tekst uit je browser en plak die hier.", "Bu sayfada okunabilir metin bulunamadı. Hiçbir şey kaydedilmedi. Metni tarayıcınızdan kopyalayıp buraya yapıştırın.")).with_detail(detail));
     }
     Ok(())
 }
@@ -202,7 +212,7 @@ async fn preflight(url: &Url, user_agent: &str, cookies: &[SessionCookie]) -> Re
         let chunk = chunk.map_err(|e| AppError::network(e.to_string()))?;
         bytes.extend_from_slice(&chunk);
         if bytes.len() > MAX_PDF {
-            return Err(AppError::new("pdf", "Deze pdf is groter dan 500 MB en is niet opgeslagen."));
+            return Err(AppError::new("pdf", tr("This PDF is larger than 500 MB and was not saved.", "Deze pdf is groter dan 500 MB en is niet opgeslagen.", "Bu PDF 500 MB'tan büyük olduğu için kaydedilmedi.")));
         }
     }
     Ok(Preflight::Pdf { bytes, name })
@@ -279,7 +289,7 @@ async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status
     let result = async {
         let login = session.map(|s| snapshot::Login { site: &s.site, cookies: &page.session_cookies });
         let assets = snapshot::build(&page.html, &final_url, &dir, engine.user_agent(), login).await?;
-        let title = page.title.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| final_url.host_str().unwrap_or("Pagina").to_string());
+        let title = page.title.clone().filter(|t| !t.is_empty()).unwrap_or_else(|| final_url.host_str().map(String::from).unwrap_or_else(|| tr("Page", "Pagina", "Sayfa")));
         let mut source = base_source(id.clone(), SourceKind::Web, title);
         source.url = Some(url.to_string());
         source.final_url = Some(final_url.to_string());
@@ -292,7 +302,12 @@ async fn capture_page(store: &Store, engine: &impl PageEngine, url: &Url, status
         source.completeness = judged;
         source.fetched_with_session = session.is_some();
         if assets.failed > 0 {
-            source.warnings.push(format!("{} afbeeldingen of stijlbestanden konden niet worden opgeslagen.", assets.failed));
+            let failed = assets.failed;
+            source.warnings.push(match ui() {
+                Lang::En => format!("{failed} images or style files could not be saved."),
+                Lang::Nl => format!("{failed} afbeeldingen of stijlbestanden konden niet worden opgeslagen."),
+                Lang::Tr => format!("{failed} görsel veya stil dosyası kaydedilemedi."),
+            });
         }
         source.assets = assets;
         store.commit(&dir, &source)?;
@@ -344,9 +359,9 @@ fn is_worse(old: &Source, new: &Source) -> bool {
 pub async fn refetch(app: &AppHandle, store: &Store, id: &str) -> Result<RefetchOutcome, AppError> {
     let mut old = store.get(id)?;
     if old.kind == SourceKind::Text {
-        return Err(AppError::new("refetch", "Geplakte tekst heeft geen site om opnieuw van op te halen."));
+        return Err(AppError::new("refetch", tr("Pasted text has no site to fetch it again from.", "Geplakte tekst heeft geen site om opnieuw van op te halen.", "Yapıştırılan metnin yeniden indirilebileceği bir sitesi yok.")));
     }
-    let raw = old.url.clone().or_else(|| old.final_url.clone()).ok_or_else(|| AppError::new("refetch", "Van deze bron is geen webadres bekend."))?;
+    let raw = old.url.clone().or_else(|| old.final_url.clone()).ok_or_else(|| AppError::new("refetch", tr("No web address is known for this source.", "Van deze bron is geen webadres bekend.", "Bu kaynağın web adresi bilinmiyor.")))?;
     let url = parse_url(&raw)?;
     let mut new = fetch(app, store, &url, None).await?;
     let (old_words, new_words) = (old.word_count, new.word_count);
@@ -355,6 +370,7 @@ pub async fn refetch(app: &AppHandle, store: &Store, id: &str) -> Result<Refetch
     }
     new.previous_id = Some(old.id.clone());
     new.hide_floating = old.hide_floating;
+    new.ai_language = old.ai_language.clone();
     if is_worse(&old, &new) {
         new.superseded_by = Some(old.id.clone());
         store.update(&new)?;
@@ -405,14 +421,22 @@ pub fn set_hide_floating(store: &Store, id: &str, hide: bool) -> Result<Source, 
     Ok(source)
 }
 
+/// The language the model writes in for this source. `None` follows the interface language.
+pub fn set_ai_language(store: &Store, id: &str, language: Option<String>) -> Result<Source, AppError> {
+    let mut source = store.get(id)?;
+    source.ai_language = language.as_deref().and_then(crate::i18n::Lang::from_code).map(|l| l.code().to_string());
+    store.update(&source)?;
+    Ok(source)
+}
+
 // ---------- pdf ----------
 
 pub fn save_pdf(store: &Store, bytes: &[u8], name: &str, url: Option<&str>) -> Result<Source, AppError> {
     if !bytes.starts_with(b"%PDF-") && !bytes[..bytes.len().min(1024)].windows(5).any(|w| w == b"%PDF-") {
-        return Err(AppError::new("pdf", "Dit bestand is geen geldige pdf."));
+        return Err(AppError::new("pdf", tr("This file is not a valid PDF.", "Dit bestand is geen geldige pdf.", "Bu dosya geçerli bir PDF değil.")));
     }
     if bytes.len() > MAX_PDF {
-        return Err(AppError::new("pdf", "Deze pdf is groter dan 500 MB en is niet opgeslagen."));
+        return Err(AppError::new("pdf", tr("This PDF is larger than 500 MB and was not saved.", "Deze pdf is groter dan 500 MB en is niet opgeslagen.", "Bu PDF 500 MB'tan büyük olduğu için kaydedilmedi.")));
     }
     let hash = hex::encode(Sha256::digest(bytes));
     if let Some(existing) = store.find_by_hash(&hash) {
@@ -421,12 +445,12 @@ pub fn save_pdf(store: &Store, bytes: &[u8], name: &str, url: Option<&str>) -> R
     let id = new_id();
     let dir = store.begin(&id)?;
     let title = name.strip_suffix(".pdf").or(name.strip_suffix(".PDF")).unwrap_or(name).to_string();
-    let mut source = base_source(id, SourceKind::Pdf, if title.is_empty() { "Pdf".into() } else { title });
+    let mut source = base_source(id, SourceKind::Pdf, if title.is_empty() { tr("PDF", "Pdf", "PDF") } else { title });
     source.url = url.map(String::from);
     source.final_url = url.map(String::from);
     source.content_hash = Some(hash);
     source.text_ready = false;
-    source.completeness = Completeness::plain(CompletenessVerdict::Complete, "Het hele pdf-bestand is opgeslagen.");
+    source.completeness = Completeness::plain(CompletenessVerdict::Complete, tr("The whole PDF file was saved.", "Het hele pdf-bestand is opgeslagen.", "PDF dosyasının tamamı kaydedildi."));
     let result = std::fs::write(dir.join("original.pdf"), bytes).map_err(AppError::storage).and_then(|_| store.commit(&dir, &source));
     if result.is_err() {
         store.discard(&dir);
@@ -438,7 +462,7 @@ pub fn save_pdf(store: &Store, bytes: &[u8], name: &str, url: Option<&str>) -> R
 pub fn save_pdf_text(store: &Store, id: &str, title: Option<String>, page_count: u32, mut blocks: Vec<Block>) -> Result<Source, AppError> {
     let mut source = store.get(id)?;
     if source.kind != SourceKind::Pdf {
-        return Err(AppError::new("pdf", "Deze bron is geen pdf."));
+        return Err(AppError::new("pdf", tr("This source is not a PDF.", "Deze bron is geen pdf.", "Bu kaynak bir PDF değil.")));
     }
     if source.text_ready {
         return Ok(source);
@@ -454,7 +478,11 @@ pub fn save_pdf_text(store: &Store, id: &str, title: Option<String>, page_count:
     source.blocks = blocks;
     source.text_ready = true;
     if source.word_count == 0 {
-        source.warnings.push("Deze pdf heeft geen tekstlaag (waarschijnlijk een scan). De pagina's zijn te lezen, maar tekst selecteren werkt hier niet.".into());
+        source.warnings.push(tr(
+            "This PDF has no text layer (probably a scan). You can read the pages, but selecting text does not work here.",
+            "Deze pdf heeft geen tekstlaag (waarschijnlijk een scan). De pagina's zijn te lezen, maar tekst selecteren werkt hier niet.",
+            "Bu PDF'in metin katmanı yok (muhtemelen taranmış). Sayfalar okunabilir, ancak burada metin seçilemez.",
+        ));
     }
     store.update(&source)?;
     Ok(source)
@@ -497,7 +525,7 @@ pub fn split_paragraphs(text: &str) -> Vec<String> {
 pub fn import_text(store: &Store, title: Option<String>, url: Option<String>, text: &str) -> Result<Source, AppError> {
     let paragraphs = split_paragraphs(text);
     if paragraphs.is_empty() {
-        return Err(AppError::new("empty_text", "Er is geen tekst geplakt."));
+        return Err(AppError::new("empty_text", tr("No text was pasted.", "Er is geen tekst geplakt.", "Hiçbir metin yapıştırılmadı.")));
     }
     let title = title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()).unwrap_or_else(|| {
         let first = &paragraphs[0];
@@ -523,7 +551,7 @@ pub fn import_text(store: &Store, title: Option<String>, url: Option<String>, te
     let id = new_id();
     let dir = store.begin(&id)?;
     let mut source = base_source(id, SourceKind::Text, title);
-    source.completeness = Completeness::plain(CompletenessVerdict::Unknown, "Geplakte tekst: de app kan niet zien of dit het hele stuk is.");
+    source.completeness = Completeness::plain(CompletenessVerdict::Unknown, tr("Pasted text: the app cannot tell whether this is the whole piece.", "Geplakte tekst: de app kan niet zien of dit het hele stuk is.", "Yapıştırılan metin: uygulama bunun yazının tamamı olup olmadığını göremez."));
     source.url = url.map(|u| u.trim().to_string()).filter(|u| !u.is_empty());
     source.word_count = word_count(&blocks);
     source.blocks = blocks;

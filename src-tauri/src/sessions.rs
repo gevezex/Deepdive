@@ -144,13 +144,13 @@ fn check_platform() -> Result<(), AppError> {
     if major >= 14 {
         Ok(())
     } else {
-        Err(AppError::new("login_unsupported", "Inloggen op sites vraagt om macOS 14 of nieuwer."))
+        Err(AppError::new("login_unsupported", crate::i18n::tr("Signing in to sites requires macOS 14 or later.", "Inloggen op sites vraagt om macOS 14 of nieuwer.", "Sitelere giriş yapmak için macOS 14 veya üzeri gerekir.")))
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 fn check_platform() -> Result<(), AppError> {
-    Err(AppError::new("login_unsupported", "Inloggen op sites werkt nog alleen op macOS."))
+    Err(AppError::new("login_unsupported", crate::i18n::tr("Signing in to sites only works on macOS for now.", "Inloggen op sites werkt nog alleen op macOS.", "Sitelere giriş şimdilik yalnızca macOS'ta çalışıyor.")))
 }
 
 impl SiteSessions {
@@ -191,7 +191,7 @@ impl SiteSessions {
         let mut entries = self.entries.lock().unwrap();
         if let Some(e) = entries.iter().find(|e| e.site == site) {
             if e.wipe_pending {
-                return Err(AppError::new("session_busy", "De vorige sessie van deze site wordt nog gewist. Start de app opnieuw en probeer het dan nog eens."));
+                return Err(AppError::new("session_busy", crate::i18n::tr("The previous session for this site is still being cleared. Restart the app and then try again.", "De vorige sessie van deze site wordt nog gewist. Start de app opnieuw en probeer het dan nog eens.", "Bu sitenin önceki oturumu hâlâ siliniyor. Uygulamayı yeniden başlatıp tekrar deneyin.")));
             }
             return Ok(e.clone());
         }
@@ -219,7 +219,7 @@ impl SiteSessions {
 
     fn take_for_wipe(&self, site: &str) -> Result<Option<String>, AppError> {
         if self.busy.lock().unwrap().contains_key(site) {
-            return Err(AppError::new("session_busy", "Er wordt nu een pagina van deze site opgehaald. Probeer het zo nog eens."));
+            return Err(AppError::new("session_busy", crate::i18n::tr("A page from this site is being fetched right now. Please try again shortly.", "Er wordt nu een pagina van deze site opgehaald. Probeer het zo nog eens.", "Şu anda bu siteden bir sayfa alınıyor. Birazdan tekrar deneyin.")));
         }
         let mut entries = self.entries.lock().unwrap();
         let Some(e) = entries.iter_mut().find(|e| e.site == site) else { return Ok(None) };
@@ -252,13 +252,13 @@ async fn remove_store(app: &AppHandle, id: &str) -> Result<(), AppError> {
                 if !left.contains(&bytes) {
                     return Ok(());
                 }
-                last = "de opslag bestaat nog".into();
+                last = crate::i18n::tr("the storage still exists", "de opslag bestaat nog", "depolama hâlâ duruyor");
             }
             Err(e) => last = e.to_string(),
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
-    Err(AppError::new("session_busy", "De sessie kon nog niet worden gewist. Dat gebeurt automatisch bij de volgende start; tot die tijd gebruikt de app haar niet meer.").with_detail(last))
+    Err(AppError::new("session_busy", crate::i18n::tr("The session could not be cleared yet. That will happen automatically at the next start; until then the app no longer uses it.", "De sessie kon nog niet worden gewist. Dat gebeurt automatisch bij de volgende start; tot die tijd gebruikt de app haar niet meer.", "Oturum henüz silinemedi. Bu, bir sonraki açılışta otomatik olarak yapılacak; o zamana kadar uygulama oturumu kullanmıyor.")).with_detail(last))
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -317,8 +317,11 @@ async fn login_closed(app: AppHandle, site: String, store_id: String) {
 
 fn title_for(site: &str, url: &Url) -> String {
     let host = url.host_str().unwrap_or("");
-    let secure = if url.scheme() == "https" { "" } else { " (niet beveiligd)" };
-    format!("Inloggen bij {site} – je bent nu op {host}{secure}")
+    let secure = if url.scheme() == "https" { String::new() } else { crate::i18n::tr(" (not secure)", " (niet beveiligd)", " (güvenli değil)") };
+    crate::i18n::tr("Sign in to {site} – you are now on {host}{secure}", "Inloggen bij {site} – je bent nu op {host}{secure}", "{site} sitesine giriş – şu an {host} adresindesiniz{secure}")
+        .replace("{site}", site)
+        .replace("{host}", host)
+        .replace("{secure}", &secure)
 }
 
 /// Opent de site in een zichtbaar venster. De gebruiker logt daar zelf in; de app kijkt niet mee.

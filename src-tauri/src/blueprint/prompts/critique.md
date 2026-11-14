@@ -1,70 +1,72 @@
-OPDRACHT: maak laag 3 van de blauwdruk: de kritische laag. Hieronder staat de vastgestelde structuur van laag 1 en 2. Die verander je niet; je hangt je punten eraan op met de ids die daarin staan.
+TASK: make layer 3 of the blueprint: the critical layer. Below is the established structure of layers 1 and 2. You do not change it; you attach your points to it with the ids it contains.
 
-<structuur>
+<structure>
 {{STRUCTURE}}
-</structuur>
+</structure>
 
-Toets de redenering, niet de positie. Hanteer dezelfde strengheid, of je het standpunt nu deelt of niet en of het nu van links, rechts of niet-politiek komt. Vraag bij elk punt: zou een zorgvuldige lezer die het mét de auteur eens is dit ook erkennen?
+Test the reasoning, not the position. Apply the same rigour whether or not you share the view, and whether it comes from the left, the right or is not political. Ask of every point: would a careful reader who agrees with the author acknowledge this too?
 
-Er is geen quotum. Verzin geen gebreken. Een kloppend bewijs, een zuiver feitenbericht of een handleiding kan nul punten opleveren, en dat is een goede uitkomst: zeg het dan. Noem hooguit de acht belangrijkste punten; bij een kort stuk zijn dat er meestal veel minder. Een punt dat alleen zegt dat de auteur iets meer had kunnen uitwerken, of dat alleen voor elke tekst zou gelden, laat je weg.
+There is no quota. Do not invent flaws. A sound proof, a plain factual report or a manual can yield zero points, and that is a good outcome: say so. Name at most the eight most important points; for a short piece there are usually far fewer. Leave out a point that only says the author could have elaborated more, or that would apply to any text.
 
-De onderdelen (category):
-- assumption: waar gaat de auteur van uit, ook als het nergens staat?
-- leap: waar volgt de conclusie niet uit wat ervoor staat? Hangt meestal aan een relatie (rN).
-- gap: waar ontbreekt een stap, of spreekt de tekst zichzelf tegen?
-- evidence: hoe sterk is het bewijs voor een claim? Noem dit alleen als het bewijs opvallend zwak is, of opvallend sterk en belangrijk voor het betoog. Kijk bij cijfers en onderzoek naar de steekproef, de meting en wie het betaalde of er belang bij heeft. Vul `evidenceKind` in: study, data, expert, anecdote of assertion.
-- missing: welke tegenargumenten, alternatieve verklaringen, belangen of partijen blijven buiten beeld, terwijl ze ertoe doen?
-- headline_vs_content: gaan de kop of de samenvatting verder dan de tekst? Vergelijk cijfers uit een samenvatting met de tabellen en resultaten waar ze vandaan komen.
+The parts (category):
+- assumption: what does the author take for granted, even if it is not written anywhere?
+- leap: where does the conclusion not follow from what comes before? Usually attached to a relation (rN).
+- gap: where is a step missing, or does the text contradict itself?
+- evidence: how strong is the evidence for a claim? Only mention this if the evidence is strikingly weak, or strikingly strong and important for the argument. With figures and research, look at the sample, the measurement and who paid for it or has an interest in it. Fill in `evidenceKind`: study, data, expert, anecdote or assertion.
+- missing: which counterarguments, alternative explanations, interests or parties stay out of view while they matter?
+- headline_vs_content: do the headline or the summary go further than the text? Compare figures from a summary with the tables and results they come from.
 
-Elk punt is een minpunt of een pluspunt (`polarity`):
-- minus: een zwakte in het betoog. De meeste punten zijn dit.
-- plus: iets dat het betoog opvallend sterker maakt, zoals sterk bewijs op de plek waar het ertoe doet, of een auteur die een zwakte zelf eerlijk benoemt. Geen beleefdheid: alleen als een zorgvuldige lezer het ook opvallend zou vinden.
+Every point is a minus or a plus (`polarity`):
+- minus: a weakness in the argument. Most points are this.
+- plus: something that makes the argument strikingly stronger, such as strong evidence where it matters, or an author who honestly names a weakness. No politeness: only if a careful reader would find it striking too.
 
-Begrippen zijn geen kritiek en horen niet in `points`. Zet ze in de aparte hulplijst `terms`: alleen begrippen die een geïnteresseerde leek echt nodig heeft om het stuk te volgen en die de tekst niet zelf uitlegt. Eén regel per begrip, met een korte uitleg en de alinea waar het voor het eerst voorkomt. Een lege lijst is prima.
+Terms are not criticism and do not belong in `points`. Put them in the separate helper list `terms`: only terms that an interested layperson really needs to follow the piece and that the text does not explain itself. One line per term, with a short explanation and the paragraph where it first occurs. An empty list is fine.
 
-Waar je op let, per soort tekst:
-- news: wat is feit en wat is duiding? Wie komt aan het woord en wie niet? Welke achtergrond moet je kennen? Gaat de kop verder dan het artikel? Een nieuwsbericht hoeft zijn feiten niet te bewijzen: dat de bron een woordvoerder is, is alleen een punt als het ertoe doet.
-- opinion: wat is de stelling en wat zijn de argumenten? Welke aannames blijven onuitgesproken? Wat zou de tegenpartij zeggen?
-- research: wat is onderzocht en hoe? Hoe sterk is het bewijs en wat mag je er níet uit concluderen?
-- memoir: een persoonlijk verhaal hoeft niets te bewijzen, dus evidence is daar not_applicable. Let op wat ervaring is en wat generalisatie: gaat de les verder dan de ervaring? Wat wordt weggelaten?
-- essay, explainer, reference, review: is de uitleg of het oordeel navolgbaar? Wat wordt als vanzelfsprekend gepresenteerd? Bij reference en instructies is meestal alleen wat ontbreekt relevant.
+What to look for, per kind of text:
+- news: what is fact and what is interpretation? Who gets to speak and who does not? What background do you need? Does the headline go further than the article? A news report does not have to prove its facts: that the source is a spokesperson is only a point if it matters.
+- opinion: what is the thesis and what are the arguments? Which assumptions remain unspoken? What would the other side say?
+- research: what was studied and how? How strong is the evidence and what may you *not* conclude from it?
+- memoir: a personal story does not have to prove anything, so evidence is not_applicable there. Watch what is experience and what is generalisation: does the lesson go further than the experience? What is left out?
+- essay, explainer, reference, review: can the explanation or judgement be followed? What is presented as self-evident? For reference and instructions usually only what is missing is relevant.
 
-Scheid wat er staat van wat jij afleidt:
-- origin "stated": de tekst spreekt het punt zelf uit (de auteur noemt een eigen aanname of beperking), of het volgt direct uit twee letterlijke passages (de samenvatting zegt 40, de tabel 14). Dan is minstens één letterlijk citaat verplicht.
-- origin "inferred": jouw interpretatie. Dat iets niet is onderbouwd, dat een stap ontbreekt of dat iets buiten beeld blijft, is altijd inferred: de tekst zegt dat immers niet zelf. Geef aan op welke alinea's je het baseert. Een citaat mag, en helpt de lezer controleren.
+Separate what is written from what you infer:
+- origin "stated": the text itself expresses the point (the author names an own assumption or limitation), or it follows directly from two literal passages (the summary says 40, the table 14). Then at least one literal quote is required.
+- origin "inferred": your interpretation. That something is not substantiated, that a step is missing or that something stays out of view is always inferred: the text does not say so itself. State which paragraphs you base it on. A quote is allowed and helps the reader check.
 
-Zekerheid (`certainty`) volgens deze vaste maat. Kies het laagste niveau waaraan je zeker voldoet:
-- high: iedereen kan het in de tekst nagaan zonder interpretatie. Je kunt de passages aanwijzen die het punt dragen, bijvoorbeeld twee cijfers die elkaar tegenspreken, of een conclusie over een groep die het onderzoek niet heeft gemeten. Ook wie het met de auteur eens is, zou het toegeven.
-- medium: de tekst wijst die kant op, maar het hangt af van hoe je een passage leest, of van een redelijke veronderstelling die je zelf toevoegt. Iemand die het met de auteur eens is, kan het betwisten. Dit is het gewone niveau voor een afgeleid punt.
-- low: een vermoeden. Het hangt af van kennis buiten de tekst, of de tekst geeft er te weinig houvast voor. Noem het alleen als het voor de lezer de moeite waard is om na te gaan.
+Certainty (`certainty`) on this fixed scale. Choose the lowest level you are sure to meet:
+- high: anyone can check it in the text without interpretation. You can point to the passages that carry the point, for example two figures that contradict each other, or a conclusion about a group the study did not measure. Even someone who agrees with the author would concede it.
+- medium: the text points that way, but it depends on how you read a passage, or on a reasonable assumption you add yourself. Someone who agrees with the author can dispute it. This is the normal level for an inferred point.
+- low: a suspicion. It depends on knowledge outside the text, or the text gives too little to go on. Only mention it if it is worth the reader's while to check.
 
-Verwijzingen (`paragraphs`): wijs de plek aan waar het punt het duidelijkst te zien is, in hooguit vijf alinea's. Geldt een punt voor het hele stuk, bijvoorbeeld iets dat overal ontbreekt, wijs dan alleen de alinea's aan waar het het meest opvalt. Verwijs nooit naar een heel stuk of een lange reeks alinea's: de lezer moet de plek kunnen nazoeken.
+References (`paragraphs`): point to the place where the point is most clearly visible, in at most five paragraphs. If a point applies to the whole piece, for example something missing everywhere, point only to the paragraphs where it stands out most. Never refer to a whole piece or a long series of paragraphs: the reader must be able to look the place up.
 
-Geef precies dit object:
+Give exactly this object:
 
 {
   "points": [
     {
       "id": "k1",
       "category": ...,
-      "polarity": "minus of plus",
-      "origin": "stated of inferred",
+      "polarity": "minus or plus",
+      "origin": "stated or inferred",
       "certainty": ...,
-      "anchor": "id van het blok (bN) of de relatie (rN) waar dit aan hangt",
-      "claim": "het punt in één zin",
-      "explanation": "waarom, in maximaal twee zinnen",
+      "anchor": "id of the block (bN) or the relation (rN) this is attached to",
+      "claim": "the point in one sentence",
+      "explanation": "why, in at most two sentences",
       "paragraphs": [[10, 12]],
-      "quotes": [ { "paragraph": 11, "text": "letterlijk" } ],
+      "quotes": [ { "paragraph": 11, "text": "literal" } ],
       "evidenceKind": null
     }
   ],
   "terms": [
-    { "term": "het begrip", "explanation": "wat het betekent, in één korte zin", "paragraphs": [[3, 3]] }
+    { "term": "the term", "explanation": "what it means, in one short sentence", "paragraphs": [[3, 3]] }
   ],
   "checked": [
-    { "category": "assumption", "result": "found, nothing_found of not_applicable", "note": null of "korte toelichting" }
+    { "category": "assumption", "result": "found, nothing_found or not_applicable", "note": null or "short explanation" }
   ],
-  "overall": "je eerlijke oordeel in één of twee zinnen: hoe stevig staat dit stuk, gemeten naar wat het probeert te doen?"
+  "overall": "your honest verdict in one or two sentences: how solid is this piece, measured against what it tries to do?"
 }
 
-`checked` noemt alle zes onderdelen hierboven precies één keer. Gebruik found alleen als er een punt in die categorie staat, en nothing_found als je hebt gezocht en niets vond.
+`checked` names all six parts above exactly once. Use found only if there is a point in that category, and nothing_found if you searched and found nothing.
+
+Write every descriptive text (claim, explanation, term explanation, note, overall) in {{LANGUAGE}}. A term itself stays as it appears in the source.

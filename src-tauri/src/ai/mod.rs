@@ -28,7 +28,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const LIST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Een lokaal model kan lang laden voor het eerste woord komt, dus deze grens is ruim.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
-const CHECK_PROMPT: &str = "Antwoord met precies één woord: werkt";
+const CHECK_PROMPT: &str = "Reply with exactly one word: works";
 const CHECK_MAX_TOKENS: u32 = 32;
 const CHECK_SAMPLE_CHARS: usize = 40;
 /// Een ChatGPT-abonnement kan tijdelijk niet beschikbaar zijn; daarna krijgt de lezer een melding.
@@ -130,7 +130,7 @@ pub fn check_key_transport(url: &Url) -> Result<(), AppError> {
     if url.scheme() == "https" || is_loopback(url) {
         return Ok(());
     }
-    Err(AppError::new("insecure_key", "Een API-sleutel wordt alleen via https verstuurd. Gebruik een https-adres, of haal de sleutel weg als deze server er geen nodig heeft."))
+    Err(AppError::new("insecure_key", crate::i18n::tr("An API key is only sent over https. Use an https address, or remove the key if this server does not need one.", "Een API-sleutel wordt alleen via https verstuurd. Gebruik een https-adres, of haal de sleutel weg als deze server er geen nodig heeft.", "API anahtarı yalnızca https üzerinden gönderilir. Bir https adresi kullanın ya da bu sunucu anahtar gerektirmiyorsa anahtarı kaldırın.")))
 }
 
 /// Haalt alvast op wat een aanroep nodig heeft. Een verlopen login komt zo meteen aan het licht, en de wachttijd op een
@@ -230,14 +230,14 @@ impl Decoder {
 pub fn check_capabilities(target: &Target, request: &ChatRequest) -> Result<(), AppError> {
     let parts = || request.messages.iter().flat_map(|m| &m.parts);
     if target.supports_images == Some(false) && parts().any(|p| matches!(p, Part::Image { .. })) {
-        return Err(AppError::new("model_no_images", format!("Model \"{}\" kan geen afbeeldingen lezen. Kies een ander model bovenaan dit paneel.", target.model)));
+        return Err(AppError::new("model_no_images", crate::i18n::tr("Model \"{model}\" cannot read images. Choose another model at the top of this panel.", "Model \"{model}\" kan geen afbeeldingen lezen. Kies een ander model bovenaan dit paneel.", "\"{model}\" modeli görselleri okuyamıyor. Bu panelin üst kısmından başka bir model seçin.").replace("{model}", &target.model)));
     }
     if let Some(limit) = target.context_tokens {
         let chars = request.system.as_deref().map_or(0, str::len)
             + parts().map(|p| if let Part::Text(t) = p { t.len() } else { 0 }).sum::<usize>();
         // Ruwe schatting: ongeveer vier tekens per token.
         if chars / 4 > limit as usize {
-            return Err(AppError::new("context_too_large", format!("Dit is te veel tekst voor model \"{}\", dat ongeveer {limit} tokens aankan. Kies een model met meer context of pas de waarde aan bij Providers.", target.model)));
+            return Err(AppError::new("context_too_large", crate::i18n::tr("This is too much text for model \"{model}\", which handles about {limit} tokens. Choose a model with more context, or adjust the value under Providers.", "Dit is te veel tekst voor model \"{model}\", dat ongeveer {limit} tokens aankan. Kies een model met meer context of pas de waarde aan bij Providers.", "Bu metin, yaklaşık {limit} token işleyebilen \"{model}\" modeli için fazla uzun. Daha geniş bağlamlı bir model seçin ya da değeri Sağlayıcılar bölümünden ayarlayın.").replace("{model}", &target.model).replace("{limit}", &limit.to_string())));
         }
     }
     Ok(())
@@ -330,7 +330,7 @@ pub async fn stream_chat(target: &Target, request: &ChatRequest, mut on_event: i
             let _ = emit(vec![done]);
             Ok(())
         }
-        None => Err(errors::stream_cut("De verbinding ging dicht voordat het antwoord af was.", &ctx)),
+        None => Err(errors::stream_cut(&crate::i18n::tr("The connection closed before the answer was complete.", "De verbinding ging dicht voordat het antwoord af was.", "Yanıt tamamlanmadan bağlantı kapandı."), &ctx)),
     }
 }
 

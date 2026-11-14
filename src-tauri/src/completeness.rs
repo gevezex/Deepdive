@@ -3,6 +3,7 @@
 //! De pagina kan die signalen beïnvloeden, dus dit is een hulpmiddel en geen beveiliging.
 
 use crate::engine::{PageSignals, RenderedPage};
+use crate::i18n::{tr, ui, Lang};
 use crate::model::{Completeness, CompletenessSignal, CompletenessVerdict};
 use regex::Regex;
 use std::sync::OnceLock;
@@ -31,6 +32,9 @@ const GATE_PHRASES: &[&str] = &[
     "get full access", "unlock this article", "unlock this story", "start your free trial", "become a member to",
     "create an account to read", "create a free account to", "you have reached your limit", "you've reached your limit",
     "free articles remaining", "free article remaining",
+    // Turks
+    "okumaya devam etmek için", "devamını okumak için", "haberin devamını okumak için", "abonelere özel", "sadece abonelere",
+    "zaten abone misiniz", "zaten abone misin",
 ];
 
 /// Staan alleen op een artikel dat je niet kunt lezen. Daarna volgen vaak nog bronnen en auteurs, dus de
@@ -92,13 +96,28 @@ fn weigh_gate(tally: &mut Tally, s: &PageSignals) {
         }
     }
     if let Some((_, text)) = found.first() {
-        tally.add("gate_text", 4, format!("Op de pagina staat: \"{}\"", snippet(text)));
+        let quote = snippet(text);
+        tally.add("gate_text", 4, match ui() {
+            Lang::En => format!("The page says: \"{quote}\""),
+            Lang::Nl => format!("Op de pagina staat: \"{quote}\""),
+            Lang::Tr => format!("Sayfada şu yazıyor: \"{quote}\""),
+        });
     }
     if found.len() > 1 {
-        tally.add("gate_text_more", 1, format!("Er staan {} van zulke teksten op de pagina.", found.len()));
+        let n = found.len();
+        tally.add("gate_text_more", 1, match ui() {
+            Lang::En => format!("The page has {n} texts like this."),
+            Lang::Nl => format!("Er staan {n} van zulke teksten op de pagina."),
+            Lang::Tr => format!("Sayfada bu türden {n} metin var."),
+        });
     }
     if let Some(name) = s.gate_elements.first() {
-        tally.add("gate_element", 2, format!("Op de pagina staat een afsluitend blok ({}).", snippet(name)));
+        let name = snippet(name);
+        tally.add("gate_element", 2, match ui() {
+            Lang::En => format!("The page has a blocking element ({name})."),
+            Lang::Nl => format!("Op de pagina staat een afsluitend blok ({name})."),
+            Lang::Tr => format!("Sayfada içeriği kapatan bir blok var ({name})."),
+        });
     }
 }
 
@@ -121,44 +140,70 @@ pub fn judge(page: &RenderedPage, has_session: bool) -> Completeness {
         let trustworthy = claimed >= 600 || (!locked && !gated);
         if words as f32 >= claimed as f32 * 0.8 && trustworthy {
             length_confirmed = true;
-            tally.add("length_matches", -5, format!("De pagina geeft zelf {claimed} woorden op en er zijn er {words} gevonden."));
+            tally.add("length_matches", -5, match ui() {
+                Lang::En => format!("The page itself states {claimed} words, and {words} were found."),
+                Lang::Nl => format!("De pagina geeft zelf {claimed} woorden op en er zijn er {words} gevonden."),
+                Lang::Tr => format!("Sayfa kendisi {claimed} kelime belirtiyor ve {words} kelime bulundu."),
+            });
         } else if claimed as f32 >= words as f32 * 1.6 {
-            tally.add("length_short", 4, format!("De pagina geeft zelf {claimed} woorden op, maar er zijn er maar {words} gevonden."));
+            tally.add("length_short", 4, match ui() {
+                Lang::En => format!("The page itself states {claimed} words, but only {words} were found."),
+                Lang::Nl => format!("De pagina geeft zelf {claimed} woorden op, maar er zijn er maar {words} gevonden."),
+                Lang::Tr => format!("Sayfa kendisi {claimed} kelime belirtiyor, ancak yalnızca {words} kelime bulundu."),
+            });
         }
     }
 
     if locked && !length_confirmed {
-        tally.add("not_free", if has_session { 1 } else { 2 }, "De pagina meldt zelf dat het stuk niet vrij toegankelijk is.".into());
+        tally.add("not_free", if has_session { 1 } else { 2 }, tr("The page itself says the piece is not freely accessible.", "De pagina meldt zelf dat het stuk niet vrij toegankelijk is.", "Sayfa, yazının serbestçe erişilebilir olmadığını kendisi belirtiyor."));
     } else if !locked && s.ld_free.iter().any(|f| *f) {
-        tally.add("free", -2, "De pagina meldt zelf dat het stuk gratis is.".into());
+        tally.add("free", -2, tr("The page itself says the piece is free.", "De pagina meldt zelf dat het stuk gratis is.", "Sayfa, yazının ücretsiz olduğunu kendisi belirtiyor."));
     }
 
     if s.password_field && words < 400 {
-        tally.add("password_field", 3, "Op de pagina staat een inlogformulier.".into());
+        tally.add("password_field", 3, tr("The page contains a login form.", "Op de pagina staat een inlogformulier.", "Sayfada bir giriş formu var."));
     }
     if let Ok(final_url) = Url::parse(&page.final_url) {
         if login_path().is_match(final_url.path()) && words < 400 {
-            tally.add("login_redirect", 4, format!("De site stuurde door naar een inlogpagina ({}).", final_url.host_str().unwrap_or("")));
+            let host = final_url.host_str().unwrap_or("");
+            tally.add("login_redirect", 4, match ui() {
+                Lang::En => format!("The site redirected to a login page ({host})."),
+                Lang::Nl => format!("De site stuurde door naar een inlogpagina ({host})."),
+                Lang::Tr => format!("Site bir giriş sayfasına yönlendirdi ({host})."),
+            });
         }
     }
     if s.clipped {
-        tally.add("clipped", 2, "De tekst wordt op de pagina afgekapt.".into());
+        tally.add("clipped", 2, tr("The text is cut off on the page.", "De tekst wordt op de pagina afgekapt.", "Metin sayfada kesiliyor."));
     }
     if s.fade {
-        tally.add("fade", 1, "De tekst loopt onderaan weg in een vervaging.".into());
+        tally.add("fade", 1, tr("The text fades out at the bottom.", "De tekst loopt onderaan weg in een vervaging.", "Metin altta solarak kayboluyor."));
     }
     match ending(page) {
-        Some(Ending::Dots) => tally.add("ends_with_dots", 2, "De tekst eindigt met puntjes.".into()),
-        Some(Ending::Open) => tally.add("ends_mid_sentence", 1, "De tekst stopt midden in een zin.".into()),
+        Some(Ending::Dots) => tally.add("ends_with_dots", 2, tr("The text ends with an ellipsis.", "De tekst eindigt met puntjes.", "Metin üç noktayla bitiyor.")),
+        Some(Ending::Open) => tally.add("ends_mid_sentence", 1, tr("The text stops mid-sentence.", "De tekst stopt midden in een zin.", "Metin bir cümlenin ortasında bitiyor.")),
         None => {}
     }
     if s.page_words > 0 && words < 500 && (words as f32) < s.page_words as f32 * 0.2 {
-        tally.add("small_share", 1, format!("Het stuk is maar een klein deel van de pagina ({words} van {} woorden).", s.page_words));
+        let page_words = s.page_words;
+        tally.add("small_share", 1, match ui() {
+            Lang::En => format!("The piece is only a small part of the page ({words} of {page_words} words)."),
+            Lang::Nl => format!("Het stuk is maar een klein deel van de pagina ({words} van {page_words} woorden)."),
+            Lang::Tr => format!("Yazı, sayfanın yalnızca küçük bir kısmı ({page_words} kelimenin {words} kelimesi)."),
+        });
     }
     if words >= 1200 {
-        tally.add("long_text", -3, format!("Het stuk is lang ({words} woorden)."));
+        tally.add("long_text", -3, match ui() {
+            Lang::En => format!("The piece is long ({words} words)."),
+            Lang::Nl => format!("Het stuk is lang ({words} woorden)."),
+            Lang::Tr => format!("Yazı uzun ({words} kelime)."),
+        });
     } else if words >= 600 {
-        tally.add("fair_length", -1, format!("Het stuk heeft een behoorlijke lengte ({words} woorden)."));
+        tally.add("fair_length", -1, match ui() {
+            Lang::En => format!("The piece has a reasonable length ({words} words)."),
+            Lang::Nl => format!("Het stuk heeft een behoorlijke lengte ({words} woorden)."),
+            Lang::Tr => format!("Yazı makul bir uzunlukta ({words} kelime)."),
+        });
     }
 
     let verdict = match tally.score {
@@ -175,12 +220,23 @@ fn reason_for(verdict: CompletenessVerdict, signals: &[CompletenessSignal], has_
     positive.sort_by_key(|s| -s.weight);
     let top = positive.iter().take(2).map(|s| s.detail.as_str()).collect::<Vec<_>>().join(" ");
     match verdict {
-        CompletenessVerdict::LikelyIncomplete if has_session => format!("{top} Je bent op deze site ingelogd, maar de sessie is misschien verlopen of je abonnement geeft geen toegang tot dit stuk."),
+        CompletenessVerdict::LikelyIncomplete if has_session => {
+            let more = tr(
+                "You are logged in to this site, but the session may have expired or your subscription does not give access to this piece.",
+                "Je bent op deze site ingelogd, maar de sessie is misschien verlopen of je abonnement geeft geen toegang tot dit stuk.",
+                "Bu sitede oturum açmışsınız, ancak oturumun süresi dolmuş olabilir ya da aboneliğiniz bu yazıya erişim sağlamıyor olabilir.",
+            );
+            format!("{top} {more}")
+        }
         CompletenessVerdict::LikelyIncomplete => top,
-        CompletenessVerdict::Unknown => format!("Een enkele zwakke aanwijzing: {top}"),
+        CompletenessVerdict::Unknown => match ui() {
+            Lang::En => format!("A single weak hint: {top}"),
+            Lang::Nl => format!("Een enkele zwakke aanwijzing: {top}"),
+            Lang::Tr => format!("Tek bir zayıf işaret: {top}"),
+        },
         CompletenessVerdict::Complete => match signals.iter().find(|s| s.key == "length_matches") {
             Some(s) => s.detail.clone(),
-            None => "Er zijn geen aanwijzingen gevonden dat er tekst ontbreekt.".into(),
+            None => tr("No signs were found that any text is missing.", "Er zijn geen aanwijzingen gevonden dat er tekst ontbreekt.", "Metnin eksik olduğuna dair bir işaret bulunamadı."),
         },
     }
 }
@@ -231,7 +287,7 @@ mod tests {
         let s = PageSignals { gate_candidates: vec![gate("Log in om verder te lezen", "after", 0)], ..Default::default() };
         let j = judge(&page(150, "Het begin van het stuk.", s), false);
         assert_eq!(j.verdict, CompletenessVerdict::LikelyIncomplete);
-        assert!(j.reason.contains("Log in om verder te lezen"), "{}", j.reason);
+        assert!(j.reason.starts_with("The page says: \"Log in om verder te lezen"), "{}", j.reason);
     }
 
     #[test]

@@ -6,6 +6,7 @@ import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
 import { frameLoading, initReading, jumpInFrame, pdfReady, setReadingSource } from "./reading";
 import { initSites, refreshSites } from "./sites";
+import { formatDate, formatNumber, initLanguage, isLang, lang, LANGUAGES, onLanguageChange, plural, setLanguage, t } from "./i18n";
 import type { PdfViewHandle } from "./pdf";
 import type { AppError, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
 
@@ -37,12 +38,58 @@ function remembered(): string | null {
   try { return localStorage.getItem(LAST_KEY); } catch { return null; }
 }
 
-/** De bron voor alles wat erbij hoort: blauwdruk, vragen en markeringen. */
+/** De bron voor alles wat erbij hoort: blauwdruk, vragen, markeringen en de taal van het model. */
 function setSource(source: Source | null) {
+  renderAiLanguage(source);
   void setBlueprintSource(source);
   void setAnswersSource(source);
   void setReadingSource(source);
 }
+
+// ---------- talen ----------
+
+const aiLanguage = $<HTMLSelectElement>("ai-language");
+
+/** The flag next to the model: the language the model writes in for this article. */
+function renderAiLanguage(source: Source | null) {
+  aiLanguage.replaceChildren(...LANGUAGES.map((l) => new Option(`${l.flag} ${l.name}`, l.code)));
+  aiLanguage.disabled = !source;
+  aiLanguage.value = source?.aiLanguage && isLang(source.aiLanguage) ? source.aiLanguage : lang();
+}
+
+aiLanguage.addEventListener("change", async () => {
+  const source = current;
+  if (!source || !isLang(aiLanguage.value)) return;
+  try {
+    const saved = await invoke<Source>("set_ai_language", { id: source.id, language: aiLanguage.value });
+    if (current?.id !== saved.id) return;
+    current = saved;
+    setSource(saved);
+  } catch (err) {
+    showError(err);
+    renderAiLanguage(current);
+  }
+});
+
+function initSettings() {
+  const dialog = $<HTMLDialogElement>("settings-dialog");
+  const select = $<HTMLSelectElement>("settings-language");
+  select.replaceChildren(...LANGUAGES.map((l) => new Option(`${l.flag} ${l.name}`, l.code)));
+  $("settings-open").addEventListener("click", () => {
+    select.value = lang();
+    dialog.showModal();
+  });
+  $("settings-close").addEventListener("click", () => dialog.close());
+  select.addEventListener("change", () => {
+    if (isLang(select.value)) void setLanguage(select.value);
+  });
+}
+
+onLanguageChange(() => {
+  renderAiLanguage(current);
+  if (current) renderStatus(current);
+  void refreshList().catch(() => {});
+});
 
 // ---------- meldingen en status ----------
 
@@ -67,7 +114,7 @@ function showError(err: unknown, pasteUrl?: string) {
 
 function normalizeError(err: unknown): AppError {
   if (err && typeof err === "object" && "message" in err) return err as AppError;
-  return { kind: "unknown", message: "Er ging iets mis. Probeer het opnieuw.", detail: String(err) };
+  return { kind: "unknown", message: t("common.genericError"), detail: String(err) };
 }
 
 function clearError() {
@@ -83,13 +130,12 @@ function setBusy(text: string | null) {
 function renderStatus(source: Source | null) {
   $("status").hidden = !source;
   if (!source) return;
-  const date = new Date(source.capturedAt).toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "short" });
   const parts = [
-    source.kind === "web" ? "Website" : source.kind === "pdf" ? "Pdf" : "Geplakte tekst",
-    source.pageCount ? `${source.pageCount} pagina's` : null,
-    `${source.blocks.length} alinea's`,
-    `${source.wordCount.toLocaleString("nl-NL")} woorden`,
-    `vastgelegd ${date}`,
+    t(`app.kind.${source.kind}`),
+    source.pageCount ? plural(source.pageCount, "app.pages.one", "app.pages.other") : null,
+    plural(source.blocks.length, "app.paragraphs.one", "app.paragraphs.other"),
+    plural(source.wordCount, "app.words.one", "app.words.other"),
+    t("app.capturedAt", { date: formatDate(source.capturedAt) }),
   ];
   $("status-text").textContent = parts.filter(Boolean).join(" · ");
   $("status-text").title = source.finalUrl ?? source.url ?? "";
@@ -97,7 +143,7 @@ function renderStatus(source: Source | null) {
   $("refresh").hidden = !source.url || source.kind === "text";
   const hide = $("hide-floating");
   hide.hidden = source.kind !== "web";
-  hide.textContent = source.hideFloating ? "Popup terugzetten" : "Popup weghalen";
+  hide.textContent = t(source.hideFloating ? "app.showFloating" : "app.hideFloating");
 }
 
 // ---------- melding boven de kopie ----------
@@ -133,16 +179,16 @@ function renderSourceNotice(source: Source) {
   clearNotice();
   if (source.supersededBy) {
     const newest = source.supersededBy;
-    setNotice("Dit is een oudere kopie.", "Er is een nieuwere kopie van dit stuk.", [{ label: "Naar de nieuwste", primary: true, run: () => void openById(newest) }]);
+    setNotice(t("app.olderCopyTitle"), t("app.olderCopyText"), [{ label: t("app.toNewest"), primary: true, run: () => void openById(newest) }]);
     return;
   }
   const c = source.completeness;
   if (c.verdict !== "likely_incomplete" || c.acceptedByUser) return;
   const url = source.url ?? source.finalUrl;
-  setNotice("Dit stuk is waarschijnlijk onvolledig.", c.reason, [
-    ...(url ? [{ label: "Inloggen", primary: true, run: () => void beginLogin(url, source) }] : []),
+  setNotice(t("app.incompleteTitle"), c.reason, [
+    ...(url ? [{ label: t("app.logIn"), primary: true, run: () => void beginLogin(url, source) }] : []),
     {
-      label: "Toch gebruiken",
+      label: t("app.useAnyway"),
       run: async () => {
         try {
           const saved = await invoke<Source>("accept_incomplete", { id: source.id });
@@ -182,7 +228,7 @@ async function beginLogin(url: string, source: Source | null) {
     const session = await invoke<SiteSession>("site_login_open", { url });
     loginSite = session.site;
     loginAfter = again;
-    setNotice(`Log in bij ${session.site} in het venster dat net is geopend.`, "De app ziet je wachtwoord niet. Ben je klaar, dan haalt de app het stuk opnieuw op.", [{ label: "Opnieuw ophalen", primary: true, run: again }]);
+    setNotice(t("app.loginTitle", { site: session.site }), t("app.loginText"), [{ label: t("app.refetch"), primary: true, run: again }]);
     refreshSites();
   } catch (err) {
     showError(err);
@@ -190,7 +236,7 @@ async function beginLogin(url: string, source: Source | null) {
 }
 
 function words(n: number) {
-  return n.toLocaleString("nl-NL");
+  return formatNumber(n);
 }
 
 async function refetch(source: Source) {
@@ -201,31 +247,31 @@ async function refetch(source: Source) {
     loginSite = null;
     loginAfter = null;
   }
-  setBusy("Er wordt een nieuwe kopie gemaakt. De huidige kopie blijft bewaard tot dat is gelukt…");
+  setBusy(t("app.refetching"));
   try {
     const result = await invoke<RefetchOutcome>("refetch_source", { id: source.id });
     if (result.status === "replaced") {
       await show(result.current);
       const previous = result.current.previousId;
       const c = result.current.completeness;
-      const title = c.verdict === "likely_incomplete" ? "Nieuwe kopie gemaakt, maar het stuk lijkt nog steeds onvolledig." : "Nieuwe kopie gemaakt.";
-      const detail = `${words(result.oldWords)} → ${words(result.newWords)} woorden. De vorige kopie blijft bewaard.`;
+      const title = t(c.verdict === "likely_incomplete" ? "app.newCopyStillIncomplete" : "app.newCopy");
+      const detail = t("app.newCopyDetail", { old: words(result.oldWords), new: words(result.newWords) });
       setNotice(title, c.verdict === "likely_incomplete" ? `${c.reason} ${detail}` : detail, [
-        ...(previous ? [{ label: "Vorige kopie", run: () => void openById(previous) }] : []),
-        ...(c.verdict === "likely_incomplete" && result.current.url ? [{ label: "Inloggen", primary: true, run: () => void beginLogin(result.current.url!, result.current) }] : []),
+        ...(previous ? [{ label: t("app.previousCopy"), run: () => void openById(previous) }] : []),
+        ...(c.verdict === "likely_incomplete" && result.current.url ? [{ label: t("app.logIn"), primary: true, run: () => void beginLogin(result.current.url!, result.current) }] : []),
       ]);
     } else if (result.status === "kept_old" && result.candidateId) {
       const candidate = result.candidateId;
       setNotice(
-        "Je kopie is niet gewijzigd.",
-        `De nieuwe poging lijkt minder volledig (${words(result.oldWords)} → ${words(result.newWords)} woorden). Misschien is je sessie verlopen.`,
+        t("app.copyUnchangedTitle"),
+        t("app.copyUnchangedText", { old: words(result.oldWords), new: words(result.newWords) }),
         [
-          { label: "Oude houden", primary: true, run: () => void invoke("discard_candidate", { id: source.id, candidateId: candidate }).then(clearNotice, showError) },
-          { label: "Toch de nieuwe", run: () => void invoke<Source>("adopt_candidate", { id: source.id, candidateId: candidate }).then(show, showError) },
+          { label: t("app.keepOld"), primary: true, run: () => void invoke("discard_candidate", { id: source.id, candidateId: candidate }).then(clearNotice, showError) },
+          { label: t("app.takeNew"), run: () => void invoke<Source>("adopt_candidate", { id: source.id, candidateId: candidate }).then(show, showError) },
         ],
       );
     } else {
-      setNotice("Geen verschil.", "Het opgehaalde bestand is hetzelfde als je kopie.");
+      setNotice(t("app.noDifferenceTitle"), t("app.noDifferenceText"));
     }
   } catch (err) {
     showError(err, source.url ?? undefined);
@@ -242,15 +288,15 @@ void listen<LoginClosed>("site-login-closed", ({ payload }) => {
   loginSite = null;
   loginAfter = null;
   if (!payload.hasSession) {
-    setNotice("Er is geen sessie bewaard.", "Het inlogvenster is gesloten en de site heeft niets opgeslagen.");
+    setNotice(t("app.noSessionTitle"), t("app.noSessionText"));
     return;
   }
-  setNotice("Het inlogvenster is gesloten.", "Haal het stuk opnieuw op om een kopie te maken met je sessie. De huidige kopie blijft bewaard tot dat is gelukt.", again ? [{ label: "Opnieuw ophalen", primary: true, run: again }] : []);
+  setNotice(t("app.loginClosedTitle"), t("app.loginClosedText"), again ? [{ label: t("app.refetch"), primary: true, run: again }] : []);
 });
 
 async function refreshList() {
   const sources = await invoke<SourceSummary[]>("list_sources");
-  sourceList.replaceChildren(new Option(sources.length ? `Eerder geopend (${sources.length})` : "Nog geen bronnen", ""));
+  sourceList.replaceChildren(new Option(sources.length ? t("app.previouslyOpened", { n: sources.length }) : t("app.noSources"), ""));
   for (const s of sources) sourceList.add(new Option(s.title, s.id));
   sourceList.value = current && sources.some((s) => s.id === current!.id) ? current.id : "";
 }
@@ -283,7 +329,7 @@ async function show(source: Source) {
 
   if (source.kind === "pdf") {
     pdfView.hidden = false;
-    setBusy("De pdf wordt geopend…");
+    setBusy(t("app.openingPdf"));
     try {
       // pdf.js alleen inladen als er echt een pdf wordt geopend.
       const { loadPdf, renderPdf, extractText } = await import("./pdf");
@@ -293,7 +339,7 @@ async function show(source: Source) {
       pdfHandle = await renderPdf(pdfView, doc);
       void pdfReady(pdfHandle, source);
       if (!source.textReady) {
-        setBusy("De tekst wordt gelezen…");
+        setBusy(t("app.readingText"));
         const text = await extractText(doc);
         const saved = await invoke<Source>("save_pdf_text", { id: source.id, title: text.title, pageCount: text.pageCount, blocks: text.blocks });
         if (token === opening) {
@@ -305,7 +351,7 @@ async function show(source: Source) {
         }
       }
     } catch (err) {
-      if (token === opening) showError({ kind: "pdf", message: "Deze pdf kon niet worden geopend. Het bestand is mogelijk beschadigd of beveiligd.", detail: String(err) });
+      if (token === opening) showError({ kind: "pdf", message: t("app.pdfFailed"), detail: String(err) });
     } finally {
       if (token === opening) setBusy(null);
     }
@@ -379,7 +425,7 @@ function showPreview(preview: PagePreview, url: string) {
   document.title = `${preview.title} – Deepdive`;
   urlInput.value = url;
   $("empty").hidden = true;
-  renderPreviewStatus("Voorbeeld · wordt op de achtergrond opgeslagen…");
+  renderPreviewStatus(t("app.previewSaving"));
   setBusy(null);
   frame.hidden = false;
   frame.src = `${snapshotBase}/preview/${preview.id}/index.html`;
@@ -416,7 +462,7 @@ async function openUrl(url: string, refresh = false) {
   const token = ++opening;
   const request = String(++previewRequests);
   awaitingPreview = { request, token, url: trimmed };
-  setBusy("De pagina wordt geladen…");
+  setBusy(t("app.loadingPage"));
   try {
     const source = await invoke<Source>("open_url", { url: trimmed, refresh, previewRequest: request });
     if (token !== opening) {
@@ -434,7 +480,7 @@ async function openUrl(url: string, refresh = false) {
     }
   } catch (err) {
     if (token !== opening) return;
-    if (previewShownFor === request) renderPreviewStatus("Voorbeeld · niet opgeslagen");
+    if (previewShownFor === request) renderPreviewStatus(t("app.previewNotSaved"));
     showError(err, trimmed);
   } finally {
     if (token === opening) {
@@ -446,7 +492,7 @@ async function openUrl(url: string, refresh = false) {
 
 async function openPdfFile(file: File) {
   clearError();
-  setBusy("De pdf wordt opgeslagen…");
+  setBusy(t("app.savingPdf"));
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const source = await invoke<Source>("import_pdf", bytes, { headers: { "x-file-name": encodeURIComponent(file.name) } });
@@ -552,12 +598,12 @@ window.addEventListener("drop", (e) => {
   const file = data.files[0];
   if (file) {
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) void openPdfFile(file);
-    else showError({ kind: "pdf", message: `"${file.name}" is geen pdf. Sleep een pdf of een webadres.`, detail: null });
+    else showError({ kind: "pdf", message: t("app.notPdf", { name: file.name }), detail: null });
     return;
   }
   const url = droppedUrl(data);
   if (url) void openUrl(url);
-  else showError({ kind: "invalid_url", message: "Dit is geen webadres of pdf. Sleep een link of een pdf-bestand.", detail: null });
+  else showError({ kind: "invalid_url", message: t("app.notUrlOrPdf"), detail: null });
 });
 
 // Een afgeschermde iframe geeft sleepacties niet door. Slepen vanuit een andere app gebeurt altijd terwijl
@@ -585,6 +631,9 @@ $("tab-blueprint").addEventListener("click", () => showPanel("blueprint"));
 $("tab-answers").addEventListener("click", () => showPanel("answers"));
 
 async function start() {
+  await initLanguage();
+  initSettings();
+  renderAiLanguage(null);
   initSites();
   initBlueprint(jumpToParagraphs);
   initAnswers(jumpToParagraphs, () => showPanel("answers"));

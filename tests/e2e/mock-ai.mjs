@@ -117,8 +117,8 @@ async function streamAsk(req, res, body, bp) {
 }
 
 async function streamBlueprint(req, res, body, bp) {
-  if (body.includes("<selectie-")) return streamAsk(req, res, body, bp);
-  const critique = body.includes("OPDRACHT: maak laag 3");
+  if (body.includes("<selection-")) return streamAsk(req, res, body, bp);
+  const critique = body.includes("TASK: make layer 3");
   bp.calls.push(critique ? "critique" : "structure");
   const failure = critique ? bp.failCritique : bp.failStructure;
   if (failure) return json(res, failure.status, { error: { message: failure.message } });

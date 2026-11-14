@@ -32,7 +32,7 @@ impl Keychain {
 
 /// De tekst van `keyring` bevat nooit de waarde van de sleutel.
 fn failed(e: keyring::Error) -> AppError {
-    AppError::new("keychain", "De sleutelhanger van deze computer gaf een fout. Probeer het opnieuw; sta de toegang toe als macOS erom vraagt.").with_detail(e.to_string())
+    AppError::new("keychain", crate::i18n::tr("This computer's keychain returned an error. Please try again, and allow access if macOS asks.", "De sleutelhanger van deze computer gaf een fout. Probeer het opnieuw; sta de toegang toe als macOS erom vraagt.", "Bu bilgisayarın anahtar zinciri bir hata verdi. Tekrar deneyin; macOS sorarsa erişime izin verin.")).with_detail(e.to_string())
 }
 
 impl SecretStore for Keychain {

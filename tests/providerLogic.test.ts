@@ -70,11 +70,11 @@ describe("invoer", () => {
 
 describe("uitslag", () => {
   it("is begrijpelijk", () => {
-    expect(describeReport({ model: "m", sample: "werkt", firstTokenMs: 1200 })).toBe("Verbinding werkt. m antwoordde in 1,2 s: “werkt”");
-    expect(describeReport({ model: "m", sample: "", firstTokenMs: 40 })).toBe("Verbinding werkt. m antwoordde in 40 ms, zonder tekst");
-    expect(countSummary([model("a"), model("b", false)])).toBe("2 modellen, 1 in de kiezer");
-    expect(countSummary([model("a")])).toBe("1 model, 1 in de kiezer");
-    expect(describeReport({ model: null, sample: "", firstTokenMs: null })).toContain("nog geen model");
+    expect(describeReport({ model: "m", sample: "werkt", firstTokenMs: 1200 })).toBe("Connection works. m replied in 1.2 s: “werkt”");
+    expect(describeReport({ model: "m", sample: "", firstTokenMs: 40 })).toBe("Connection works. m replied in 40 ms, without text");
+    expect(countSummary([model("a"), model("b", false)])).toBe("2 models, 1 in the picker");
+    expect(countSummary([model("a")])).toBe("1 model, 1 in the picker");
+    expect(describeReport({ model: null, sample: "", firstTokenMs: null })).toContain("no model to try yet");
   });
 });
 
@@ -86,11 +86,11 @@ describe("ChatGPT-koppeling", () => {
 
   it("onderscheidt de toestanden en noemt het account", () => {
     expect(chatgptState(provider())).toBe("ready");
-    expect(chatgptStatus(provider())).toContain("Ingelogd als a@b.nl");
+    expect(chatgptStatus(provider())).toContain("Logged in as a@b.nl");
     expect(chatgptState(provider({ chatgpt: account({ planEnabled: false }) }))).toBe("plan_disabled");
     expect(chatgptState(provider({ hasKey: false }))).toBe("signed_out");
     expect(chatgptState(provider({ hasKey: false, chatgpt: account({ sessionLost: true }) }))).toBe("session_lost");
-    expect(chatgptStatus(provider({ hasKey: false, chatgpt: account({ sessionLost: true }) }))).toContain("ingetrokken");
+    expect(chatgptStatus(provider({ hasKey: false, chatgpt: account({ sessionLost: true }) }))).toContain("revoked");
   });
 
   it("toont modellen alleen als het abonnement bruikbaar is, maar houdt de actieve keuze zichtbaar", () => {

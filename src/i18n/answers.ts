@@ -1,0 +1,47 @@
+import { defineMessages } from "./define";
+
+// The Questions tab (answers.ts).
+export default defineMessages({
+  en: {
+    "ans.noSource": "Open a source. Then select a piece of text to ask the professor something.",
+    "ans.empty": "Select a piece of text on the left. A bar appears with which you can ask the professor something, or highlight the text.",
+    "ans.goTo": "Go to {where}",
+    "ans.goToPlace": "Go to this place in the text",
+    "ans.stopping": "Stopping…",
+    "ans.thinking": "Thinking…",
+    "ans.writing": "Writing…",
+    "ans.wait": "One moment…",
+    "ans.removeThread": "Remove conversation",
+    "ans.stopped": "Stopped before the answer was finished.",
+    "ans.followUp": "Ask further…",
+    "ans.followUpLabel": "Follow-up question",
+  },
+  nl: {
+    "ans.noSource": "Open een bron. Selecteer dan een stuk tekst om de professor iets te vragen.",
+    "ans.empty": "Selecteer links een stuk tekst. Dan verschijnt er een balk waarmee je de professor iets vraagt, of de tekst markeert.",
+    "ans.goTo": "Naar {where}",
+    "ans.goToPlace": "Naar deze plek in de tekst",
+    "ans.stopping": "Stoppen…",
+    "ans.thinking": "Denkt na…",
+    "ans.writing": "Schrijft…",
+    "ans.wait": "Even geduld…",
+    "ans.removeThread": "Gesprek weghalen",
+    "ans.stopped": "Gestopt voordat het antwoord af was.",
+    "ans.followUp": "Doorvragen…",
+    "ans.followUpLabel": "Vervolgvraag",
+  },
+  tr: {
+    "ans.noSource": "Bir kaynak aç. Sonra profesöre bir şey sormak için metnin bir bölümünü seç.",
+    "ans.empty": "Soldan metnin bir bölümünü seç. Profesöre bir şey sorabileceğin ya da metni işaretleyebileceğin bir çubuk belirir.",
+    "ans.goTo": "{where} konumuna git",
+    "ans.goToPlace": "Metinde bu yere git",
+    "ans.stopping": "Durduruluyor…",
+    "ans.thinking": "Düşünüyor…",
+    "ans.writing": "Yazıyor…",
+    "ans.wait": "Bir dakika…",
+    "ans.removeThread": "Sohbeti kaldır",
+    "ans.stopped": "Yanıt bitmeden durduruldu.",
+    "ans.followUp": "Devamını sor…",
+    "ans.followUpLabel": "Ek soru",
+  },
+});

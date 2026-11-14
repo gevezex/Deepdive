@@ -23,6 +23,7 @@ pub use validate::SourceIndex;
 
 use crate::ai::{self, ChatRequest, Message, Part, Role, StopReason, StreamEvent, Target};
 use crate::error::AppError;
+use crate::i18n::{tr, Lang};
 use crate::model::{CompletenessVerdict, Source};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -43,13 +44,20 @@ const BAD_ANSWER_ECHO_CHARS: usize = 20_000;
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    /// De taal van de beschrijvende velden, zoals het in een zin past: "Nederlands", "Engels".
-    pub language: String,
+    /// The language of the descriptive fields. Quotes stay in the language of the source.
+    pub language: Lang,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { language: "Nederlands".into() }
+        Self { language: Lang::En }
+    }
+}
+
+impl Options {
+    /// The language chosen for this source, or `language` when the reader asks for a specific one.
+    pub fn for_source(source: &Source, language: Option<&str>) -> Self {
+        Self { language: language.and_then(Lang::from_code).unwrap_or_else(|| crate::i18n::for_source(source.ai_language.as_deref())) }
     }
 }
 
@@ -245,7 +253,7 @@ pub(crate) async fn run(
     caller: &mut impl Caller,
 ) -> Result<Blueprint, AppError> {
     if !source.text_ready || source.blocks.is_empty() {
-        return Err(AppError::new("no_text", "Deze bron heeft nog geen tekst om een blauwdruk van te maken."));
+        return Err(AppError::new("no_text", tr("This source has no text yet to make a blueprint from.", "Deze bron heeft nog geen tekst om een blauwdruk van te maken.", "Bu kaynakta henüz plan çıkarılacak bir metin yok.")));
     }
     let start = Instant::now();
     let frame = Frame::new(source, options);
@@ -254,7 +262,14 @@ pub(crate) async fn run(
         if report.estimated_input_tokens + RESERVED_TOKENS > u64::from(limit) {
             return Err(AppError::new(
                 "context_too_large",
-                format!("Deze bron is ongeveer {} tokens en past niet in dit model ({limit}). Kies een model met meer context. Er is niets weggelaten of verstuurd.", report.estimated_input_tokens),
+                {
+                    let tokens = report.estimated_input_tokens;
+                    tr_fmt!(
+                        "This source is about {tokens} tokens and does not fit in this model ({limit}). Choose a model with more context. Nothing was left out or sent.",
+                        "Deze bron is ongeveer {tokens} tokens en past niet in dit model ({limit}). Kies een model met meer context. Er is niets weggelaten of verstuurd.",
+                        "Bu kaynak yaklaşık {tokens} token ve bu modele sığmıyor ({limit}). Daha geniş bağlamı olan bir model seçin. Hiçbir şey çıkarılmadı veya gönderilmedi.",
+                    )
+                },
             ));
         }
     }
@@ -274,7 +289,7 @@ pub(crate) async fn run(
         model: model.to_string(),
         provider_id: provider_id.to_string(),
         prompt_version: PROMPT_VERSION,
-        language: options.language.clone(),
+        language: options.language.code().to_string(),
         created_at: now(),
         seconds: start.elapsed().as_secs_f32(),
         structure,
@@ -298,7 +313,7 @@ async fn add_critique(frame: &Frame, blueprint: &mut Blueprint, index: &SourceIn
             blueprint.critique = Some(critique);
         }
         Err(e) if e.kind == CANCELLED => {
-            blueprint.issues.push(Issue { code: CRITIQUE_CANCELLED.into(), path: "critique".into(), detail: "De kritische laag is afgebroken.".into() });
+            blueprint.issues.push(Issue { code: CRITIQUE_CANCELLED.into(), path: "critique".into(), detail: tr("The critical layer was cancelled.", "De kritische laag is afgebroken.", "Eleştirel katman iptal edildi.") });
         }
         Err(e) => {
             blueprint.issues.push(Issue { code: CRITIQUE_FAILED.into(), path: "critique".into(), detail: e.message.clone() });
@@ -318,7 +333,16 @@ pub fn source_status(source: &Source) -> SourceStatus {
         completeness: source.completeness.verdict,
         likely_incomplete,
         accepted_by_user: source.completeness.accepted_by_user,
-        warning: likely_incomplete.then(|| format!("Deze blauwdruk gaat over een waarschijnlijk onvolledig stuk. {}", source.completeness.reason).trim().to_string()),
+        warning: likely_incomplete.then(|| {
+            let reason = &source.completeness.reason;
+            tr_fmt!(
+                "This blueprint is about a piece that is probably incomplete. {reason}",
+                "Deze blauwdruk gaat over een waarschijnlijk onvolledig stuk. {reason}",
+                "Bu plan muhtemelen eksik olan bir yazıya ait. {reason}",
+            )
+            .trim()
+            .to_string()
+        }),
         block_count: source.blocks.len() as u32,
         word_count: source.word_count,
     }
@@ -357,9 +381,9 @@ async fn ask<T: DeserializeOwned + Send>(
             Err(error) if attempt == 1 && reply.stop != StopReason::Length => {
                 let echo: String = reply.text.chars().take(BAD_ANSWER_ECHO_CHARS).collect();
                 request.messages.push(Message { role: Role::Assistant, parts: vec![Part::Text(echo)] });
-                request.messages.push(Message { role: Role::User, parts: vec![Part::Text(format!("Dit antwoord voldoet niet aan het gevraagde JSON-schema: {error}\nGeef het hele object opnieuw, met alleen de toegestane waarden en zonder tekst eromheen."))] });
+                request.messages.push(Message { role: Role::User, parts: vec![Part::Text(format!("This answer does not match the requested JSON schema: {error}\nGive the whole object again, with only the allowed values and no text around it."))] });
             }
-            Err(error) => return Err(AppError::new("blueprint_schema", "Het model gaf geen bruikbare blauwdruk terug.").with_detail(error)),
+            Err(error) => return Err(AppError::new("blueprint_schema", tr("The model did not return a usable blueprint.", "Het model gaf geen bruikbare blauwdruk terug.", "Model kullanılabilir bir plan döndürmedi.")).with_detail(error)),
         }
     }
     unreachable!("de lus eindigt altijd met een return")
@@ -369,10 +393,10 @@ async fn ask<T: DeserializeOwned + Send>(
 fn json_body(text: &str) -> Result<&str, String> {
     let body = text.rsplit_once("</think>").map_or(text, |(_, rest)| rest);
     let (Some(start), Some(end)) = (body.find('{'), body.rfind('}')) else {
-        return Err("Er staat geen JSON-object in het antwoord.".into());
+        return Err("There is no JSON object in the answer.".into());
     };
     if end < start {
-        return Err("Er staat geen JSON-object in het antwoord.".into());
+        return Err("There is no JSON object in the answer.".into());
     }
     Ok(&body[start..=end])
 }
@@ -393,11 +417,16 @@ fn parse_repaired<T: DeserializeOwned>(text: &str, repair: &impl Fn(&mut serde_j
 struct Frame {
     system: String,
     source_text: String,
+    language: Lang,
 }
 
 impl Frame {
     fn new(source: &Source, options: &Options) -> Self {
-        Self { system: SYSTEM.replace("{{LANGUAGE}}", &options.language), source_text: source_prompt(source, &uuid::Uuid::new_v4().simple().to_string()) }
+        Self {
+            system: SYSTEM.replace("{{LANGUAGE}}", options.language.english_name()),
+            source_text: source_prompt(source, &uuid::Uuid::new_v4().simple().to_string()),
+            language: options.language,
+        }
     }
 
     fn estimated_tokens(&self) -> u64 {
@@ -406,12 +435,12 @@ impl Frame {
     }
 
     fn structure_task(&self) -> String {
-        STRUCTURE_TASK.to_string()
+        STRUCTURE_TASK.replace("{{LANGUAGE}}", self.language.english_name())
     }
 
     fn critique_task(&self, structure: &Structure) -> Result<String, AppError> {
-        let json = serde_json::to_string(structure).map_err(|e| AppError::new("internal", "De structuur kon niet worden doorgegeven.").with_detail(e.to_string()))?;
-        Ok(CRITIQUE_TASK.replace("{{STRUCTURE}}", &json))
+        let json = serde_json::to_string(structure).map_err(|e| AppError::new("internal", tr("The structure could not be passed on.", "De structuur kon niet worden doorgegeven.", "Yapı aktarılamadı.")).with_detail(e.to_string()))?;
+        Ok(CRITIQUE_TASK.replace("{{STRUCTURE}}", &json).replace("{{LANGUAGE}}", self.language.english_name()))
     }
 
     fn request(&self, task: &str) -> ChatRequest {
@@ -422,17 +451,17 @@ impl Frame {
 /// De bron als tekst voor het model. De markering heeft een willekeurig deel, dat niemand vooraf in een stuk kan
 /// zetten, zodat tekst uit de bron de markering niet kan sluiten en dan als instructie kan lijken.
 pub fn source_prompt(source: &Source, nonce: &str) -> String {
-    let tag = format!("bron-{nonce}");
+    let tag = format!("source-{nonce}");
     let mut out = String::new();
     if source.completeness.verdict == CompletenessVerdict::LikelyIncomplete {
         out.push_str(&format!(
-            "Let op: de app beoordeelt deze kopie als waarschijnlijk onvolledig ({}). Maak de blauwdruk van wat er staat en beweer niets over het deel dat ontbreekt. Reken een ontbrekend einde of ontbrekend bewijs niet aan als gat in het betoog; het kan aan de kopie liggen.\n\n",
+            "Note: the app judges this copy as probably incomplete ({}). Work with what is there and claim nothing about the part that is missing. Do not count a missing ending or missing evidence as a gap in the argument; it may be due to the copy.\n\n",
             source.completeness.reason
         ));
     }
     out.push_str(&format!("<{tag}>\n"));
-    out.push_str(&format!("Titel: {}\n", source.title));
-    for (label, value) in [("Auteur", &source.author), ("Site", &source.site_name), ("Gepubliceerd", &source.published), ("Taal", &source.lang)] {
+    out.push_str(&format!("Title: {}\n", source.title));
+    for (label, value) in [("Author", &source.author), ("Site", &source.site_name), ("Published", &source.published), ("Language", &source.lang)] {
         if let Some(value) = value {
             out.push_str(&format!("{label}: {value}\n"));
         }

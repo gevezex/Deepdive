@@ -1,4 +1,5 @@
 // De rekenregels achter selecteren, markeren en antwoorden. Geen DOM, zodat het met vitest te testen is.
+import { t } from "./i18n";
 import type { ParagraphRange } from "./types";
 
 // ---------- acties ----------
@@ -6,26 +7,18 @@ import type { ParagraphRange } from "./types";
 export type Action = "ask" | "explain" | "simplify" | "define" | "fact_check" | "related" | "counterpoint";
 export type HighlightColor = "yellow" | "green" | "blue" | "pink";
 export const COLORS: HighlightColor[] = ["yellow", "green", "blue", "pink"];
-export const COLOR_LABELS: Record<HighlightColor, string> = { yellow: "Geel", green: "Groen", blue: "Blauw", pink: "Roze" };
+export function colorLabel(color: HighlightColor): string {
+  return t(`reading.color.${color}`);
+}
 
-export const ACTION_LABELS: Record<Action, string> = {
-  ask: "Vraag",
-  explain: "Leg uit",
-  simplify: "Eenvoudiger",
-  define: "Wat betekent dit woord?",
-  fact_check: "Klopt dit nog?",
-  related: "Waar komt dit nog terug?",
-  counterpoint: "Tegenargument",
-};
+export function actionLabel(action: Action | "copy"): string {
+  return t(`reading.action.${action}`);
+}
 
-/** Het menu onder ⋯, met een korte uitleg per actie. */
-export const MORE_ACTIONS: { action: Action | "copy"; label: string; hint: string }[] = [
-  { action: "define", label: "Wat betekent dit woord?", hint: "Het woord zoals déze auteur het gebruikt" },
-  { action: "fact_check", label: "Klopt dit nog?", hint: "Wat het model weet; zoekt niet op het web" },
-  { action: "related", label: "Waar komt dit nog terug?", hint: "Andere plekken in de tekst, met ¶-nummers" },
-  { action: "counterpoint", label: "Tegenargument", hint: "Het sterkste bezwaar ertegen" },
-  { action: "copy", label: "Citaat kopiëren", hint: "Met titel en alineanummer" },
-];
+/** Het menu onder ⋯, met een korte uitleg per actie, in de taal van de interface. */
+export function moreActions(): { action: Action | "copy"; label: string; hint: string }[] {
+  return (["define", "fact_check", "related", "counterpoint", "copy"] as const).map((action) => ({ action, label: actionLabel(action), hint: t(`reading.hint.${action}`) }));
+}
 
 // ---------- verwijzingen en citaten ----------
 

@@ -30,7 +30,7 @@ function check(name, ok, extra = "") {
 }
 
 function startApp() {
-  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_KEYCHAIN_SERVICE: SERVICE, DEEPDIVE_CHATGPT_AUTH_BASE: mock.base, DEEPDIVE_CHATGPT_API_BASE: `${mock.base}/v1`, DEEPDIVE_CHATGPT_BROWSER_FILE: browserFile }, stdio: ["ignore", "pipe", "pipe"] });
+  app = spawn(BIN, [], { env: { ...process.env, DEEPDIVE_DATA_DIR: data, DEEPDIVE_E2E_DIR: ctl, DEEPDIVE_LANGUAGE: "nl", DEEPDIVE_KEYCHAIN_SERVICE: SERVICE, DEEPDIVE_CHATGPT_AUTH_BASE: mock.base, DEEPDIVE_CHATGPT_API_BASE: `${mock.base}/v1`, DEEPDIVE_CHATGPT_BROWSER_FILE: browserFile }, stdio: ["ignore", "pipe", "pipe"] });
   app.stdout.on("data", (d) => (appOutput += d));
   app.stderr.on("data", (d) => (appOutput += d));
 }

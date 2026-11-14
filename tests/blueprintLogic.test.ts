@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignLanes, errorView, formatRanges, highlightParam, isLocalModel, MAX_LANES, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, suggestModel } from "../src/blueprintLogic";
+import { assignLanes, blueprintLanguage, errorView, formatRanges, highlightParam, isLocalModel, MAX_LANES, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, suggestModel } from "../src/blueprintLogic";
 import type { Blueprint, Critique, DiagramBlock, Point, Provider, ProvidersFile, Relation } from "../src/types";
 
 const block = (id: string): DiagramBlock => ({ id, role: "argument", title: id, content: "", paragraphs: [], quote: null });
@@ -25,7 +25,7 @@ describe("verwijzingen", () => {
 describe("tekst van het model", () => {
   it("vervangt interne ids door het nummer dat de lezer ziet", () => {
     const numbers = new Map([["b3", 2], ["b4", 3]]);
-    expect(readableIds("Het in b3 gemaakte getal en de tegenspraak in b4.", numbers)).toBe("Het in stap 2 gemaakte getal en de tegenspraak in stap 3.");
+    expect(readableIds("Het in b3 gemaakte getal en de tegenspraak in b4.", numbers)).toBe("Het in step 2 gemaakte getal en de tegenspraak in step 3.");
     expect(readableIds("Vitamine b12 en b9 blijven staan.", numbers)).toBe("Vitamine b12 en b9 blijven staan.");
   });
 });
@@ -80,12 +80,12 @@ describe("kritische laag", () => {
       checked: [{ category: "evidence", result: "not_applicable", note: "Een memoire hoeft niets te bewijzen." }, { category: "assumption", result: "nothing_found", note: null }],
     }));
     const by = Object.fromEntries(list.map((o) => [o.category, o]));
-    expect(by.leap.text).toBe("2 punten");
-    expect(by.gap.text).toBe("1 punt");
-    expect(by.evidence.text).toBe("niet van toepassing");
+    expect(by.leap.text).toBe("2 points");
+    expect(by.gap.text).toBe("1 point");
+    expect(by.evidence.text).toBe("not applicable");
     expect(by.evidence.note).toContain("memoire");
-    expect(by.assumption.text).toBe("niets gevonden");
-    expect(by.missing.text).toBe("niet beoordeeld");
+    expect(by.assumption.text).toBe("nothing found");
+    expect(by.missing.text).toBe("not assessed");
     expect(list).toHaveLength(6);
   });
 });
@@ -96,6 +96,15 @@ describe("bewaarde blauwdrukken", () => {
 
   it("toont die van het gekozen model, ook als een andere nieuwer is", () => {
     expect(pickSaved([a, b], { providerId: "p", modelId: "a" })).toBe(a);
+  });
+
+  it("toont alleen een blauwdruk in de taal van het artikel; oude heten nog Nederlands", () => {
+    const nl = blueprint({ model: "a", language: "Nederlands" });
+    const tr = blueprint({ model: "a", language: "tr", createdAt: "2026-03-01" });
+    expect(blueprintLanguage(nl)).toBe("nl");
+    expect(pickSaved([nl, tr], { providerId: "p", modelId: "a" }, "nl")).toBe(nl);
+    expect(pickSaved([nl, tr], { providerId: "p", modelId: "a" }, "tr")).toBe(tr);
+    expect(pickSaved([nl, tr], null, "en")).toBeNull();
   });
 
   it("zonder eigen blauwdruk de nieuwste, zodat er geen nieuwe aanroep nodig is", () => {
@@ -143,9 +152,9 @@ describe("meldingen", () => {
 
   it("elke situatie die de lezer kan oplossen heeft een eigen titel en knop", () => {
     expect(view("no_model").actions).toContain("providers");
-    expect(view("context_too_large").title).toContain("te lang");
+    expect(view("context_too_large").title).toContain("too long");
     expect(view("context_too_large").actions).toEqual(["picker"]);
-    expect(view("chatgpt_session_revoked").title).toContain("verlopen");
+    expect(view("chatgpt_session_revoked").title).toContain("expired");
     expect(view("chatgpt_session_revoked").actions).toEqual(["providers"]);
     expect(view("chatgpt_usage_limit").actions).toContain("usage");
     const titles = ["no_model", "context_too_large", "chatgpt_session_revoked", "chatgpt_usage_limit", "unreachable_local", "blueprint_schema"].map((k) => view(k).title);

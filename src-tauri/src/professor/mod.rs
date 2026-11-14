@@ -22,7 +22,6 @@ const MAX_TOKENS: u32 = 16_000;
 /// Langer dan dit is geen selectie meer maar de halve tekst; die staat toch al in de bron.
 const MAX_SELECTION_CHARS: usize = 6_000;
 const MAX_QUESTION_CHARS: usize = 2_000;
-const LANGUAGE: &str = "Nederlands";
 
 /// Wat de lezer kan vragen. De naam komt van de interface; alleen deze zijn geldig.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,13 +39,13 @@ pub enum Action {
 impl Action {
     fn task(self) -> &'static str {
         match self {
-            Action::Ask => "Beantwoord de vraag van de lezer over het geselecteerde stuk.",
-            Action::Explain => "Leg uit wat het geselecteerde stuk hier betekent en waarom het op deze plek in de tekst staat. Is er een naam, zeg dan wie of wat dat is. Leg beeldspraak uit.",
-            Action::Simplify => "Zeg hetzelfde idee in gewone woorden, zonder vakjargon, zodat iemand zonder voorkennis het snapt. Sluit af met één regel over het punt dat het stuk maakt.",
-            Action::Define => "Wat betekent dit woord of deze term zoals déze auteur het hier gebruikt? Zeg of het vaktaal, ouderwets of ongebruikelijk is, en of de auteur het elders anders gebruikt.",
-            Action::FactCheck => "Klopt dit nog? Je kunt niet op het web zoeken. Zeg wat je weet tot je kennisdatum, wat er sindsdien veranderd kan zijn en hoe zeker je bent. Zeg in de kern dat dit niet is nagezocht op internet.",
-            Action::Related => "Waar neemt de tekst dit idee nog meer op? Noem de plekken met alineanummers en zeg per plek in één zin wat daar gebeurt. Is er geen andere plek, zeg dat dan.",
-            Action::Counterpoint => "Geef het sterkste bezwaar tegen wat hier staat. Zeg daarna hoe de auteur op grond van de tekst zou kunnen antwoorden, en of dat het bezwaar wegneemt.",
+            Action::Ask => "Answer the reader's question about the selected passage.",
+            Action::Explain => "Explain what the selected passage means here and why it stands at this place in the text. If there is a name, say who or what it is. Explain figurative language.",
+            Action::Simplify => "Say the same idea in plain words, without jargon, so that someone without prior knowledge gets it. End with one line about the point the passage makes.",
+            Action::Define => "What does this word or term mean as *this* author uses it here? Say whether it is jargon, old-fashioned or unusual, and whether the author uses it differently elsewhere.",
+            Action::FactCheck => "Is this still correct? You cannot search the web. Say what you know up to your knowledge cutoff, what may have changed since and how sure you are. Say in the core sentence that this was not checked on the internet.",
+            Action::Related => "Where else does the text take up this idea? Name the places with paragraph numbers and say in one sentence per place what happens there. If there is no other place, say so.",
+            Action::Counterpoint => "Give the strongest objection to what is said here. Then say how the author could answer on the basis of the text, and whether that removes the objection.",
         }
     }
 }
@@ -103,7 +102,7 @@ impl Selection {
     pub fn cleaned(&self) -> Result<Self, AppError> {
         let text = clip(&self.text.split_whitespace().collect::<Vec<_>>().join(" "), MAX_SELECTION_CHARS);
         if text.is_empty() {
-            return Err(AppError::new("empty_selection", "Selecteer eerst een stuk tekst."));
+            return Err(AppError::new("empty_selection", crate::i18n::tr("Select a piece of text first.", "Selecteer eerst een stuk tekst.", "Önce bir metin parçası seçin.")));
         }
         let (from, to) = match (self.from, self.to) {
             (Some(a), Some(b)) => (Some(a.min(b)), Some(a.max(b))),
@@ -124,19 +123,19 @@ impl Selection {
 pub fn clean_question(question: &str) -> Result<String, AppError> {
     let q = clip(question, MAX_QUESTION_CHARS);
     if q.is_empty() {
-        return Err(AppError::new("empty_question", "Typ eerst een vraag."));
+        return Err(AppError::new("empty_question", crate::i18n::tr("Type a question first.", "Typ eerst een vraag.", "Önce bir soru yazın.")));
     }
     Ok(q)
 }
 
 /// De eerste vraag: de hele bron, dan de selectie, dan de opdracht. Vervolgvragen komen als gewone beurten.
 pub fn first_message(source: &Source, action: Action, selection: &Selection, question: Option<&str>, nonce: &str) -> String {
-    let tag = format!("selectie-{nonce}");
+    let tag = format!("selection-{nonce}");
     let mut out = source_prompt(source, nonce);
-    out.push_str(&format!("\nDe lezer selecteerde dit stuk{}:\n<{tag}>\n{}\n</{tag}>\n\n", selection.place(), selection.text));
-    out.push_str(&format!("Opdracht: {}\n", action.task()));
+    out.push_str(&format!("\nThe reader selected this passage{}:\n<{tag}>\n{}\n</{tag}>\n\n", selection.place(), selection.text));
+    out.push_str(&format!("Task: {}\n", action.task()));
     if let Some(q) = question {
-        out.push_str(&format!("\nVraag van de lezer: {q}\n"));
+        out.push_str(&format!("\nThe reader's question: {q}\n"));
     }
     out
 }
@@ -149,7 +148,9 @@ pub fn request(source: &Source, thread: &Thread, nonce: &str) -> ChatRequest {
         let text = if i == 0 { first_message(source, thread.action, &thread.selection, question, nonce) } else { turn.text.clone() };
         messages.push(Message { role: turn.role, parts: vec![Part::Text(text)] });
     }
-    ChatRequest { system: Some(SYSTEM.replace("{{LANGUAGE}}", LANGUAGE)), messages, max_tokens: MAX_TOKENS }
+    let language = crate::i18n::for_source(source.ai_language.as_deref());
+    let system = SYSTEM.replace("{{LANGUAGE}}", language.english_name()).replace("{{OUTSIDE}}", language.outside_text_label());
+    ChatRequest { system: Some(system), messages, max_tokens: MAX_TOKENS }
 }
 
 // ---------- opslag ----------

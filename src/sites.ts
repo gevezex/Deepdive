@@ -1,12 +1,13 @@
 // Het scherm met de sites waar de app een sessie voor bewaart. Er komen hier geen cookies langs,
 // alleen de naam van de site en wanneer die voor het laatst is gebruikt.
 import { invoke } from "@tauri-apps/api/core";
+import { formatDate, onLanguageChange, t } from "./i18n";
 import type { SiteSession } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 function date(value: string | null): string {
-  return value ? new Date(value).toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "short" }) : "nog niet";
+  return value ? formatDate(value) : t("sites.notYet");
 }
 
 async function render() {
@@ -26,22 +27,22 @@ async function render() {
     const when = document.createElement("span");
     when.className = "hint";
     when.textContent = s.wipePending
-      ? "Wordt gewist bij de volgende start. De app gebruikt deze sessie niet meer."
-      : `Sinds ${date(s.createdAt)} · laatst opgehaald: ${date(s.lastUsedAt)}${s.loginOpen ? " · inlogvenster open" : ""}`;
+      ? t("sites.wipePending")
+      : `${t("sites.since", { created: date(s.createdAt), used: date(s.lastUsedAt) })}${s.loginOpen ? t("sites.loginOpen") : ""}`;
     text.append(name, when);
 
     const open = document.createElement("button");
     open.type = "button";
-    open.textContent = "Site openen";
-    open.title = "Open de site in het inlogvenster, bijvoorbeeld om daar zelf uit te loggen.";
+    open.textContent = t("sites.openSite");
+    open.title = t("sites.openSiteTitle");
     open.disabled = s.wipePending;
     open.onclick = () => void run(() => invoke("site_login_open", { url: `https://${s.site}` }));
 
     const wipe = document.createElement("button");
     wipe.type = "button";
     wipe.dataset.action = "wipe";
-    wipe.textContent = "Uitloggen en wissen";
-    wipe.onclick = () => void run(() => invoke("wipe_site_session", { site: s.site }), `De sessie van ${s.site} is gewist op deze computer.`);
+    wipe.textContent = t("sites.wipe");
+    wipe.onclick = () => void run(() => invoke("wipe_site_session", { site: s.site }), t("sites.wiped", { site: s.site }));
 
     row.append(text, open, wipe);
     list.append(row);
@@ -74,6 +75,7 @@ export function initSites() {
     dialog.showModal();
   });
   $("sites-close").addEventListener("click", () => dialog.close());
+  onLanguageChange(refreshSites);
 }
 
 export const refreshSites = () => {

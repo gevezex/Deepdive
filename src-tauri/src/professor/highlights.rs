@@ -83,17 +83,17 @@ fn write(store: &Store, source_id: &str, list: &[Highlight]) -> Result<(), AppEr
 }
 
 fn check(mut h: Highlight) -> Result<Highlight, AppError> {
-    let bad = |why: &str| AppError::new("bad_highlight", "Deze markering kon niet worden bewaard.").with_detail(why.to_string());
+    let bad = |why: &str| AppError::new("bad_highlight", crate::i18n::tr("This highlight could not be saved.", "Deze markering kon niet worden bewaard.", "Bu işaretleme kaydedilemedi.")).with_detail(why.to_string());
     if !is_valid_id(&h.id) {
         return Err(bad("id"));
     }
     h.text = h.text.chars().take(MAX_TEXT).collect();
     h.note = h.note.map(|n| n.chars().take(MAX_NOTE).collect::<String>()).filter(|n| !n.trim().is_empty());
     match &h.anchor {
-        Anchor::Web { start, end } if end <= start => return Err(bad("lege plek")),
-        Anchor::Pdf { rects } if rects.is_empty() || rects.len() > MAX_RECTS => return Err(bad("rechthoeken")),
+        Anchor::Web { start, end } if end <= start => return Err(bad("empty range")),
+        Anchor::Pdf { rects } if rects.is_empty() || rects.len() > MAX_RECTS => return Err(bad("rectangles")),
         Anchor::Pdf { rects } if rects.iter().any(|r| ![r.x, r.y, r.w, r.h].iter().all(|v| v.is_finite() && (-0.01..=1.01).contains(v)) || r.page == 0) => {
-            return Err(bad("rechthoek buiten de pagina"))
+            return Err(bad("rectangle outside the page"))
         }
         _ => {}
     }
@@ -113,7 +113,7 @@ pub fn upsert(store: &Store, source_id: &str, highlight: Highlight) -> Result<Ve
         old.color = highlight.color;
         old.note = highlight.note;
     } else if list.len() >= MAX_HIGHLIGHTS {
-        return Err(AppError::new("bad_highlight", "Er zijn te veel markeringen bij deze bron."));
+        return Err(AppError::new("bad_highlight", crate::i18n::tr("This source has too many highlights.", "Er zijn te veel markeringen bij deze bron.", "Bu kaynakta çok fazla işaretleme var.")));
     } else {
         list.push(highlight);
     }

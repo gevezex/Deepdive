@@ -1,9 +1,22 @@
+/// `format!` in the interface language: `tr_fmt!("{n} words", "{n} woorden", "{n} kelime")`. Each language gets its
+/// own literal, so word order can differ. Defined before the modules so that all of them can use it.
+macro_rules! tr_fmt {
+    ($en:literal, $nl:literal, $tr:literal $(, $arg:expr)* $(,)?) => {
+        match crate::i18n::ui() {
+            crate::i18n::Lang::En => format!($en $(, $arg)*),
+            crate::i18n::Lang::Nl => format!($nl $(, $arg)*),
+            crate::i18n::Lang::Tr => format!($tr $(, $arg)*),
+        }
+    };
+}
+
 mod ai;
 mod blueprint;
 mod chatgpt;
 mod completeness;
 mod engine;
 mod error;
+mod i18n;
 mod import;
 mod model;
 mod preview;
@@ -56,9 +69,14 @@ async fn set_hide_floating(store: State<'_, Store>, id: String, hide: bool) -> R
 }
 
 #[tauri::command]
+async fn set_ai_language(store: State<'_, Store>, id: String, language: Option<String>) -> Result<Source, AppError> {
+    import::set_ai_language(&store, &id, language)
+}
+
+#[tauri::command]
 async fn import_pdf(store: State<'_, Store>, request: Request<'_>) -> Result<Source, AppError> {
     let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(AppError::new("pdf", "Het bestand is niet goed aangekomen."));
+        return Err(AppError::new("pdf", i18n::tr("The file did not arrive intact.", "Het bestand is niet goed aangekomen.", "Dosya düzgün ulaşmadı.")));
     };
     let name = request.headers().get("x-file-name").and_then(|v| v.to_str().ok()).unwrap_or("document.pdf");
     let name = url::form_urlencoded::parse(format!("n={name}").as_bytes()).next().map_or("document.pdf".to_string(), |(_, v)| v.into_owned());
@@ -186,6 +204,8 @@ pub fn run() {
             discard_candidate,
             accept_incomplete,
             set_hide_floating,
+            set_ai_language,
+            i18n::set_ui_language,
             blueprint::commands::generate_blueprint,
             blueprint::commands::cancel_blueprint,
             blueprint::commands::saved_blueprints,

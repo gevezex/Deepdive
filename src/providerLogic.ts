@@ -1,26 +1,28 @@
 // Het deel van het providerscherm dat zonder scherm te testen is.
+import { formatNumber, plural, t, type Key } from "./i18n";
 import type { ApiKind, ConnectionReport, Model, ModelRef, Provider, ProvidersFile } from "./types";
 
 export interface Preset {
   id: string;
-  label: string;
   name: string;
   kind: ApiKind;
   baseUrl: string;
-  keyHint: string;
+  /** Het label in de keuzelijst; zonder eigen tekst is het de naam. */
+  labelKey?: Key;
+  keyHintKey: Key;
 }
 
-const KEY_NEEDED = "Nodig voor deze dienst.";
-const KEY_LOCAL = "Niet nodig, tenzij je de server zelf hebt beveiligd.";
-
 export const PRESETS: Preset[] = [
-  { id: "anthropic", label: "Anthropic", name: "Anthropic", kind: "anthropic", baseUrl: "https://api.anthropic.com", keyHint: KEY_NEEDED },
-  { id: "openai", label: "OpenAI", name: "OpenAI", kind: "openai_compatible", baseUrl: "https://api.openai.com/v1", keyHint: KEY_NEEDED },
-  { id: "openrouter", label: "OpenRouter", name: "OpenRouter", kind: "openai_compatible", baseUrl: "https://openrouter.ai/api/v1", keyHint: KEY_NEEDED },
-  { id: "ollama", label: "Ollama (lokaal)", name: "Ollama", kind: "openai_compatible", baseUrl: "http://localhost:11434/v1", keyHint: KEY_LOCAL },
-  { id: "lmstudio", label: "LM Studio (lokaal)", name: "LM Studio", kind: "openai_compatible", baseUrl: "http://localhost:1234/v1", keyHint: KEY_LOCAL },
-  { id: "custom", label: "Andere OpenAI-compatibele API", name: "", kind: "openai_compatible", baseUrl: "", keyHint: "Vul in als deze dienst erom vraagt." },
+  { id: "anthropic", name: "Anthropic", kind: "anthropic", baseUrl: "https://api.anthropic.com", keyHintKey: "providers.keyNeeded" },
+  { id: "openai", name: "OpenAI", kind: "openai_compatible", baseUrl: "https://api.openai.com/v1", keyHintKey: "providers.keyNeeded" },
+  { id: "openrouter", name: "OpenRouter", kind: "openai_compatible", baseUrl: "https://openrouter.ai/api/v1", keyHintKey: "providers.keyNeeded" },
+  { id: "ollama", name: "Ollama", kind: "openai_compatible", baseUrl: "http://localhost:11434/v1", labelKey: "providers.presetOllama", keyHintKey: "providers.keyLocal" },
+  { id: "lmstudio", name: "LM Studio", kind: "openai_compatible", baseUrl: "http://localhost:1234/v1", labelKey: "providers.presetLmStudio", keyHintKey: "providers.keyLocal" },
+  { id: "custom", name: "", kind: "openai_compatible", baseUrl: "", labelKey: "providers.presetCustom", keyHintKey: "providers.keyCustom" },
 ];
+
+export const presetLabel = (p: Preset) => (p.labelKey ? t(p.labelKey) : p.name);
+export const presetKeyHint = (p: Preset) => t(p.keyHintKey);
 
 export interface PickerGroup {
   label: string;
@@ -59,16 +61,16 @@ export function chatgptState(p: Provider): ChatgptState {
 
 /** De regel in het providerscherm: met welk account je bent ingelogd en wat er eventueel moet gebeuren. */
 export function chatgptStatus(p: Provider): string {
-  const who = p.chatgpt?.email ?? "dit ChatGPT-account";
+  const who = p.chatgpt?.email ?? t("providers.thisAccount");
   switch (chatgptState(p)) {
     case "ready":
-      return `Ingelogd als ${who}. Verzoeken met deze modellen gebruiken je ChatGPT-abonnement.`;
+      return t("providers.statusReady", { who });
     case "plan_disabled":
-      return `Ingelogd als ${who}, maar Deepdive mag je ChatGPT-abonnement niet gebruiken. Schakel het in, of gebruik een andere provider met een eigen API-sleutel.`;
+      return t("providers.statusPlanDisabled", { who });
     case "session_lost":
-      return `De sessie van ${who} is ingetrokken of verlopen. Log opnieuw in om deze modellen te gebruiken.`;
+      return t("providers.statusSessionLost", { who });
     case "signed_out":
-      return `Uitgelogd (${who}). Log opnieuw in om deze modellen te gebruiken.`;
+      return t("providers.statusSignedOut", { who });
   }
 }
 
@@ -103,15 +105,17 @@ export function filterModels(models: Model[], query: string): Model[] {
 }
 
 export function describeReport(r: ConnectionReport): string {
-  if (!r.model) return "De provider is bereikbaar, maar er is nog geen model om mee te proberen. Haal de modellen op of voeg er een toe.";
+  if (!r.model) return t("providers.reportNoModel");
   const ms = r.firstTokenMs;
-  const time = ms === null ? "" : ms < 1000 ? ` in ${ms} ms` : ` in ${(ms / 1000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} s`;
-  const answer = r.sample ? `: “${r.sample}”` : ", zonder tekst";
-  return `Verbinding werkt. ${r.model} antwoordde${time}${answer}`;
+  const time = ms === null ? null : ms < 1000 ? t("providers.ms", { n: formatNumber(ms) }) : t("providers.seconds", { n: formatNumber(ms / 1000, { maximumFractionDigits: 1 }) });
+  const model = r.model;
+  if (time === null) return r.sample ? t("providers.reportText", { model, sample: r.sample }) : t("providers.reportEmpty", { model });
+  return r.sample ? t("providers.reportTimedText", { model, time, sample: r.sample }) : t("providers.reportTimedEmpty", { model, time });
 }
 
-export const modelCount = (n: number) => (n === 1 ? "1 model" : `${n} modellen`);
+export const modelCount = (n: number) => plural(n, "providers.modelCountOne", "providers.modelCountOther");
 
 export function countSummary(models: Model[]): string {
-  return models.length ? `${modelCount(models.length)}, ${models.filter((m) => m.enabled).length} in de kiezer` : "Nog geen modellen. Haal ze op of voeg er zelf een toe.";
+  if (!models.length) return t("providers.noModelsYet");
+  return t("providers.countSummary", { count: modelCount(models.length), enabled: formatNumber(models.filter((m) => m.enabled).length) });
 }

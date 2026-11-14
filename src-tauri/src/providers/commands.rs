@@ -108,7 +108,7 @@ pub struct LogoutOutcome {
 #[tauri::command]
 pub async fn chatgpt_logout(store: State<'_, ProviderStore>, provider_id: String) -> Result<LogoutOutcome, AppError> {
     if !store.is_chatgpt(&provider_id) {
-        return Err(AppError::new("provider_not_found", "Deze provider bestaat niet meer."));
+        return Err(AppError::new("provider_not_found", crate::i18n::tr("This provider no longer exists.", "Deze provider bestaat niet meer.", "Bu sağlayıcı artık yok.")));
     }
     let revoked = store.hub().logout(&provider_id).await?;
     Ok(LogoutOutcome { provider: store.finish_logout(&provider_id)?, revoked })

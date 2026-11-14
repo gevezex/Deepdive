@@ -74,12 +74,12 @@ pub struct Completeness {
 impl Default for Completeness {
     /// Bronnen die zijn opgeslagen voordat de app dit controleerde.
     fn default() -> Self {
-        Self { verdict: CompletenessVerdict::Unknown, reason: "Deze kopie is opgeslagen voordat de app dit controleerde.".into(), signals: vec![], accepted_by_user: false }
+        Self { verdict: CompletenessVerdict::Unknown, reason: crate::i18n::tr("This copy was saved before the app checked this.", "Deze kopie is opgeslagen voordat de app dit controleerde.", "Bu kopya, uygulama bunu denetlemeden önce kaydedildi."), signals: vec![], accepted_by_user: false }
     }
 }
 
 impl Completeness {
-    pub fn plain(verdict: CompletenessVerdict, reason: &str) -> Self {
+    pub fn plain(verdict: CompletenessVerdict, reason: impl Into<String>) -> Self {
         Self { verdict, reason: reason.into(), signals: vec![], accepted_by_user: false }
     }
 }
@@ -125,6 +125,10 @@ pub struct Source {
     /// De lezer koos "Popup weghalen". De kopie op schijf blijft gelijk; de app verbergt de zwevende lagen bij het tonen.
     #[serde(default)]
     pub hide_floating: bool,
+    /// The language the model writes in for this source (blueprint and answers), as a code like "tr". `None`
+    /// follows the interface language.
+    #[serde(default)]
+    pub ai_language: Option<String>,
 }
 
 /// Korte vorm voor de bronnenlijst.

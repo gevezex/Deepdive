@@ -12,7 +12,7 @@ const MAX_PAGES: usize = 20;
 fn authorized(http: reqwest::RequestBuilder, ep: &Endpoint) -> Result<reqwest::RequestBuilder, AppError> {
     let http = http.header("anthropic-version", API_VERSION);
     let Some(key) = &ep.api_key else { return Ok(http) };
-    let mut value = HeaderValue::from_str(key.expose()).map_err(|_| AppError::new("key_invalid", "De opgeslagen API-sleutel bevat ongeldige tekens. Vul hem opnieuw in."))?;
+    let mut value = HeaderValue::from_str(key.expose()).map_err(|_| AppError::new("key_invalid", crate::i18n::tr("The saved API key contains invalid characters. Enter it again.", "De opgeslagen API-sleutel bevat ongeldige tekens. Vul hem opnieuw in.", "Kayıtlı API anahtarı geçersiz karakterler içeriyor. Anahtarı yeniden girin.")))?;
     value.set_sensitive(true);
     Ok(http.header("x-api-key", value))
 }

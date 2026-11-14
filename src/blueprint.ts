@@ -1,7 +1,8 @@
 // De blauwdruk in het rechterpaneel: de knop, de voortgang en de drie lagen. Alles wat van het model komt gaat via
 // textContent op het scherm, dus tekst uit een bron of antwoord kan hier geen opmaak of script worden.
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { assignLanes, CATEGORY_LABELS, CERTAINTY_LABELS, errorView, formatRanges, GOAL_LABELS, isLocalModel, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, RELATION_LABELS, ROLE_LABELS, sameModel, suggestModel, TEXT_KIND_LABELS, type ErrorAction } from "./blueprintLogic";
+import { assignLanes, blueprintLanguage, categoryLabel, certaintyLabel, errorView, formatRanges, goalLabel, isLocalModel, modelName, outcomes, pickSaved, pointsByAnchor, pointTarget, readableIds, relationLabel, roleLabel, sameModel, sourceLanguage, suggestModel, textKindLabel, type ErrorAction } from "./blueprintLogic";
+import { formatDate, languageInfo, locale, onLanguageChange, plural, t } from "./i18n";
 import { currentProviders, onProvidersChange, selectModel } from "./providers";
 import type { AppError, Blueprint, Critique, DiagramBlock, DraftStructure, JobEvent, ModelRef, ParagraphRange, Point, Quote, Relation, Source, Stage, Structure } from "./types";
 
@@ -64,7 +65,15 @@ function button(label: string, className: string, onClick: () => void, id?: stri
 export function initBlueprint(onJump: (ranges: ParagraphRange[]) => void) {
   jump = onJump;
   onProvidersChange(() => {
-    if (panel.source && !jobs.has(panel.source.id) && panel.loaded) panel.shown = pickSaved(panel.saved, currentProviders().selection.active);
+    if (panel.source && !jobs.has(panel.source.id) && panel.loaded) panel.shown = pickSaved(panel.saved, currentProviders().selection.active, sourceLanguage(panel.source));
+    render();
+  });
+  onLanguageChange(() => {
+    // A source without its own language follows the interface: its blueprint may now be another one.
+    if (panel.source && !panel.source.aiLanguage && !jobs.has(panel.source.id) && panel.loaded) {
+      panel.shown = pickSaved(panel.saved, currentProviders().selection.active, sourceLanguage(panel.source));
+      selected = null;
+    }
     render();
   });
   setInterval(tick, 1000);
@@ -75,8 +84,18 @@ export function initBlueprint(onJump: (ranges: ParagraphRange[]) => void) {
 /** Een andere bron op het scherm. Wat voor een andere bron wordt gemaakt loopt gewoon door. */
 export async function setBlueprintSource(source: Source | null) {
   const same = panel.source?.id === source?.id;
+  const languageChanged = sourceLanguage(panel.source) !== sourceLanguage(source);
   panel.source = source;
-  if (same) return render();
+  if (same) {
+    // The reader picked another language with the flag: show the blueprint in that language, if there is one.
+    if (languageChanged && source && panel.loaded && !jobs.has(source.id)) {
+      panel.shown = pickSaved(panel.saved, currentProviders().selection.active, sourceLanguage(source));
+      panel.error = null;
+      panel.note = null;
+      selected = null;
+    }
+    return render();
+  }
   const token = ++opening;
   Object.assign(panel, { saved: [], shown: null, error: null, note: null, loaded: false });
   selected = null;
@@ -87,7 +106,7 @@ export async function setBlueprintSource(source: Source | null) {
     const saved = await invoke<Blueprint[]>("saved_blueprints", { sourceId: source.id });
     if (token !== opening) return;
     panel.saved = saved;
-    panel.shown = pickSaved(saved, currentProviders().selection.active);
+    panel.shown = pickSaved(saved, currentProviders().selection.active, sourceLanguage(source));
   } catch (err) {
     if (token !== opening) return;
     panel.error = toError(err);
@@ -98,7 +117,7 @@ export async function setBlueprintSource(source: Source | null) {
 
 function toError(err: unknown): AppError {
   if (err && typeof err === "object" && "message" in err) return err as AppError;
-  return { kind: "unknown", message: "Er ging iets mis. Probeer het opnieuw.", detail: String(err) };
+  return { kind: "unknown", message: t("common.genericError"), detail: String(err) };
 }
 
 // ---------- maken ----------
@@ -133,6 +152,7 @@ async function start(critiqueOf: Blueprint | null = null) {
   channel.onmessage = (event) => onEvent(job, event);
   const args: Record<string, unknown> = { sourceId: source.id, onEvent: channel };
   if (critiqueOf) args.critiqueOf = ref;
+  args.language = critiqueOf ? blueprintLanguage(critiqueOf) : sourceLanguage(source);
   try {
     const blueprint = await invoke<Blueprint>("generate_blueprint", args);
     finish(job, blueprint);
@@ -185,8 +205,8 @@ async function finish(job: Job, blueprint: Blueprint) {
   panel.saved = saved;
   panel.shown = blueprint;
   // Een mislukte poging laat een eerdere, volledige blauwdruk van hetzelfde model staan.
-  if (!blueprint.critique && saved.some((b) => b.providerId === blueprint.providerId && b.model === blueprint.model && b.promptVersion === blueprint.promptVersion && b.critique)) {
-    panel.note = "De eerder bewaarde blauwdruk van dit model blijft bewaard en komt terug als je dit stuk opnieuw opent.";
+  if (!blueprint.critique && saved.some((b) => b.providerId === blueprint.providerId && b.model === blueprint.model && b.promptVersion === blueprint.promptVersion && blueprintLanguage(b) === blueprintLanguage(blueprint) && b.critique)) {
+    panel.note = t("bp.keptNote");
   }
   render();
 }
@@ -197,9 +217,9 @@ async function fail(job: Job, error: AppError) {
   if (panel.source?.id !== job.sourceId) return;
   panel.saved = saved;
   // Afgebroken of mislukt: wat er stond komt terug.
-  panel.shown = job.previous ?? pickSaved(saved, currentProviders().selection.active);
+  panel.shown = job.previous ?? pickSaved(saved, currentProviders().selection.active, sourceLanguage(panel.source));
   panel.error = error.kind === "cancelled" ? null : error;
-  panel.note = error.kind === "cancelled" ? "Afgebroken. Er is niets bewaard." : null;
+  panel.note = error.kind === "cancelled" ? t("bp.cancelledNote") : null;
   render();
 }
 
@@ -215,7 +235,7 @@ function render() {
   const out: Node[] = [];
   const source = panel.source;
   if (!source) {
-    out.push(el("p", "bp-empty", "Open eerst een stuk. Daarna maakt de professor hier de samenvatting en de blauwdruk."));
+    out.push(el("p", "bp-empty", t("bp.empty")));
     root().replaceChildren(...out);
     return;
   }
@@ -244,7 +264,7 @@ function render() {
 function warningText(source: Source, shown: Blueprint | null): string | null {
   if (shown?.source.warning) return shown.source.warning;
   if (source.completeness.verdict !== "likely_incomplete") return null;
-  return `Dit stuk is waarschijnlijk onvolledig. ${source.completeness.reason}`.trim();
+  return t("bp.incomplete", { reason: source.completeness.reason }).trim();
 }
 
 function warningBox(text: string): HTMLElement {
@@ -263,55 +283,61 @@ function controls(): Node[] {
   const activeName = active ? modelName(file, active.providerId, active.modelId) : null;
 
   if (shown) {
-    const when = new Date(shown.createdAt).toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "short" });
+    const when = formatDate(shown.createdAt);
     const row = el("div", "bp-meta");
     const text = el("p", "bp-meta-text");
     text.id = "bp-origin";
-    text.append("Gemaakt met ", el("strong", "", modelName(file, shown.providerId, shown.model)), ` · ${when} · ${duration(shown.seconds)} · opdracht v${shown.promptVersion}`);
+    text.append(t("bp.madeWith"), el("strong", "", modelName(file, shown.providerId, shown.model)), t("bp.meta", { when, duration: duration(shown.seconds), version: shown.promptVersion, language: languageText(blueprintLanguage(shown)) }));
     row.append(text);
-    const again = sameModel(shown, active) || !activeName ? "Opnieuw maken" : `Opnieuw maken met ${activeName}`;
+    const again = sameModel(shown, active) || !activeName ? t("bp.again") : t("bp.againWith", { model: activeName });
     row.append(button(again, "", () => void start(), "bp-again"));
     out.push(row);
-    if (local) out.push(el("p", "bp-hint bp-local", "Opnieuw maken met dit lokale model kan tot ongeveer een kwartier duren."));
+    if (local) out.push(el("p", "bp-hint bp-local", t("bp.againLocal")));
     if (panel.saved.length > 1) out.push(savedPicker(file));
     const missing = critiqueMissing(shown);
     if (missing) out.push(missing);
   } else {
     const box = el("div", "bp-start");
-    box.append(button("Maak samenvatting en blauwdruk", "primary", () => void start(), "bp-start"));
-    if (activeName) box.append(el("p", "bp-hint", `Met ${activeName}. Je kunt het model bovenaan wijzigen.`));
+    box.append(button(t("bp.start"), "primary", () => void start(), "bp-start"));
+    const language = languageText(sourceLanguage(panel.source));
+    box.append(el("p", "bp-hint", activeName ? t("bp.startWith", { model: activeName, language }) : t("bp.startLanguage", { language })));
     const suggestion = suggestModel(file);
     if (suggestion) {
       const offer = el("div", "bp-suggest");
       offer.id = "bp-suggest";
-      offer.append(el("p", "", "Nog geen model gekozen. Je bent ingelogd met ChatGPT; dat was in de test snel en gaf weinig ruis. Jij kiest."));
-      offer.append(button(`${suggestion.label} kiezen`, "", () => void selectModel(suggestion.ref), "bp-suggest-use"));
+      offer.append(el("p", "", t("bp.suggest")));
+      offer.append(button(t("bp.suggestUse", { label: suggestion.label }), "", () => void selectModel(suggestion.ref), "bp-suggest-use"));
       box.append(offer);
     } else if (!active) {
-      box.append(el("p", "bp-hint", "Kies eerst bovenaan een model."));
+      box.append(el("p", "bp-hint", t("bp.chooseModel")));
     }
     out.push(box);
+    // Saved in another language: still within reach.
+    if (panel.saved.length) out.push(savedPicker(file));
     if (local) out.push(localNote());
   }
   return out;
 }
 
 function localNote(): HTMLElement {
-  const note = el("p", "bp-hint bp-local", "Dit model draait op deze computer. Een blauwdruk kan dan lang duren: in de test tot ongeveer een kwartier. Je kunt intussen gewoon doorlezen.");
+  const note = el("p", "bp-hint bp-local", t("bp.localNote"));
   note.id = "bp-local-note";
   return note;
 }
 
 function savedPicker(file: ReturnType<typeof currentProviders>): HTMLElement {
-  const label = el("label", "bp-saved", "Bewaard");
+  const label = el("label", "bp-saved", t("bp.saved"));
   const select = el("select");
   select.id = "bp-saved";
+  if (!panel.shown) select.add(new Option("—", ""));
   panel.saved.forEach((b, i) => {
-    const when = new Date(b.createdAt).toLocaleDateString("nl-NL", { dateStyle: "medium" });
-    select.add(new Option(`${modelName(file, b.providerId, b.model)} · v${b.promptVersion} · ${when}`, String(i)));
+    const when = new Date(b.createdAt).toLocaleDateString(locale(), { dateStyle: "medium" });
+    const flag = languageInfo(blueprintLanguage(b))?.flag ?? blueprintLanguage(b);
+    select.add(new Option(`${flag} ${modelName(file, b.providerId, b.model)} · v${b.promptVersion} · ${when}`, String(i)));
   });
-  select.value = String(panel.saved.indexOf(panel.shown as Blueprint));
+  select.value = panel.shown ? String(panel.saved.indexOf(panel.shown)) : "";
   select.addEventListener("change", () => {
+    if (!select.value) return;
     panel.shown = panel.saved[Number(select.value)];
     selected = null;
     render();
@@ -322,7 +348,12 @@ function savedPicker(file: ReturnType<typeof currentProviders>): HTMLElement {
 
 function duration(seconds: number): string {
   const s = Math.round(seconds);
-  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
+  return s < 60 ? t("bp.seconds", { s }) : t("bp.minutes", { m: Math.floor(s / 60), s: String(s % 60).padStart(2, "0") });
+}
+
+/** "Turkish" in the interface language would need another table; the language's own name is clear to everyone. */
+function languageText(code: string): string {
+  return languageInfo(code)?.name ?? code;
 }
 
 function progressBox(job: Job): HTMLElement {
@@ -338,16 +369,16 @@ function progressBox(job: Job): HTMLElement {
     return item;
   };
   steps.append(
-    step("Doel en boodschap", hasGoal ? "done" : "now"),
-    step("Diagram", hasDiagram ? "done" : hasGoal ? "now" : "todo"),
-    step("Kritische laag", hasDiagram ? "now" : "todo"),
+    step(t("bp.stepGoal"), hasGoal ? "done" : "now"),
+    step(t("bp.stepDiagram"), hasDiagram ? "done" : hasGoal ? "now" : "todo"),
+    step(t("bp.stepCritique"), hasDiagram ? "now" : "todo"),
   );
   box.append(steps);
   const line = el("p", "bp-progress-line");
   line.id = "bp-progress-line";
   box.append(line);
   const actions = el("div", "bp-progress-actions");
-  actions.append(button(job.cancelling ? "Afbreken…" : "Afbreken", "", () => cancel(job), "bp-cancel"));
+  actions.append(button(t(job.cancelling ? "bp.cancelling" : "bp.cancel"), "", () => cancel(job), "bp-cancel"));
   (actions.firstChild as HTMLButtonElement).disabled = job.cancelling;
   box.append(actions);
   if (job.local) box.append(localNote());
@@ -360,8 +391,8 @@ function updateProgress() {
   if (!job || !line) return;
   const seconds = (Date.now() - job.startedAt) / 1000;
   // Een testbouw zonder vaste handtekening kan hier stilstaan op een melding van macOS, die niet altijd vooraan staat.
-  const waiting = !job.local && seconds > KEYCHAIN_HINT_AFTER ? "Wachten op het model. Vraagt macOS om toegang tot de sleutelhanger? Kies dan Altijd toestaan" : "Wachten op het model";
-  const what = job.attempt > 1 ? `${job.stage === "critique" ? "Kritische laag" : "Doel en diagram"}: tweede poging, het vorige antwoord was onbruikbaar` : job.thinking ? "Het model denkt na" : job.chars ? "Het model schrijft" : waiting;
+  const waiting = t(!job.local && seconds > KEYCHAIN_HINT_AFTER ? "bp.waitingKeychain" : "bp.waiting");
+  const what = job.attempt > 1 ? t("bp.secondAttempt", { stage: t(job.stage === "critique" ? "bp.stepCritique" : "bp.stageGoalDiagram") }) : job.thinking ? t("bp.thinking") : job.chars ? t("bp.writing") : waiting;
   line.textContent = `${job.modelText ? `${job.modelText}: ` : ""}${what} · ${duration(seconds)}`;
 }
 
@@ -381,7 +412,7 @@ function errorBox(error: AppError): HTMLElement {
   if (actions.childElementCount) box.append(actions);
   if (error.detail) {
     const more = el("details");
-    more.append(el("summary", "", "Technische details"), el("code", "", error.detail));
+    more.append(el("summary", "", t("common.technicalDetails")), el("code", "", error.detail));
     box.append(more);
   }
   return box;
@@ -390,13 +421,13 @@ function errorBox(error: AppError): HTMLElement {
 function errorAction(action: ErrorAction): HTMLElement {
   switch (action) {
     case "providers":
-      return button("Providers openen", "", () => document.getElementById("providers-open")?.click(), "bp-action-providers");
+      return button(t("bp.openProviders"), "", () => document.getElementById("providers-open")?.click(), "bp-action-providers");
     case "usage":
-      return button("Manage usage", "", () => void invoke("open_chatgpt_usage"), "bp-action-usage");
+      return button(t("providers.manageUsage"), "", () => void invoke("open_chatgpt_usage"), "bp-action-usage");
     case "picker":
-      return button("Ander model kiezen", "", () => document.getElementById("model-picker")?.focus(), "bp-action-picker");
+      return button(t("bp.otherModel"), "", () => document.getElementById("model-picker")?.focus(), "bp-action-picker");
     case "retry":
-      return button("Opnieuw proberen", "primary", () => void start(), "bp-action-retry");
+      return button(t("bp.retry"), "primary", () => void start(), "bp-action-retry");
   }
 }
 
@@ -408,7 +439,7 @@ function layers(structure: DraftStructure | Structure, critique: Critique | null
   const goal = goalLayer(structure);
   if (goal) out.push(goal);
   if (structure.blocks.length) out.push(diagramLayer(structure, critique));
-  else if (job && structure.message) out.push(waiting("Het diagram wordt gemaakt…"));
+  else if (job && structure.message) out.push(waiting(t("bp.diagramComing")));
   const critiqueSection = critiqueLayer(structure, critique, job);
   if (critiqueSection) out.push(critiqueSection);
   return out;
@@ -427,14 +458,14 @@ function goalLayer(s: DraftStructure | Structure): HTMLElement | null {
   if (!s.goal && !s.message && !s.textKind) return null;
   const box = el("section", "bp-goal");
   box.id = "bp-goal";
-  if (s.textKind) box.append(el("p", "bp-kind", TEXT_KIND_LABELS[s.textKind] ?? s.textKind));
+  if (s.textKind) box.append(el("p", "bp-kind", textKindLabel(s.textKind)));
   if (s.goal?.main) {
     const line = el("p", "bp-purpose");
-    line.append(el("span", "bp-label", GOAL_LABELS[s.goal.main.kind] ?? "Doel"), ` ${s.goal.main.description}`);
+    line.append(el("span", "bp-label", goalLabel(s.goal.main.kind) ?? t("bp.goal")), ` ${s.goal.main.description}`);
     box.append(line);
     for (const goal of s.goal.secondary ?? []) {
       const extra = el("p", "bp-purpose bp-secondary");
-      extra.append(el("span", "bp-label", `Daarnaast: ${(GOAL_LABELS[goal.kind] ?? "doel").toLowerCase()}`), ` ${goal.description}`);
+      extra.append(el("span", "bp-label", t("bp.alsoGoal", { goal: (goalLabel(goal.kind) ?? t("bp.goal")).toLocaleLowerCase(locale()) })), ` ${goal.description}`);
       box.append(extra);
     }
   }
@@ -445,7 +476,7 @@ function goalLayer(s: DraftStructure | Structure): HTMLElement | null {
   }
   if (s.occasion) {
     const line = el("p", "bp-occasion");
-    line.append(el("span", "bp-label", "Aanleiding"), " ");
+    line.append(el("span", "bp-label", t("bp.occasion")), " ");
     line.append(originTag(s.occasion.origin), ` ${s.occasion.text} `);
     const ranges = s.occasion.paragraphs;
     if (ranges.length) line.append(rangeLink(ranges));
@@ -460,8 +491,8 @@ function goalLayer(s: DraftStructure | Structure): HTMLElement | null {
 }
 
 function originTag(origin: "stated" | "inferred"): HTMLElement {
-  const tag = el("span", `bp-origin bp-origin-${origin}`, origin === "stated" ? "gezegd" : "afgeleid");
-  tag.title = origin === "stated" ? "De tekst zegt dit zelf." : "De professor leidt dit af. De tekst zegt het niet zo.";
+  const tag = el("span", `bp-origin bp-origin-${origin}`, t(origin === "stated" ? "bp.stated" : "bp.inferred"));
+  tag.title = t(origin === "stated" ? "bp.statedTitle" : "bp.inferredTitle");
   return tag;
 }
 
@@ -479,7 +510,7 @@ function quoteBlock(quote: Quote): HTMLElement {
 
 function diagramLayer(s: DraftStructure | Structure, critique: Critique | null): HTMLElement {
   const box = el("section", "bp-diagram-section");
-  box.append(sectionHead("Levensloop van het betoog"));
+  box.append(sectionHead(t("bp.diagramHead")));
   const diagram = el("div", "bp-diagram");
   diagram.id = "bp-diagram";
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -515,7 +546,7 @@ function relationRow(relation: Relation, number: Map<string, number>, target: Di
   if (points.some((p) => p.polarity === "minus")) row.classList.add("has-minus");
   const head = el("button", "bp-rel-head");
   head.type = "button";
-  head.append(el("span", "bp-rel-from", `van ${number.get(relation.dependsOn)}`), el("span", "bp-rel-kind", RELATION_LABELS[relation.kind] ?? relation.kind), relation.explanation ? ` ${readable(relation.explanation)}` : "");
+  head.append(el("span", "bp-rel-from", t("bp.from", { n: number.get(relation.dependsOn) ?? "?" })), el("span", "bp-rel-kind", relationLabel(relation.kind)), relation.explanation ? ` ${readable(relation.explanation)}` : "");
   head.addEventListener("click", () => selectItem(relation.id, target.paragraphs));
   row.append(head);
   if (points.length) row.append(pointList(points));
@@ -531,7 +562,7 @@ function blockCard(block: DiagramBlock, n: number, points: Point[]): HTMLElement
   const head = el("button", "bp-block-head");
   head.type = "button";
   const top = el("span", "bp-block-top");
-  top.append(el("span", "bp-num", String(n)), el("span", "bp-role", ROLE_LABELS[block.role] ?? block.role));
+  top.append(el("span", "bp-num", String(n)), el("span", "bp-role", roleLabel(block.role)));
   if (block.paragraphs.length) top.append(el("span", "bp-para", formatRanges(block.paragraphs)));
   head.append(top, el("span", "bp-title", block.title), el("span", "bp-content", readable(block.content)));
   head.addEventListener("click", () => selectItem(block.id, block.paragraphs));
@@ -559,8 +590,8 @@ function pointItem(point: Point): HTMLElement {
   head.setAttribute("aria-expanded", String(open));
   const top = el("span", "bp-point-top");
   const sign = el("span", "bp-sign", point.polarity === "plus" ? "+" : "−");
-  sign.title = point.polarity === "plus" ? "Maakt het betoog sterker" : "Maakt het betoog zwakker";
-  top.append(sign, el("span", "bp-category", CATEGORY_LABELS[point.category] ?? point.category), originTag(point.origin));
+  sign.title = t(point.polarity === "plus" ? "bp.plusTitle" : "bp.minusTitle");
+  top.append(sign, el("span", "bp-category", categoryLabel(point.category)), originTag(point.origin));
   head.append(top, el("span", "bp-claim", readable(point.claim)));
   head.addEventListener("click", () => {
     if (expanded.has(point.id)) expanded.delete(point.id);
@@ -575,9 +606,9 @@ function pointItem(point: Point): HTMLElement {
     more.append(el("p", "", readable(point.explanation)));
     for (const quote of point.quotes) more.append(quoteBlock(quote));
     const foot = el("p", "bp-point-foot");
-    foot.append(el("span", "bp-certainty", CERTAINTY_LABELS[point.certainty]));
+    foot.append(el("span", "bp-certainty", certaintyLabel(point.certainty)));
     if (point.paragraphs.length) foot.append(" ", rangeLink(pointTarget(point)));
-    if (point.broad) foot.append(el("span", "bp-broad", `Geldt voor een groot deel van het stuk (${formatRanges(point.paragraphs)}). Springen gaat naar het begin.`));
+    if (point.broad) foot.append(el("span", "bp-broad", t("bp.broad", { ranges: formatRanges(point.paragraphs) })));
     more.append(foot);
     item.append(more);
   }
@@ -588,7 +619,7 @@ function critiqueLayer(s: DraftStructure | Structure, critique: Critique | null,
   if (!critique && (!job || !job.structure)) return null;
   const box = el("section", "bp-critique");
   box.id = "bp-critique";
-  box.append(sectionHead("Kritische laag"));
+  box.append(sectionHead(t("bp.stepCritique")));
   if (critique) {
     box.append(el("p", "bp-overall", readable(critique.overall)));
     const list = el("dl", "bp-outcomes");
@@ -601,16 +632,16 @@ function critiqueLayer(s: DraftStructure | Structure, critique: Critique | null,
       list.append(line);
     }
     box.append(list);
-    if (!critique.points.length) box.append(el("p", "bp-nothing", "De professor vond geen zwakke plekken om te noemen. Dat is een uitkomst, geen ontbrekend deel."));
+    if (!critique.points.length) box.append(el("p", "bp-nothing", t("bp.nothing")));
     const { loose } = pointsByAnchor(critique, [...s.blocks.map((b) => b.id), ...s.relations.map((r) => r.id)]);
     if (loose.length) {
-      box.append(el("h3", "bp-subhead", "Hoort niet bij één stap"));
+      box.append(el("h3", "bp-subhead", t("bp.loose")));
       box.append(pointList(loose));
     }
     if (critique.terms.length) {
       const terms = el("details", "bp-terms");
       terms.id = "bp-terms";
-      terms.append(el("summary", "", `Begrippen (${critique.terms.length}): hulp bij het lezen, geen kritiek`));
+      terms.append(el("summary", "", t("bp.terms", { n: critique.terms.length })));
       const list2 = el("dl");
       for (const term of critique.terms) {
         const line = el("div");
@@ -625,7 +656,7 @@ function critiqueLayer(s: DraftStructure | Structure, critique: Critique | null,
     }
     return box;
   }
-  box.append(waiting("De kritische laag wordt gemaakt. Doel en diagram staan al vast."));
+  box.append(waiting(t("bp.critiqueComing")));
   return box;
 }
 
@@ -636,9 +667,9 @@ function critiqueMissing(shown: Blueprint): HTMLElement | null {
   const stopped = shown.issues.find((i) => i.code === "critique_cancelled");
   const notice = el("div", failed ? "notice notice-error bp-critique-missing" : "notice bp-critique-missing");
   notice.id = "bp-critique-missing";
-  if (failed) notice.append(el("strong", "", "De kritische laag is niet gelukt. Doel en diagram blijven staan."), el("p", "", failed.detail));
-  else notice.append(el("p", "", stopped ? "De kritische laag is afgebroken. Doel en diagram zijn bewaard." : "De kritische laag ontbreekt nog. Doel en diagram zijn bewaard."));
-  notice.append(button("Alleen de kritische laag maken", "primary", () => void start(shown), "bp-critique-retry"));
+  if (failed) notice.append(el("strong", "", t("bp.critiqueFailed")), el("p", "", failed.detail));
+  else notice.append(el("p", "", t(stopped ? "bp.critiqueStopped" : "bp.critiqueMissing")));
+  notice.append(button(t("bp.critiqueOnly"), "primary", () => void start(shown), "bp-critique-retry"));
   return notice;
 }
 
@@ -650,7 +681,7 @@ function repairs(b: Blueprint): Node[] {
   if (!issues.length) return [];
   const box = el("details", "bp-repairs");
   box.id = "bp-repairs";
-  box.append(el("summary", "", issues.length === 1 ? "De controle heeft 1 ding hersteld of gemarkeerd" : `De controle heeft ${issues.length} dingen hersteld of gemarkeerd`));
+  box.append(el("summary", "", plural(issues.length, "bp.repairs.one", "bp.repairs.other")));
   const list = el("ul");
   for (const issue of issues) list.append(el("li", "", issue.detail));
   box.append(list);

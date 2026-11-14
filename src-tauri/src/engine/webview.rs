@@ -93,7 +93,7 @@ async fn eval(window: &WebviewWindow, js: String) -> Result<String, AppError> {
     tokio::time::timeout(Duration::from_secs(15), rx)
         .await
         .map_err(|_| AppError::timeout())?
-        .map_err(|_| AppError::engine("de webview gaf geen antwoord"))
+        .map_err(|_| AppError::engine(crate::i18n::tr("the webview did not respond", "de webview gaf geen antwoord", "webview yanıt vermedi")))
 }
 
 /// Haalt een lange uitvoer in stukken op, want de webview geeft niet alles in één keer terug.
@@ -101,13 +101,13 @@ async fn read_chunks(window: &WebviewWindow, next: &str, limit: usize) -> Result
     let mut payload = String::new();
     loop {
         let chunk: String = serde_json::from_str(&eval(window, next.to_string()).await?)
-            .map_err(|e| AppError::engine(format!("onleesbaar antwoord: {e}")))?;
+            .map_err(|e| AppError::engine(format!("{}: {e}", crate::i18n::tr("unreadable response", "onleesbaar antwoord", "okunamayan yanıt"))))?;
         if chunk.is_empty() {
             return Ok(payload);
         }
         payload.push_str(&chunk);
         if payload.len() > limit {
-            return Err(AppError::engine("de pagina is te groot om op te slaan"));
+            return Err(AppError::engine(crate::i18n::tr("the page is too large to save", "de pagina is te groot om op te slaan", "sayfa kaydedilemeyecek kadar büyük")));
         }
     }
 }
@@ -139,7 +139,7 @@ impl PageEngine for WebviewEngine {
         let (loaded_tx, mut loaded_rx) = watch::channel(false);
 
         let builder = WebviewWindowBuilder::new(&self.app, &label, WebviewUrl::External(url.clone()))
-            .title("Deepdive – vastleggen")
+            .title(crate::i18n::tr("Deepdive – capture", "Deepdive – vastleggen", "Deepdive – yakalama"))
             .visible(false)
             .focused(false)
             .inner_size(1280.0, 900.0)
@@ -201,7 +201,7 @@ impl PageEngine for WebviewEngine {
         }
 
         let payload = read_chunks(&window, &format!("window['{ns}'].next()"), MAX_PAYLOAD).await?;
-        let mut page: RenderedPage = serde_json::from_str(&payload).map_err(|e| AppError::engine(format!("onleesbaar antwoord: {e}")))?;
+        let mut page: RenderedPage = serde_json::from_str(&payload).map_err(|e| AppError::engine(format!("{}: {e}", crate::i18n::tr("unreadable response", "onleesbaar antwoord", "okunamayan yanıt"))))?;
         if session.is_some() {
             // Na het laden gelezen: sites vernieuwen hun sessiecookie vaak bij elk bezoek.
             page.session_cookies = cookies_of(window.clone()).await?;

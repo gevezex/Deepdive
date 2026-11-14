@@ -2,8 +2,9 @@
 // afgeschermde iframe; het eigen script daarin (src-tauri/src/engine/bridge.js) geeft haar door met postMessage.
 // Bij een pdf staat de tekstlaag gewoon in dit venster.
 import { invoke } from "@tauri-apps/api/core";
+import { locale, onLanguageChange, t } from "./i18n";
 import type { PdfViewHandle } from "./pdf";
-import { COLOR_LABELS, COLORS, MORE_ACTIONS, paragraphsForRects, quoteText, type Action, type HighlightColor, type PageRect } from "./readingLogic";
+import { colorLabel, COLORS, moreActions, paragraphsForRects, quoteText, type Action, type HighlightColor, type PageRect } from "./readingLogic";
 import type { AppError, ParagraphRange, Source } from "./types";
 
 export interface Selected {
@@ -95,6 +96,12 @@ export function initReading(options: Options) {
   for (const el of document.querySelectorAll<HTMLElement>(".sel-icon[data-icon]")) el.innerHTML = icon(el.dataset.icon!);
   renderColorDot();
   buildMoreMenu();
+  // Andere interfacetaal: het menu en de titels zijn in code gemaakt, dus opnieuw opbouwen.
+  onLanguageChange(() => {
+    buildMoreMenu();
+    renderColorDot();
+    if (activeMark && !markMenu().hidden) openMarkMenu(activeMark, markRect);
+  });
 
   window.addEventListener("message", onFrameMessage);
   for (const button of bar().querySelectorAll<HTMLButtonElement>("button[data-action]")) {
@@ -143,9 +150,9 @@ export function initReading(options: Options) {
 
   // Klikken ergens anders sluit de balk en de menu's.
   document.addEventListener("mousedown", (e) => {
-    const t = e.target as HTMLElement;
-    if (t.closest("#sel-bar, #sel-menu, #mark-menu, #note-pop")) return;
-    if (t.closest("#pdf-view")) {
+    const target = e.target as HTMLElement;
+    if (target.closest("#sel-bar, #sel-menu, #mark-menu, #note-pop")) return;
+    if (target.closest("#pdf-view")) {
       hideMarkMenu();
       return;
     }
@@ -411,7 +418,7 @@ function run(action: Action, question?: string) {
 function buildMoreMenu() {
   const m = menu();
   m.replaceChildren();
-  MORE_ACTIONS.forEach((item, i) => {
+  moreActions().forEach((item, i) => {
     if (item.action === "copy") m.append(Object.assign(document.createElement("div"), { className: "sel-menu-sep" }));
     const b = document.createElement("button");
     b.type = "button";
@@ -473,23 +480,23 @@ async function copyQuote() {
     document.execCommand("copy");
     area.remove();
   }
-  toast("Citaat gekopieerd");
+  toast(t("reading.quoteCopied"));
 }
 
 let toastTimer = 0;
 function toast(text: string) {
-  const t = $("toast");
-  t.textContent = text;
-  t.hidden = false;
+  const el = $("toast");
+  el.textContent = text;
+  el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (t.hidden = true), 1800);
+  toastTimer = window.setTimeout(() => (el.hidden = true), 1800);
 }
 
 // ---------- markeren ----------
 
 function renderColorDot() {
   $("sel-mark-dot").dataset.color = color;
-  $("sel-mark").title = `Markeren (${COLOR_LABELS[color].toLowerCase()})`;
+  $("sel-mark").title = t("reading.highlightColor", { color: colorLabel(color).toLocaleLowerCase(locale()) });
 }
 
 async function save(h: Highlight): Promise<boolean> {
@@ -542,8 +549,8 @@ function openMarkMenu(id: string, rect?: { top: number; left: number; bottom: nu
     b.type = "button";
     b.className = `sel-swatch${c === h.color ? " is-current" : ""}`;
     b.dataset.color = c;
-    b.title = COLOR_LABELS[c];
-    b.setAttribute("aria-label", COLOR_LABELS[c]);
+    b.title = colorLabel(c);
+    b.setAttribute("aria-label", colorLabel(c));
     b.addEventListener("click", () => void recolor(id, c));
     m.append(b);
   }
@@ -560,16 +567,16 @@ function openMarkMenu(id: string, rect?: { top: number; left: number; bottom: nu
     b.addEventListener("click", onClick);
     m.append(b);
   };
-  addButton(h.note ? "Notitie" : "Notitie", "pencil", () => {
+  addButton(t("reading.note"), "pencil", () => {
     const r = markRect;
     hideMarkMenu();
     openNote(id, r);
-  }, h.note ? `Notitie: ${h.note}` : "Notitie toevoegen");
-  addButton("Leg uit", "bulb", () => {
+  }, h.note ? t("reading.noteWithText", { note: h.note }) : t("reading.addNote"));
+  addButton(t("reading.action.explain"), "bulb", () => {
     hideMarkMenu();
     opts.ask("explain", { text: h.text, from: h.from, to: h.to });
   });
-  addButton("", "trash", () => void removeMark(id), "Markering weghalen");
+  addButton("", "trash", () => void removeMark(id), t("reading.removeHighlight"));
   m.hidden = false;
   placeMarkMenu();
 }

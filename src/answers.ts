@@ -3,7 +3,8 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { modelName } from "./blueprintLogic";
 import { currentProviders } from "./providers";
-import { ACTION_LABELS, paragraphLabel, parseAnswer, type Action, type Inline } from "./readingLogic";
+import { actionLabel, paragraphLabel, parseAnswer, type Action, type Inline } from "./readingLogic";
+import { onLanguageChange, t } from "./i18n";
 import type { Selected } from "./reading";
 import type { AppError, ParagraphRange, Source } from "./types";
 
@@ -67,7 +68,7 @@ function button(label: string, className: string, onClick: () => void, title?: s
 
 function toError(err: unknown): AppError {
   if (err && typeof err === "object" && "message" in err) return err as AppError;
-  return { kind: "unknown", message: "Er ging iets mis. Probeer het opnieuw.", detail: String(err) };
+  return { kind: "unknown", message: t("common.genericError"), detail: String(err) };
 }
 
 // ---------- van buitenaf ----------
@@ -75,6 +76,7 @@ function toError(err: unknown): AppError {
 export function initAnswers(onJump: (ranges: ParagraphRange[]) => void, onShow: () => void) {
   jump = onJump;
   showTab = onShow;
+  onLanguageChange(render);
   render();
 }
 
@@ -173,7 +175,7 @@ function render() {
   const r = root();
   updateCount();
   if (!source) {
-    r.replaceChildren(el("p", "bp-empty", "Open een bron. Selecteer dan een stuk tekst om de professor iets te vragen."));
+    r.replaceChildren(el("p", "bp-empty", t("ans.noSource")));
     return;
   }
   const cards: HTMLElement[] = [];
@@ -184,7 +186,7 @@ function render() {
   for (const thread of [...threads].reverse()) cards.push(threadCard(thread));
   if (!cards.length) {
     r.replaceChildren(
-      el("p", "bp-empty", "Selecteer links een stuk tekst. Dan verschijnt er een balk waarmee je de professor iets vraagt, of de tekst markeert."),
+      el("p", "bp-empty", t("ans.empty")),
     );
     return;
   }
@@ -203,7 +205,7 @@ function inline(parts: Inline[]): Node[] {
   return parts.map((p) => {
     if (p.ref) {
       const ref = p.ref;
-      const b = button(p.text, "bp-range", () => jump([ref]), `Naar ${p.text}`);
+      const b = button(p.text, "bp-range", () => jump([ref]), t("ans.goTo", { where: p.text }));
       if (p.bold) b.classList.add("is-bold");
       return b;
     }
@@ -233,18 +235,18 @@ function answerBody(text: string): HTMLElement {
 
 function head(action: Action, selection: Selected, actions: HTMLElement[]): HTMLElement {
   const top = el("div", "ans-head");
-  top.append(el("span", "ans-action", ACTION_LABELS[action]));
+  top.append(el("span", "ans-action", actionLabel(action)));
   const where = paragraphLabel(selection.from, selection.to);
   if (where && selection.from != null) {
     const range: ParagraphRange = [selection.from, selection.to ?? selection.from];
-    top.append(button(where, "bp-range", () => jump([range]), `Naar ${where}`));
+    top.append(button(where, "bp-range", () => jump([range]), t("ans.goTo", { where })));
   }
   top.append(el("span", "spacer"), ...actions);
   const quote = el("blockquote", "ans-quote", selection.text);
   if (selection.from != null) {
     const range: ParagraphRange = [selection.from, selection.to ?? selection.from];
     quote.addEventListener("click", () => jump([range]));
-    quote.title = "Naar deze plek in de tekst";
+    quote.title = t("ans.goToPlace");
   }
   const wrap = el("div");
   wrap.append(top, quote);
@@ -263,15 +265,15 @@ function liveAnswer(item: Live): HTMLElement {
     err.append(el("strong", "", item.error.message));
     if (item.error.detail) {
       const d = el("details");
-      d.append(el("summary", "", "Technische details"), el("code", "", item.error.detail));
+      d.append(el("summary", "", t("common.technicalDetails")), el("code", "", item.error.detail));
       err.append(d);
     }
     box.append(err);
     return box;
   }
   const status = el("div", "ans-status");
-  status.append(el("span", "ans-dots"), document.createTextNode(item.stopping ? "Stoppen…" : item.thinking ? "Denkt na…" : item.answer ? "Schrijft…" : "Even geduld…"));
-  if (!item.stopping) status.append(button("Stoppen", "link", () => stop(item)));
+  status.append(el("span", "ans-dots"), document.createTextNode(t(item.stopping ? "ans.stopping" : item.thinking ? "ans.thinking" : item.answer ? "ans.writing" : "ans.wait")));
+  if (!item.stopping) status.append(button(t("common.stop"), "link", () => stop(item)));
   box.append(status);
   return box;
 }
@@ -282,7 +284,7 @@ function newCard(item: Live): HTMLElement {
   const close = item.error ? [button("×", "ans-close", () => {
     live.delete(item.key);
     render();
-  }, "Weghalen")] : [];
+  }, t("common.remove"))] : [];
   card.append(head(item.action, item.selection, close));
   if (item.question) card.append(question(item.question));
   card.append(liveAnswer(item));
@@ -293,19 +295,19 @@ function threadCard(thread: Thread): HTMLElement {
   const card = el("article", "ans-card");
   const running = live.get(thread.id);
   if (running) card.dataset.live = running.key;
-  card.append(head(thread.action, thread.selection, [button("×", "ans-close", () => void removeThread(thread), "Gesprek weghalen")]));
+  card.append(head(thread.action, thread.selection, [button("×", "ans-close", () => void removeThread(thread), t("ans.removeThread"))]));
   thread.turns.forEach((turn, i) => {
     if (turn.role === "user") {
       if (turn.text) card.append(question(turn.text));
     } else {
       card.append(answerBody(turn.text));
-      if (i === thread.turns.length - 1 && thread.stopped) card.append(el("p", "ans-note", "Gestopt voordat het antwoord af was."));
+      if (i === thread.turns.length - 1 && thread.stopped) card.append(el("p", "ans-note", t("ans.stopped")));
     }
   });
   if (running) {
     card.append(question(running.question ?? ""), liveAnswer(running));
     if (running.error) {
-      card.append(button("Sluiten", "link", () => {
+      card.append(button(t("common.close"), "link", () => {
         live.delete(thread.id);
         render();
       }));
@@ -315,8 +317,8 @@ function threadCard(thread: Thread): HTMLElement {
     form.autocomplete = "off";
     const input = el("input");
     input.type = "text";
-    input.placeholder = "Doorvragen…";
-    input.setAttribute("aria-label", "Vervolgvraag");
+    input.placeholder = t("ans.followUp");
+    input.setAttribute("aria-label", t("ans.followUpLabel"));
     form.append(input);
     form.addEventListener("submit", (e) => {
       e.preventDefault();

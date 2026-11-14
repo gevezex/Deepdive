@@ -1,35 +1,20 @@
 // Het deel van de blauwdruk dat zonder scherm te testen is.
 import { chatgptState, modelLabel } from "./providerLogic";
+import { lang, plural, t, type Key } from "./i18n";
 import type { AppError, Blueprint, Category, CheckResult, Critique, DiagramBlock, ModelRef, ParagraphRange, Point, ProvidersFile, Relation } from "./types";
 
-export const ROLE_LABELS: Record<string, string> = {
-  occasion: "Aanleiding", thesis: "Stelling", concept: "Begrip", explanation: "Uitleg", argument: "Argument", evidence: "Bewijs", example: "Voorbeeld",
-  objection: "Bezwaar", rebuttal: "Weerlegging", conclusion: "Conclusie", question: "Vraag", method: "Methode", results: "Resultaten",
-  interpretation: "Interpretatie", limitation: "Beperking", event: "Gebeurtenis", background: "Achtergrond", reaction: "Reactie",
-  reflection: "Bespiegeling", lesson: "Les", instruction: "Instructie", assessment: "Beoordeling", other: "Stap",
-};
-
-export const RELATION_LABELS: Record<string, string> = {
-  builds_on: "bouwt voort", evidence_for: "bewijs", example_of: "voorbeeld", answers: "antwoord", contrasts: "contrast", follows_in_time: "daarna", concludes: "conclusie",
-};
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  assumption: "Aanname", leap: "Sprong", gap: "Logisch gat", evidence: "Bewijs", missing: "Wat ontbreekt", headline_vs_content: "Kop tegenover inhoud",
-};
-
-export const GOAL_LABELS: Record<string, string> = {
-  explain_problem: "Een probleem uitleggen", offer_solution: "Een oplossing bieden", vent_frustration: "Een frustratie uiten", personal_experience: "Een ervaring vertellen",
-  develop_concept: "Een idee uitwerken", persuade: "De lezer overtuigen", report_research: "Onderzoek rapporteren", report_event: "Een gebeurtenis verslaan",
-  refute: "Weerleggen", evaluate: "Beoordelen", instruct: "Instructies geven", other: "Anders",
-};
-
-export const TEXT_KIND_LABELS: Record<string, string> = {
-  news: "Nieuws", opinion: "Opinie", research: "Onderzoek", memoir: "Memoire", essay: "Essay", explainer: "Uitleg", review: "Recensie", reference: "Naslag", other: "Tekst",
-};
-
-export const RESULT_LABELS: Record<CheckResult, string> = { found: "gevonden", nothing_found: "niets gevonden", not_applicable: "niet van toepassing" };
-
-export const CERTAINTY_LABELS = { high: "Zekerheid: hoog", medium: "Zekerheid: gemiddeld", low: "Zekerheid: laag, een vermoeden" } as const;
+/** Labels for the fixed values the model returns. Unknown values are shown as they are. */
+function label(prefix: string, value: string): string | null {
+  const key = `${prefix}.${value}` as Key;
+  const text = t(key);
+  return text === key ? null : text;
+}
+export const roleLabel = (role: string) => label("bp.role", role) ?? role;
+export const relationLabel = (kind: string) => label("bp.rel", kind) ?? kind;
+export const categoryLabel = (category: string) => label("bp.cat", category) ?? category;
+export const goalLabel = (kind: string) => label("bp.goal", kind);
+export const textKindLabel = (kind: string) => label("bp.kind", kind) ?? kind;
+export const certaintyLabel = (certainty: "high" | "medium" | "low") => t(`bp.certainty.${certainty}`);
 
 /** Volgorde waarin de onderdelen van de kritiek op het scherm staan. */
 const CATEGORY_ORDER: Category[] = ["assumption", "leap", "gap", "evidence", "missing", "headline_vs_content"];
@@ -39,7 +24,7 @@ export const MAX_LANES = 4;
 
 /** Modellen schrijven soms de interne ids in hun tekst ("het in b3 gemaakte getal"). De lezer kent alleen de nummers. */
 export function readableIds(text: string, numbers: Map<string, number>): string {
-  return text.replace(/\bb\d+\b/g, (id) => (numbers.has(id) ? `stap ${numbers.get(id)}` : id));
+  return text.replace(/\bb\d+\b/g, (id) => (numbers.has(id) ? t("bp.step", { n: numbers.get(id)! }) : id));
 }
 
 export function formatRanges(ranges: ParagraphRange[]): string {
@@ -117,13 +102,31 @@ export function outcomes(critique: Critique): Outcome[] {
     const count = critique.points.filter((p) => p.category === category).length;
     const result: CheckResult = count ? "found" : (check?.result ?? "nothing_found");
     const known = check !== undefined || count > 0;
-    const text = result === "found" ? (count === 1 ? "1 punt" : `${count} punten`) : known ? RESULT_LABELS[result] : "niet beoordeeld";
-    return { category, label: CATEGORY_LABELS[category], result, text, note: check?.note ?? null };
+    const text = result === "found" ? plural(count, "bp.points.one", "bp.points.other") : known ? t(`bp.result.${result}`) : t("bp.result.notAssessed");
+    return { category, label: categoryLabel(category), result, text, note: check?.note ?? null };
   });
 }
 
-/** Welke bewaarde blauwdruk bij openen op het scherm komt: die van het gekozen model, anders de nieuwste. */
-export function pickSaved(all: Blueprint[], active: ModelRef | null): Blueprint | null {
+/** The language a blueprint was written in. Blueprints from before languages existed said "Nederlands". */
+export function blueprintLanguage(b: Pick<Blueprint, "language">): string {
+  const value = (b.language ?? "").toLowerCase();
+  if (value === "nederlands" || value === "dutch") return "nl";
+  if (value === "engels" || value === "english") return "en";
+  if (value === "turks" || value === "turkish") return "tr";
+  return value;
+}
+
+/** The language the model writes in for this source: its own choice, otherwise the interface language. */
+export function sourceLanguage(source: { aiLanguage?: string | null } | null | undefined): string {
+  return source?.aiLanguage || lang();
+}
+
+/**
+ * Welke bewaarde blauwdruk bij openen op het scherm komt: in de taal van de bron, die van het gekozen model, anders
+ * de nieuwste. Zonder `language` telt elke taal.
+ */
+export function pickSaved(all: Blueprint[], active: ModelRef | null, language?: string): Blueprint | null {
+  if (language) all = all.filter((b) => blueprintLanguage(b) === language);
   if (!all.length) return null;
   const newest = (list: Blueprint[]) =>
     [...list].sort((a, b) => b.promptVersion - a.promptVersion || (a.createdAt < b.createdAt ? 1 : -1))[0];
@@ -175,31 +178,31 @@ export interface ErrorView {
 export function errorView(e: AppError): ErrorView {
   switch (e.kind) {
     case "no_model":
-      return { title: "Kies eerst een model.", text: "Kies bovenaan dit paneel welk model de blauwdruk maakt. Staat er nog niets in de lijst, voeg dan een provider toe.", actions: ["picker", "providers"] };
+      return { title: t("bp.err.noModelTitle"), text: t("bp.err.noModelText"), actions: ["picker", "providers"] };
     case "context_too_large":
-      return { title: "Deze tekst is te lang voor dit model.", text: e.message, actions: ["picker"] };
+      return { title: t("bp.err.tooLongTitle"), text: e.message, actions: ["picker"] };
     case "chatgpt_session_revoked":
     case "chatgpt_signed_out":
-      return { title: "Je ChatGPT-login is verlopen.", text: "Log opnieuw in via Providers. Je bewaarde blauwdrukken blijven gewoon staan.", actions: ["providers"] };
+      return { title: t("bp.err.chatgptExpiredTitle"), text: t("bp.err.chatgptExpiredText"), actions: ["providers"] };
     case "chatgpt_plan_disabled":
-      return { title: "Deepdive mag je ChatGPT-abonnement nu niet gebruiken.", text: e.message, actions: ["providers", "picker"] };
+      return { title: t("bp.err.planDisabledTitle"), text: e.message, actions: ["providers", "picker"] };
     case "chatgpt_usage_limit":
     case "chatgpt_usage_unavailable":
-      return { title: "Je ChatGPT-limiet is bereikt.", text: e.message, actions: ["usage", "picker"] };
+      return { title: t("bp.err.usageLimitTitle"), text: e.message, actions: ["usage", "picker"] };
     case "auth":
     case "key_missing":
-      return { title: "De sleutel van deze provider werkt niet.", text: e.message, actions: ["providers"] };
+      return { title: t("bp.err.authTitle"), text: e.message, actions: ["providers"] };
     case "keychain":
-      return { title: "De sleutelhanger gaf geen toegang.", text: e.message, actions: ["retry"] };
+      return { title: t("bp.err.keychainTitle"), text: e.message, actions: ["retry"] };
     case "unreachable_local":
-      return { title: "De lokale server reageert niet.", text: e.message, actions: ["retry", "picker"] };
+      return { title: t("bp.err.localTitle"), text: e.message, actions: ["retry", "picker"] };
     case "no_text":
-      return { title: "Deze bron heeft nog geen tekst.", text: "Wacht tot de pdf is gelezen en probeer het opnieuw. Een pdf zonder tekstlaag, zoals een scan, kan nog niet.", actions: ["retry"] };
+      return { title: t("bp.err.noTextTitle"), text: t("bp.err.noTextText"), actions: ["retry"] };
     case "blueprint_schema":
-      return { title: "Het model gaf geen bruikbare blauwdruk terug.", text: "Dat kan bij een volgende poging goed gaan. Lukt het vaker niet, kies dan een ander model.", actions: ["retry", "picker"] };
+      return { title: t("bp.err.schemaTitle"), text: t("bp.err.schemaText"), actions: ["retry", "picker"] };
     case "blueprint_busy":
-      return { title: "Dit stuk is al bezig.", text: e.message, actions: [] };
+      return { title: t("bp.err.busyTitle"), text: e.message, actions: [] };
     default:
-      return { title: "De blauwdruk is niet gelukt.", text: e.message, actions: ["retry", "picker"] };
+      return { title: t("bp.err.failedTitle"), text: e.message, actions: ["retry", "picker"] };
   }
 }

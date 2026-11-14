@@ -53,7 +53,7 @@ impl Jobs {
     fn begin(&self, source_id: &str) -> Result<(JobGuard<'_>, watch::Receiver<bool>), AppError> {
         let mut map = self.0.lock().unwrap();
         if map.contains_key(source_id) {
-            return Err(AppError::new("blueprint_busy", "Voor dit stuk wordt al een blauwdruk gemaakt."));
+            return Err(AppError::new("blueprint_busy", crate::i18n::tr("A blueprint is already being made for this piece.", "Voor dit stuk wordt al een blauwdruk gemaakt.", "Bu yazı için zaten bir plan hazırlanıyor.")));
         }
         let (sender, receiver) = watch::channel(false);
         map.insert(source_id.to_string(), sender);
@@ -123,7 +123,7 @@ impl Relay {
 }
 
 fn no_model() -> AppError {
-    AppError::new("no_model", "Er is nog geen model gekozen.")
+    AppError::new("no_model", crate::i18n::tr("No model has been chosen yet.", "Er is nog geen model gekozen.", "Henüz bir model seçilmedi."))
 }
 
 /// Maakt samenvatting en blauwdruk. `critique_of` is een bewaarde blauwdruk met dit model waarvan alleen de
@@ -135,6 +135,7 @@ pub async fn generate_blueprint(
     jobs: State<'_, Jobs>,
     source_id: String,
     critique_of: Option<ModelRef>,
+    language: Option<String>,
     on_event: Channel<JobEvent>,
 ) -> Result<Blueprint, AppError> {
     let (_guard, cancel) = jobs.begin(&source_id)?;
@@ -145,7 +146,7 @@ pub async fn generate_blueprint(
     };
     let target = providers.target(&chosen)?;
     crate::ai::prepare(&target).await?;
-    let options = Options::default();
+    let options = Options::for_source(&source, language.as_deref());
     let mut report = RunReport::default();
     let store: &Store = &store;
     let relay = std::sync::Arc::new(Mutex::new(Relay::new(on_event)));
@@ -167,7 +168,7 @@ pub async fn generate_blueprint(
 
     let result = match critique_of {
         Some(chosen) => {
-            let previous = saved::find(store, &source_id, &chosen.provider_id, &chosen.model_id, super::PROMPT_VERSION).ok_or_else(|| AppError::new("not_found", "Deze blauwdruk is niet meer bewaard. Maak hem opnieuw."))?;
+            let previous = saved::find(store, &source_id, &chosen.provider_id, &chosen.model_id, super::PROMPT_VERSION, options.language.code()).ok_or_else(|| AppError::new("not_found", crate::i18n::tr("This blueprint is no longer saved. Make it again.", "Deze blauwdruk is niet meer bewaard. Maak hem opnieuw.", "Bu plan artık kayıtlı değil. Yeniden oluşturun.")))?;
             super::redo_critique(&target, &source, &options, previous, &mut report, cancel, on).await
         }
         None => super::generate_live(&target, &chosen.provider_id, &source, &options, &mut report, cancel, on).await,

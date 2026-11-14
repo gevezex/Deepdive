@@ -84,7 +84,7 @@ impl Config {
 }
 
 fn open_in_system_browser(url: &str) -> Result<(), AppError> {
-    let failed = |detail: String| AppError::new("chatgpt_browser", "De browser kon niet worden geopend. Probeer het opnieuw.").with_detail(detail);
+    let failed = |detail: String| AppError::new("chatgpt_browser", crate::i18n::tr("The browser could not be opened. Please try again.", "De browser kon niet worden geopend. Probeer het opnieuw.", "Tarayıcı açılamadı. Lütfen tekrar deneyin.")).with_detail(detail);
     let status = std::process::Command::new("open").arg(url).status().map_err(|e| failed(e.to_string()))?;
     status.success().then_some(()).ok_or_else(|| failed(status.to_string()))
 }
@@ -201,7 +201,7 @@ impl Hub {
         if is_loopback(&self.config.auth_base) {
             builder = builder.no_proxy();
         }
-        builder.build().map_err(|e| AppError::new("internal", "De verbinding kon niet worden voorbereid.").with_detail(e.to_string()))
+        builder.build().map_err(|e| AppError::new("internal", crate::i18n::tr("The connection could not be prepared.", "De verbinding kon niet worden voorbereid.", "Bağlantı hazırlanamadı.")).with_detail(e.to_string()))
     }
 
     /// De stabiele, anonieme ID van deze installatie. Wordt één keer gemaakt, vóór de eerste login. Is geen
@@ -248,7 +248,7 @@ impl Hub {
         let status = response.status().as_u16();
         let body = response.text().await.map_err(|e| TokenError::Temporary(redact(&e.to_string(), None)))?;
         if (200..300).contains(&status) {
-            return serde_json::from_str(&body).map_err(|_| TokenError::Temporary("Het token-antwoord is onleesbaar.".into()));
+            return serde_json::from_str(&body).map_err(|_| TokenError::Temporary(crate::i18n::tr("The token response is unreadable.", "Het token-antwoord is onleesbaar.", "Token yanıtı okunamıyor.")));
         }
         let value: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
         let code = value.get("error").and_then(Value::as_str).or_else(|| value.pointer("/error/code").and_then(Value::as_str)).or_else(|| value.get("code").and_then(Value::as_str)).map(String::from);
@@ -260,17 +260,17 @@ impl Hub {
 
     /// Haalt de vaste adressen op uit OpenAI's OpenID-document en controleert dat dit de verwachte uitgever is.
     async fn discovery(&self) -> Result<Discovery, AppError> {
-        let failed = |detail: String| AppError::new("chatgpt_login_failed", "De inloggegevens van OpenAI konden niet worden opgehaald. Controleer je internetverbinding en probeer het opnieuw.").with_detail(detail);
+        let failed = |detail: String| AppError::new("chatgpt_login_failed", crate::i18n::tr("OpenAI's sign-in details could not be retrieved. Check your internet connection and try again.", "De inloggegevens van OpenAI konden niet worden opgehaald. Controleer je internetverbinding en probeer het opnieuw.", "OpenAI giriş bilgileri alınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.")).with_detail(detail);
         let client = self.client()?;
         let response = client.get(self.config.auth("/.well-known/openid-configuration")).send().await.map_err(|e| failed(redact(&e.to_string(), None)))?;
         let found: Discovery = response.error_for_status().map_err(|e| failed(e.to_string()))?.json().await.map_err(|e| failed(e.to_string()))?;
         if found.issuer != self.config.auth_base.as_str().trim_end_matches('/') {
-            return Err(failed(format!("onverwachte uitgever: {}", found.issuer)));
+            return Err(failed(format!("{}: {}", crate::i18n::tr("unexpected issuer", "onverwachte uitgever", "beklenmeyen yayıncı"), found.issuer)));
         }
         for address in [Some(&found.jwks_uri), found.revocation_endpoint.as_ref()].into_iter().flatten() {
             let safe = Url::parse(address).is_ok_and(|u| u.scheme() == "https" || is_loopback(&u));
             if !safe {
-                return Err(failed(format!("onveilig adres: {address}")));
+                return Err(failed(format!("{}: {address}", crate::i18n::tr("insecure address", "onveilig adres", "güvensiz adres"))));
             }
         }
         Ok(found)
@@ -317,15 +317,15 @@ struct Discovery {
 }
 
 pub fn signed_out() -> AppError {
-    AppError::new("chatgpt_signed_out", "Je bent niet ingelogd bij ChatGPT. Log in via Providers om deze modellen te gebruiken.")
+    AppError::new("chatgpt_signed_out", crate::i18n::tr("You are not signed in to ChatGPT. Sign in under Providers to use these models.", "Je bent niet ingelogd bij ChatGPT. Log in via Providers om deze modellen te gebruiken.", "ChatGPT'ye giriş yapmadınız. Bu modelleri kullanmak için Sağlayıcılar bölümünden giriş yapın."))
 }
 
 pub fn plan_disabled() -> AppError {
-    AppError::new("chatgpt_plan_disabled", "Het gebruik van je ChatGPT-abonnement staat uit voor Deepdive. Schakel het in bij Providers, of gebruik een eigen API-sleutel.")
+    AppError::new("chatgpt_plan_disabled", crate::i18n::tr("Using your ChatGPT subscription is turned off for Deepdive. Turn it on under Providers, or use your own API key.", "Het gebruik van je ChatGPT-abonnement staat uit voor Deepdive. Schakel het in bij Providers, of gebruik een eigen API-sleutel.", "ChatGPT aboneliğinizin kullanımı Deepdive için kapalı. Sağlayıcılar bölümünden açın ya da kendi API anahtarınızı kullanın."))
 }
 
 pub fn session_revoked() -> AppError {
-    AppError::new("chatgpt_session_revoked", "Je ChatGPT-sessie is ingetrokken of verlopen. Log opnieuw in via Providers.")
+    AppError::new("chatgpt_session_revoked", crate::i18n::tr("Your ChatGPT session was revoked or has expired. Sign in again under Providers.", "Je ChatGPT-sessie is ingetrokken of verlopen. Log opnieuw in via Providers.", "ChatGPT oturumunuz iptal edildi ya da süresi doldu. Sağlayıcılar bölümünden yeniden giriş yapın."))
 }
 
 /// De toegang tot één koppeling, voor de AI-laag.
@@ -395,7 +395,7 @@ impl Session {
         let response = match self.hub.post_token(&form).await {
             Ok(response) => response,
             Err(TokenError::Temporary(detail)) => {
-                return Err(AppError::new("chatgpt_unreachable", "Je ChatGPT-sessie kon nu niet worden vernieuwd. Je blijft ingelogd; controleer je internetverbinding en probeer het opnieuw.").with_detail(detail));
+                return Err(AppError::new("chatgpt_unreachable", crate::i18n::tr("Your ChatGPT session could not be renewed right now. You are still signed in; check your internet connection and try again.", "Je ChatGPT-sessie kon nu niet worden vernieuwd. Je blijft ingelogd; controleer je internetverbinding en probeer het opnieuw.", "ChatGPT oturumunuz şu anda yenilenemedi. Oturumunuz açık kalıyor; internet bağlantınızı kontrol edip tekrar deneyin.")).with_detail(detail));
             }
             Err(TokenError::Refused { code, detail, status }) => {
                 return match code.as_deref() {
@@ -406,8 +406,8 @@ impl Session {
                             _ => Err(self.lose_session()),
                         }
                     }
-                    Some("invalid_client") => Err(AppError::new("chatgpt_client_invalid", "Deze ChatGPT-koppeling is niet meer geldig. Verwijder deze provider en log opnieuw in.").with_detail(detail)),
-                    _ => Err(AppError::new("chatgpt_unreachable", "Je ChatGPT-sessie kon nu niet worden vernieuwd. Je blijft ingelogd; probeer het later opnieuw.").with_detail(format!("HTTP {status}: {detail}"))),
+                    Some("invalid_client") => Err(AppError::new("chatgpt_client_invalid", crate::i18n::tr("This ChatGPT connection is no longer valid. Remove this provider and sign in again.", "Deze ChatGPT-koppeling is niet meer geldig. Verwijder deze provider en log opnieuw in.", "Bu ChatGPT bağlantısı artık geçerli değil. Bu sağlayıcıyı kaldırıp yeniden giriş yapın.")).with_detail(detail)),
+                    _ => Err(AppError::new("chatgpt_unreachable", crate::i18n::tr("Your ChatGPT session could not be renewed right now. You are still signed in; please try again later.", "Je ChatGPT-sessie kon nu niet worden vernieuwd. Je blijft ingelogd; probeer het later opnieuw.", "ChatGPT oturumunuz şu anda yenilenemedi. Oturumunuz açık kalıyor; lütfen daha sonra tekrar deneyin.")).with_detail(format!("HTTP {status}: {detail}"))),
                 };
             }
         };

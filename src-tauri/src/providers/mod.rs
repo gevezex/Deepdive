@@ -124,13 +124,13 @@ pub struct ModelInput {
 }
 
 pub fn normalize_base_url(input: &str, kind: ApiKind) -> Result<Url, AppError> {
-    let invalid = || AppError::new("invalid_address", "Dit is geen geldig adres. Gebruik bijvoorbeeld https://api.openai.com/v1 of http://localhost:11434/v1.");
+    let invalid = || AppError::new("invalid_address", crate::i18n::tr("This is not a valid address. Use, for example, https://api.openai.com/v1 or http://localhost:11434/v1.", "Dit is geen geldig adres. Gebruik bijvoorbeeld https://api.openai.com/v1 of http://localhost:11434/v1.", "Bu geçerli bir adres değil. Örneğin https://api.openai.com/v1 veya http://localhost:11434/v1 kullanın."));
     let mut url = Url::parse(input.trim()).map_err(|_| invalid())?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err(invalid());
     }
     if !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some() {
-        return Err(AppError::new("invalid_address", "Zet geen inlognaam, sleutel of andere extra's in het adres. De sleutel heeft een eigen veld."));
+        return Err(AppError::new("invalid_address", crate::i18n::tr("Do not put a username, key or anything else extra in the address. The key has its own field.", "Zet geen inlognaam, sleutel of andere extra's in het adres. De sleutel heeft een eigen veld.", "Adrese kullanıcı adı, anahtar ya da başka ekler koymayın. Anahtarın kendi alanı var.")));
     }
     let mut path = url.path().trim_end_matches('/').to_string();
     if kind == ApiKind::Anthropic {
@@ -143,10 +143,10 @@ pub fn normalize_base_url(input: &str, kind: ApiKind) -> Result<Url, AppError> {
 fn clean_key(key: &ApiKey) -> Result<ApiKey, AppError> {
     let value = key.expose().trim();
     if value.is_empty() {
-        return Err(AppError::new("key_invalid", "De sleutel is leeg."));
+        return Err(AppError::new("key_invalid", crate::i18n::tr("The key is empty.", "De sleutel is leeg.", "Anahtar boş.")));
     }
     if !value.bytes().all(|b| b.is_ascii_graphic()) {
-        return Err(AppError::new("key_invalid", "De sleutel bevat tekens die er niet in horen, zoals spaties of regeleinden. Kopieer hem opnieuw."));
+        return Err(AppError::new("key_invalid", crate::i18n::tr("The key contains characters that do not belong in it, such as spaces or line breaks. Copy it again.", "De sleutel bevat tekens die er niet in horen, zoals spaties of regeleinden. Kopieer hem opnieuw.", "Anahtar, içinde olmaması gereken boşluk veya satır sonu gibi karakterler içeriyor. Yeniden kopyalayın.")));
     }
     Ok(ApiKey::new(value))
 }
@@ -229,7 +229,7 @@ impl ProviderStore {
     pub fn save_provider(&self, input: ProviderInput, key: KeyChange) -> Result<Provider, AppError> {
         let name = input.name.trim().to_string();
         if name.is_empty() {
-            return Err(AppError::new("invalid_name", "Geef de provider een naam."));
+            return Err(AppError::new("invalid_name", crate::i18n::tr("Give the provider a name.", "Geef de provider een naam.", "Sağlayıcıya bir ad verin.")));
         }
         let url = normalize_base_url(&input.base_url, input.kind)?;
         let key = match key {
@@ -246,7 +246,7 @@ impl ProviderStore {
             // Een ChatGPT-koppeling ontstaat alleen door in te loggen. Daarna is alleen de naam te wijzigen.
             let was_chatgpt = existing.is_some_and(|p| p.kind == ApiKind::ChatgptPlan);
             if was_chatgpt != (input.kind == ApiKind::ChatgptPlan) || (was_chatgpt && !matches!(key, KeyChange::Keep)) {
-                return Err(AppError::new("chatgpt_only_login", "Een ChatGPT-koppeling maak je met de knop Continue with ChatGPT en heeft geen API-sleutel."));
+                return Err(AppError::new("chatgpt_only_login", crate::i18n::tr("A ChatGPT connection is set up with the Continue with ChatGPT button and has no API key.", "Een ChatGPT-koppeling maak je met de knop Continue with ChatGPT en heeft geen API-sleutel.", "ChatGPT bağlantısı Continue with ChatGPT düğmesiyle kurulur ve API anahtarı yoktur.")));
             }
             if was_chatgpt {
                 let slot = provider_mut(state, &id)?;
@@ -266,7 +266,7 @@ impl ProviderStore {
             if let (KeyChange::Keep, true, Some(old)) = (&key, had_key, existing) {
                 let old_url = Url::parse(&old.base_url).ok();
                 if old_url.as_ref().and_then(|u| u.host_str()) != url.host_str() {
-                    return Err(AppError::new("key_host_changed", "Het adres wijst nu naar een andere server. Vul de sleutel opnieuw in, of haal hem weg, zodat je oude sleutel daar niet terechtkomt."));
+                    return Err(AppError::new("key_host_changed", crate::i18n::tr("The address now points to a different server. Enter the key again or remove it, so your old key does not end up there.", "Het adres wijst nu naar een andere server. Vul de sleutel opnieuw in, of haal hem weg, zodat je oude sleutel daar niet terechtkomt.", "Adres artık başka bir sunucuyu gösteriyor. Eski anahtarınız oraya gitmesin diye anahtarı yeniden girin ya da kaldırın.")));
                 }
             }
             let mut provider = existing.cloned().unwrap_or(Provider { id: id.clone(), name: String::new(), kind: input.kind, base_url: String::new(), has_key: false, models: vec![], chatgpt: None });
@@ -309,10 +309,10 @@ impl ProviderStore {
     pub fn upsert_model(&self, provider_id: &str, input: ModelInput) -> Result<Provider, AppError> {
         let id = input.id.trim().to_string();
         if id.is_empty() || id.len() > 300 || id.chars().any(char::is_control) {
-            return Err(AppError::new("invalid_model", "Vul de naam van het model in, precies zoals de provider die gebruikt."));
+            return Err(AppError::new("invalid_model", crate::i18n::tr("Enter the model name exactly as the provider uses it.", "Vul de naam van het model in, precies zoals de provider die gebruikt.", "Model adını, sağlayıcının kullandığı biçimde birebir girin.")));
         }
         if input.context_tokens == Some(0) {
-            return Err(AppError::new("invalid_model", "De context moet groter zijn dan nul, of leeg als die onbekend is."));
+            return Err(AppError::new("invalid_model", crate::i18n::tr("The context must be greater than zero, or empty if it is unknown.", "De context moet groter zijn dan nul, of leeg als die onbekend is.", "Bağlam sıfırdan büyük olmalı ya da bilinmiyorsa boş bırakılmalı.")));
         }
         self.change(|state| {
             let provider = provider_mut(state, provider_id)?;
@@ -373,7 +373,7 @@ impl ProviderStore {
             if let Some(chosen) = &selection {
                 let known = state.providers.iter().any(|p| p.id == chosen.provider_id && p.models.iter().any(|m| m.id == chosen.model_id));
                 if !known {
-                    return Err(AppError::new("unknown_model", "Dit model staat niet (meer) in de lijst."));
+                    return Err(AppError::new("unknown_model", crate::i18n::tr("This model is not (or no longer) in the list.", "Dit model staat niet (meer) in de lijst.", "Bu model listede yok (ya da artık yok).")));
                 }
             }
             state.selection.active = selection;
@@ -411,7 +411,7 @@ impl ProviderStore {
         let key = if has_key {
             ai::check_key_transport(&url)?;
             let key = self.secrets.get(&account(provider_id))?;
-            Some(key.ok_or_else(|| AppError::new("key_missing", "De sleutel van deze provider staat niet meer in de sleutelhanger. Vul hem opnieuw in."))?)
+            Some(key.ok_or_else(|| AppError::new("key_missing", crate::i18n::tr("This provider's key is no longer in the keychain. Enter it again.", "De sleutel van deze provider staat niet meer in de sleutelhanger. Vul hem opnieuw in.", "Bu sağlayıcının anahtarı artık anahtar zincirinde değil. Anahtarı yeniden girin.")))?)
         } else {
             None
         };
@@ -425,7 +425,7 @@ impl ProviderStore {
             let p = state.providers.iter().find(|p| p.id == chosen.provider_id).ok_or_else(not_found)?;
             p.models.iter().find(|m| m.id == chosen.model_id).cloned()
         }
-        .ok_or_else(|| AppError::new("unknown_model", "Dit model staat niet (meer) in de lijst."))?;
+        .ok_or_else(|| AppError::new("unknown_model", crate::i18n::tr("This model is not (or no longer) in the list.", "Dit model staat niet (meer) in de lijst.", "Bu model listede yok (ya da artık yok).")))?;
         Ok(Target { endpoint: self.endpoint(&chosen.provider_id)?, model: model.id, supports_images: model.supports_images, context_tokens: model.context_tokens })
     }
 
@@ -498,7 +498,7 @@ fn unique_chatgpt_name(state: &ProvidersFile, email: Option<&str>) -> String {
 }
 
 fn not_found() -> AppError {
-    AppError::new("provider_not_found", "Deze provider bestaat niet meer.")
+    AppError::new("provider_not_found", crate::i18n::tr("This provider no longer exists.", "Deze provider bestaat niet meer.", "Bu sağlayıcı artık yok."))
 }
 
 fn provider_mut<'a>(state: &'a mut ProvidersFile, id: &str) -> Result<&'a mut Provider, AppError> {

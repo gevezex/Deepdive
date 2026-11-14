@@ -1,44 +1,46 @@
-OPDRACHT: maak laag 1 en 2 van de blauwdruk: het doel van het stuk en de levensloop van het betoog. De kritische laag komt later; beoordeel nu nog niets.
+TASK: make layers 1 and 2 of the blueprint: the purpose of the piece and the life course of the argument. The critical layer comes later; do not judge anything yet.
 
-De bron bevat soms ook menu's, voetteksten, reclame of een bronnenlijst. Die horen niet bij het stuk: laat ze buiten de blokken en geef in `articleParagraphs` aan waar het eigenlijke stuk begint en eindigt.
+The source sometimes also contains menus, footers, advertising or a reference list. They are not part of the piece: keep them out of the blocks and use `articleParagraphs` to say where the actual piece begins and ends.
 
-Schrijf de velden in precies deze volgorde:
+Write the fields in exactly this order:
 
 {
-  "textKind": een van news, opinion, research, memoir, essay, explainer, review, reference, other,
+  "textKind": one of news, opinion, research, memoir, essay, explainer, review, reference, other,
   "goal": {
-    "main": { "kind": ..., "description": "wat de auteur hier doet, in één zin" },
+    "main": { "kind": ..., "description": "what the author does here, in one sentence" },
     "secondary": [ { "kind": ..., "description": "..." } ]
   },
-  "message": "wat de auteur wil dat de lezer meeneemt, in precies één zin",
-  "occasion": { "text": "waarom dit is geschreven: wat klopt er niet of wat ontbreekt er", "origin": "stated of inferred", "paragraphs": [[1, 2]] } of null als het stuk daar niets over zegt en je het ook niet met redelijke zekerheid kunt afleiden,
-  "summary": "de inhoud in maximaal vier zinnen",
-  "articleParagraphs": [eerste, laatste],
+  "message": "what the author wants the reader to take away, in exactly one sentence",
+  "occasion": { "text": "why this was written: what is wrong or what is missing", "origin": "stated or inferred", "paragraphs": [[1, 2]] } or null if the piece says nothing about it and you cannot infer it with reasonable certainty either,
+  "summary": "the content in at most four sentences",
+  "articleParagraphs": [first, last],
   "blocks": [
-    { "id": "b1", "role": ..., "title": "korte titel, maximaal zes woorden", "content": "wat er in deze stap gebeurt, in één of twee zinnen", "paragraphs": [[1, 2]], "quote": null of { "paragraph": 2, "text": "letterlijk kernzinnetje" } }
+    { "id": "b1", "role": ..., "title": "short title, at most six words", "content": "what happens in this step, in one or two sentences", "paragraphs": [[1, 2]], "quote": null or { "paragraph": 2, "text": "literal key phrase" } }
   ],
   "relations": [
-    { "id": "r1", "block": "b2", "dependsOn": "b1", "kind": ..., "explanation": "hoe b2 op b1 steunt, in één korte zin" }
+    { "id": "r1", "block": "b2", "dependsOn": "b1", "kind": ..., "explanation": "how b2 rests on b1, in one short sentence" }
   ]
 }
 
-Toegestane waarden:
-- goal.kind: explain_problem, offer_solution, vent_frustration, personal_experience, develop_concept, persuade, report_research, report_event, refute, evaluate, instruct, other. Bijdoelen alleen als ze er echt zijn; anders een lege lijst.
+Allowed values:
+- goal.kind: explain_problem, offer_solution, vent_frustration, personal_experience, develop_concept, persuade, report_research, report_event, refute, evaluate, instruct, other. Secondary goals only if they are really there; otherwise an empty list.
 - role: occasion, thesis, concept, explanation, argument, evidence, example, objection, rebuttal, conclusion, question, method, results, interpretation, limitation, event, background, reaction, reflection, lesson, instruction, assessment, other.
 - relation.kind: builds_on, evidence_for, example_of, answers, contrasts, follows_in_time, concludes.
-- origin: stated als de auteur het zelf zegt, inferred als jij het afleidt.
+- origin: stated if the author says it, inferred if you infer it.
 
-De vorm past bij de soort tekst. Dwing er geen betoog in dat er niet is:
-- news: de kern van het nieuws, dan wie wat zegt, achtergrond en wat er nog komt. Een nieuwsbericht is meestal geen redenering: gebruik vooral event, reaction en background, en follows_in_time of builds_on.
-- opinion: stelling, argumenten, eventueel bezwaar en weerlegging, conclusie.
-- research: vraag, methode, resultaten, interpretatie, beperkingen, conclusie.
-- memoir: verhaallijn met gebeurtenissen en reflectie, met de les aan het eind. Geen bewijs zoeken.
-- essay: de ontwikkeling van de gedachte, stap voor stap.
-- explainer en reference: begrippen, uitleg en instructie in logische volgorde.
-- review: wat wordt besproken, de beoordeling en de redenen.
+The shape fits the kind of text. Do not force an argument that is not there:
+- news: the core of the news, then who says what, background and what comes next. A news report is usually not a line of reasoning: mostly use event, reaction and background, and follows_in_time or builds_on.
+- opinion: thesis, arguments, possibly objection and rebuttal, conclusion.
+- research: question, method, results, interpretation, limitations, conclusion.
+- memoir: a story line with events and reflection, with the lesson at the end. Do not look for evidence.
+- essay: the development of the thought, step by step.
+- explainer and reference: concepts, explanation and instruction in logical order.
+- review: what is discussed, the assessment and the reasons.
 
-Regels voor het diagram:
-- Kies het aantal blokken naar wat het stuk nodig heeft: een kort bericht 2 tot 4, een lang stuk hooguit 12. Eén blok per stap in het betoog, niet per alinea.
-- Blokken staan in de volgorde van de tekst. De alineabereiken overlappen niet en dekken samen het hele eigenlijke stuk, op wat losse koppen na.
-- Relaties laten zien waarop iets steunt, niet alleen wat erna komt. `block` steunt op `dependsOn`, dus de pijl loopt van dependsOn naar block. Een blok kan op meerdere blokken steunen. Geen kringen.
-- Elk id begint met b of r gevolgd door een nummer.
+Rules for the diagram:
+- Choose the number of blocks the piece needs: a short report 2 to 4, a long piece at most 12. One block per step in the argument, not per paragraph.
+- Blocks are in the order of the text. The paragraph ranges do not overlap and together cover the whole actual piece, apart from a few loose headings.
+- Relations show what something rests on, not just what comes next. `block` rests on `dependsOn`, so the arrow runs from dependsOn to block. A block can rest on several blocks. No cycles.
+- Every id starts with b or r followed by a number.
+
+Write every descriptive text (description, message, occasion.text, summary, title, content, explanation) in {{LANGUAGE}}.

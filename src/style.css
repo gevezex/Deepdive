@@ -315,3 +315,5 @@ button.ans-close:hover { color: var(--ink); }
 .ans-follow { display: flex; margin-top: 6px; }
 .ans-follow input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 14px; }
 .ans-meta { margin: 6px 0 0; color: var(--ink-soft); font-size: 11px; text-align: right; }
+.model-bar select.ai-language { flex: 0 0 auto; width: auto; }
+.settings-row select { max-width: 260px; }

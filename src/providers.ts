@@ -1,7 +1,8 @@
 // Het providerscherm en de modelkiezer. Een sleutel gaat alleen de richting van Rust op: het veld wordt na
 // opslaan geleegd en de app krijgt alleen `hasKey` terug.
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { chatgptState, chatgptStatus, countSummary, describeReport, filterModels, imagesToValue, modelCount, modelLabel, parseContext, parseRefValue, pickerGroups, PRESETS, refValue, testModel, usesChatgptPlan, valueToImages } from "./providerLogic";
+import { onLanguageChange, plural, t } from "./i18n";
+import { chatgptState, chatgptStatus, countSummary, describeReport, filterModels, imagesToValue, modelCount, modelLabel, parseContext, parseRefValue, pickerGroups, presetKeyHint, presetLabel, PRESETS, refValue, testModel, usesChatgptPlan, valueToImages } from "./providerLogic";
 import type { ApiKind, AppError, ConnectionReport, KeyChange, LoginOutcome, LogoutOutcome, Model, ModelRef, Provider, ProvidersFile, StreamEvent } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -61,7 +62,7 @@ export async function selectModel(selection: ModelRef) {
 
 function toError(err: unknown): AppError {
   if (err && typeof err === "object" && "message" in err) return err as AppError;
-  return { kind: "unknown", message: "Er ging iets mis. Probeer het opnieuw.", detail: String(err) };
+  return { kind: "unknown", message: t("common.genericError"), detail: String(err) };
 }
 
 function showMessage(target: HTMLElement, tone: "ok" | "error" | "busy", message: string, detail?: string | null) {
@@ -73,7 +74,7 @@ function showMessage(target: HTMLElement, tone: "ok" | "error" | "busy", message
   if (detail) {
     const more = document.createElement("details");
     const summary = document.createElement("summary");
-    summary.textContent = "Technische details";
+    summary.textContent = t("common.technicalDetails");
     const code = document.createElement("code");
     code.textContent = detail;
     more.append(summary, code);
@@ -92,7 +93,7 @@ function showError(target: HTMLElement, err: unknown) {
     const manage = document.createElement("button");
     manage.type = "button";
     manage.className = "primary notice-action";
-    manage.textContent = "Manage usage";
+    manage.textContent = t("providers.manageUsage");
     manage.addEventListener("click", openUsage);
     target.append(manage);
   }
@@ -117,9 +118,9 @@ async function reload() {
 
 // ---------- modelkiezer ----------
 
-function renderPicker() {
+function renderPicker(notify = true) {
   const groups = pickerGroups(data);
-  const placeholder = new Option(groups.length ? "Kies een model" : "Nog geen model ingesteld", "");
+  const placeholder = new Option(groups.length ? t("providers.chooseModel") : t("providers.noModelSet"), "");
   picker.replaceChildren(placeholder);
   for (const group of groups) {
     const optgroup = document.createElement("optgroup");
@@ -130,7 +131,7 @@ function renderPicker() {
   picker.value = data.selection.active ? refValue(data.selection.active) : "";
   picker.disabled = groups.length === 0;
   planBadge.hidden = !usesChatgptPlan(data);
-  for (const listener of changeListeners) listener();
+  if (notify) for (const listener of changeListeners) listener();
 }
 
 picker.addEventListener("change", async () => {
@@ -161,13 +162,13 @@ function renderList() {
 
 function renderKeyState(provider: Provider | null) {
   const has = provider?.hasKey ?? false;
-  keyState.textContent = has ? "Er is een sleutel ingesteld, bewaard in de sleutelhanger. Laat dit veld leeg om hem te houden." : "Wordt alleen in de sleutelhanger van deze Mac bewaard.";
-  keyInput.placeholder = has ? "••••••••" : "Geen sleutel";
+  keyState.textContent = has ? t("providers.keySet") : t("providers.keyStoredLocally");
+  keyInput.placeholder = has ? "••••••••" : t("providers.noKey");
   keyClear.hidden = !has;
 }
 
 function resetDeleteButton() {
-  removeButton.textContent = "Provider verwijderen";
+  removeButton.textContent = t("providers.delete");
   removeButton.dataset.armed = "";
 }
 
@@ -204,7 +205,12 @@ function applyPreset() {
   nameInput.value = preset.name;
   kindSelect.value = preset.kind;
   urlInput.value = preset.baseUrl;
-  keyState.textContent = `${preset.keyHint} Wordt alleen in de sleutelhanger van deze Mac bewaard.`;
+  renderPresetHint();
+}
+
+function renderPresetHint() {
+  const preset = PRESETS.find((p) => p.id === presetSelect.value) ?? PRESETS[0];
+  keyState.textContent = `${presetKeyHint(preset)} ${t("providers.keyStoredLocally")}`;
 }
 
 async function saveForm(key?: KeyChange): Promise<Provider> {
@@ -232,7 +238,7 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
     await saveForm();
-    showMessage(result, "ok", "Opgeslagen.");
+    showMessage(result, "ok", t("providers.saved"));
   } catch (err) {
     showError(result, err);
   }
@@ -244,7 +250,7 @@ $("provider-new").addEventListener("click", () => select(null));
 keyClear.addEventListener("click", async () => {
   try {
     await saveForm({ action: "clear" });
-    showMessage(result, "ok", "De sleutel is uit de sleutelhanger verwijderd.");
+    showMessage(result, "ok", t("providers.keyRemoved"));
   } catch (err) {
     showError(result, err);
   }
@@ -254,7 +260,7 @@ keyClear.addEventListener("click", async () => {
 removeButton.addEventListener("click", async () => {
   if (!selectedId) return;
   if (removeButton.dataset.armed !== "yes") {
-    removeButton.textContent = "Echt verwijderen, ook de sleutel?";
+    removeButton.textContent = t("providers.confirmDelete");
     removeButton.dataset.armed = "yes";
     return;
   }
@@ -290,13 +296,13 @@ function renderChatgptAccount(provider: Provider | null) {
 async function chatgptLogin(providerId: string | null, askConsent: boolean) {
   loginBusy = true;
   renderChatgptAccount(selected());
-  showMessage(result, "busy", "Ga verder in je browser. Deepdive wacht op OpenAI…");
+  showMessage(result, "busy", t("providers.loginWaiting"));
   try {
     const outcome = await invoke<LoginOutcome>("chatgpt_login", { providerId, askConsent });
     loginBusy = false;
     await reload();
     select(outcome.provider.id);
-    if (outcome.modelsError) showMessage(result, "error", `Je bent ingelogd, maar de modellen konden niet worden opgehaald. ${outcome.modelsError.message}`, outcome.modelsError.detail);
+    if (outcome.modelsError) showMessage(result, "error", t("providers.loginModelsError", { message: outcome.modelsError.message }), outcome.modelsError.detail);
     else showMessage(result, "ok", chatgptStatus(outcome.provider));
     if (outcome.showWelcome) welcome.showModal();
   } catch (err) {
@@ -326,8 +332,8 @@ chatgptSignout.addEventListener("click", async () => {
     const outcome = await invoke<LogoutOutcome>("chatgpt_logout", { providerId: selectedId });
     await reload();
     select(outcome.provider.id);
-    if (outcome.revoked) showMessage(result, "ok", "Je bent uitgelogd. De tokens zijn gewist en de sessie is ingetrokken.");
-    else showMessage(result, "error", "Je bent hier uitgelogd en de tokens zijn gewist, maar OpenAI heeft het intrekken van de sessie niet bevestigd. Je kunt de koppeling verbreken in je ChatGPT-instellingen.");
+    if (outcome.revoked) showMessage(result, "ok", t("providers.logoutRevoked"));
+    else showMessage(result, "error", t("providers.logoutUnconfirmed"));
   } catch (err) {
     showError(result, err);
   }
@@ -353,10 +359,10 @@ testButton.addEventListener("click", async () => {
     onEvent.onmessage = (event) => {
       if (event.type === "text") {
         sample += event.text;
-        showMessage(result, "busy", `Antwoord komt binnen: ${sample}`);
+        showMessage(result, "busy", t("providers.testReceiving", { sample }));
       }
     };
-    showMessage(result, "busy", "Bezig met testen…");
+    showMessage(result, "busy", t("providers.testing"));
     const report = await invoke<ConnectionReport>("test_connection", { providerId: provider.id, modelId: testModel(provider, data.selection.active), onEvent });
     showMessage(result, "ok", describeReport(report));
   } catch (err) {
@@ -385,7 +391,7 @@ function modelRow(providerId: string, model: Model): HTMLElement {
   const enabled = document.createElement("input");
   enabled.type = "checkbox";
   enabled.checked = model.enabled;
-  enabled.setAttribute("aria-label", `${model.id} in de kiezer`);
+  enabled.setAttribute("aria-label", t("providers.rowInPicker", { model: model.id }));
 
   const name = document.createElement("td");
   name.className = "model-name";
@@ -393,26 +399,26 @@ function modelRow(providerId: string, model: Model): HTMLElement {
   name.title = model.id;
 
   const images = document.createElement("select");
-  images.setAttribute("aria-label", `${model.id} kan afbeeldingen lezen`);
-  images.append(new Option("Onbekend", ""), new Option("Ja", "yes"), new Option("Nee", "no"));
+  images.setAttribute("aria-label", t("providers.rowImages", { model: model.id }));
+  images.append(new Option(t("providers.unknown"), ""), new Option(t("providers.yes"), "yes"), new Option(t("providers.no"), "no"));
   images.value = imagesToValue(model.supportsImages);
 
   const context = document.createElement("input");
   context.type = "text";
   context.inputMode = "numeric";
-  context.placeholder = "onbekend";
+  context.placeholder = t("providers.contextUnknown");
   context.value = model.contextTokens?.toString() ?? "";
-  context.setAttribute("aria-label", `${model.id} context in tokens`);
+  context.setAttribute("aria-label", t("providers.rowContext", { model: model.id }));
 
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "link";
-  remove.textContent = "Weghalen";
+  remove.textContent = t("common.remove");
 
   const save = async () => {
     const tokens = parseContext(context.value);
     if (tokens === undefined) {
-      showMessage(modelsResult, "error", `"${context.value}" is geen geldig aantal tokens. Vul een getal in, of laat het leeg als het onbekend is.`);
+      showMessage(modelsResult, "error", t("providers.invalidTokensLong", { value: context.value }));
       context.focus();
       return;
     }
@@ -453,7 +459,7 @@ modelsFilter.addEventListener("input", renderModels);
 refreshButton.addEventListener("click", async () => {
   if (!selectedId) return;
   refreshButton.disabled = true;
-  showMessage(modelsResult, "busy", "Modellen worden opgehaald…");
+  showMessage(modelsResult, "busy", t("providers.fetchingModels"));
   try {
     const provider = await saveForm();
     const updated = await invoke<Provider>("refresh_models", { providerId: provider.id });
@@ -461,12 +467,12 @@ refreshButton.addEventListener("click", async () => {
     await reload();
     renderModels();
     const hidden = updated.models.filter((m) => !m.enabled).length;
-    const note = hidden ? ` ${hidden} staan niet in de kiezer; vink aan welke je wilt gebruiken.` : "";
-    showMessage(modelsResult, "ok", `${modelCount(updated.models.length)} gevonden.${note}`);
+    const found = t("providers.modelsFound", { count: modelCount(updated.models.length) });
+    showMessage(modelsResult, "ok", hidden ? `${found} ${plural(hidden, "providers.hiddenOne", "providers.hiddenOther")}` : found);
   } catch (err) {
     await syncAfterChatgptError(err);
     const e = toError(err);
-    showMessage(modelsResult, "error", `${e.message} Je kunt een model ook hieronder zelf toevoegen.`, e.detail);
+    showMessage(modelsResult, "error", `${e.message} ${t("providers.addYourself")}`, e.detail);
   } finally {
     refreshButton.disabled = false;
   }
@@ -479,7 +485,7 @@ $<HTMLFormElement>("model-add-form").addEventListener("submit", async (e) => {
   const tokensInput = $<HTMLInputElement>("model-add-context");
   const tokens = parseContext(tokensInput.value);
   if (tokens === undefined) {
-    showMessage(modelsResult, "error", `"${tokensInput.value}" is geen geldig aantal tokens.`);
+    showMessage(modelsResult, "error", t("providers.invalidTokens", { value: tokensInput.value }));
     return;
   }
   try {
@@ -502,8 +508,30 @@ function open() {
   dialog.showModal();
 }
 
+function renderPresets() {
+  const value = presetSelect.value;
+  presetSelect.replaceChildren(...PRESETS.map((preset) => new Option(presetLabel(preset), preset.id)));
+  if (value) presetSelect.value = value;
+}
+
+/** Een andere interfacetaal: wat in code is opgebouwd opnieuw tekenen, zonder ingevulde velden te wissen. */
+function onLanguage() {
+  renderPresets();
+  renderPicker(false);
+  if (!dialog.open) return;
+  const provider = selected();
+  renderList();
+  if (provider) renderKeyState(provider);
+  else renderPresetHint();
+  if (removeButton.dataset.armed === "yes") removeButton.textContent = t("providers.confirmDelete");
+  else resetDeleteButton();
+  renderChatgptAccount(provider);
+  renderModels();
+}
+
 export async function initProviders() {
-  for (const preset of PRESETS) presetSelect.add(new Option(preset.label, preset.id));
+  renderPresets();
+  onLanguageChange(onLanguage);
   $("providers-open").addEventListener("click", open);
   $("providers-close").addEventListener("click", () => dialog.close());
   await reload();
