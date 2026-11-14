@@ -69,6 +69,8 @@ async function run(body, timeoutMs = 90000) {
 }
 
 const HELPERS = `
+const openSource = async (id) => { const s = $("source-search"); s.value = ""; s.dispatchEvent(new Event("input")); const item = () => $("source-list").querySelector(\`[data-id="\${id}"]\`); for (let i = 0; i < 200 && !item(); i++) await wait(25); if (!item()) throw "bron niet in de zijbalk: " + id; item().click(); };
+const sourceCount = () => $("source-list").querySelectorAll(".src-item[data-id]").length;
 const $ = (id) => document.getElementById(id);
 const invoke = window.__TAURI_INTERNALS__.invoke;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -280,9 +282,7 @@ async function main() {
     const f = $("source-frame");
     const loaded = new Promise((r) => f.addEventListener("load", () => r(true), { once: true }));
     await invoke("get_source", { id: ${JSON.stringify(copy)} });
-    const list = $("source-list"); await wait(100);
-    if (![...list.options].some((o) => o.value === ${JSON.stringify(copy)})) list.add(new Option("Kopie", ${JSON.stringify(copy)}));
-    list.value = ${JSON.stringify(copy)}; list.dispatchEvent(new Event("change"));
+    await openSource(${JSON.stringify(copy)});
     const ok = await Promise.race([loaded, wait(5000).then(() => false)]);
     await wait(1500);
     return { ok, sandbox: f.getAttribute("sandbox"), title: document.title };

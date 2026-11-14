@@ -75,6 +75,19 @@ export interface SourceSummary {
   url: string | null;
   capturedAt: string;
   wordCount: number;
+  siteName: string | null;
+  pageCount: number | null;
+  /** Shortened, for searching in the sidebar. */
+  highlights: HighlightBrief[];
+}
+
+export interface HighlightBrief {
+  id: string;
+  color: "yellow" | "green" | "blue" | "pink";
+  text: string;
+  note: string | null;
+  from: number | null;
+  to: number | null;
 }
 
 export interface AppError {

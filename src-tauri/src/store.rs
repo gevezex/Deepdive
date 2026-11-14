@@ -5,7 +5,7 @@
 //!   original.pdf  het bestand (pdf)
 
 use crate::error::AppError;
-use crate::model::{Source, SourceSummary};
+use crate::model::{HighlightBrief, Source, SourceSummary};
 use std::path::{Path, PathBuf};
 
 pub struct Store {
@@ -98,7 +98,20 @@ impl Store {
         self.all()
             .into_iter()
             .filter(|s| s.superseded_by.is_none())
-            .map(|s| SourceSummary { id: s.id, kind: s.kind, title: s.title, url: s.url, captured_at: s.captured_at, word_count: s.word_count })
+            .map(|s| {
+                let highlights = crate::professor::highlights::all(self, &s.id).unwrap_or_default().into_iter().map(brief).collect();
+                SourceSummary {
+                    id: s.id,
+                    kind: s.kind,
+                    title: s.title,
+                    url: s.url,
+                    captured_at: s.captured_at,
+                    word_count: s.word_count,
+                    site_name: s.site_name,
+                    page_count: s.page_count,
+                    highlights,
+                }
+            })
             .collect()
     }
 
@@ -130,6 +143,13 @@ impl Store {
         let id = path.trim_start_matches('/').split('/').next().unwrap_or("");
         self.get(id).is_ok_and(|s| s.hide_floating)
     }
+}
+
+const BRIEF: usize = 400;
+
+fn brief(h: crate::professor::highlights::Highlight) -> HighlightBrief {
+    let cut = |t: String| t.chars().take(BRIEF).collect::<String>();
+    HighlightBrief { id: h.id, color: h.color, text: cut(h.text), note: h.note.map(cut), from: h.from, to: h.to }
 }
 
 pub fn mime_for(path: &Path) -> &'static str {

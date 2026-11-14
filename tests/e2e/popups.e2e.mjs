@@ -55,8 +55,8 @@ async function run(body, timeoutMs = 120000) {
   }
   throw new Error(`te lang gewacht op: ${body.slice(0, 100)}`);
 }
-const open = (path) => run(`const s=await invoke("open_url",{url:${JSON.stringify(base + path)},refresh:true});$("source-list").value="";return s;`);
-const show = (id) => run(`await invoke("list_sources");const o=new Option("x",${JSON.stringify(id)});$("source-list").add(o);$("source-list").value=${JSON.stringify(id)};$("source-list").dispatchEvent(new Event("change"));await wait(1500);return {label:$("hide-floating").textContent,hidden:$("hide-floating").hidden,src:$("source-frame").getAttribute("src"),sandbox:$("source-frame").getAttribute("sandbox")};`);
+const open = (path) => run(`const s=await invoke("open_url",{url:${JSON.stringify(base + path)},refresh:true});return s;`);
+const show = (id) => run(`const s=$("source-search");s.value="";s.dispatchEvent(new Event("input"));const item=()=>$("source-list").querySelector('[data-id="'+${JSON.stringify(id)}+'"]');for(let i=0;i<200&&!item();i++)await wait(25);item().click();await wait(1500);return {label:$("hide-floating").textContent,hidden:$("hide-floating").hidden,src:$("source-frame").getAttribute("src"),sandbox:$("source-frame").getAttribute("sandbox")};`);
 const pagePath = (id, name = "index.html") => join(data, "sources", id, name);
 const page = (id) => readFileSync(pagePath(id), "utf8");
 const hash = (id) => createHash("sha256").update(readFileSync(pagePath(id))).digest("hex");

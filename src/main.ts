@@ -5,11 +5,13 @@ import { initBlueprint, setBlueprintSource } from "./blueprint";
 import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
 import { frameLoading, initReading, jumpInFrame, pdfReady, setReadingSource } from "./reading";
+import { focusSearch, initSidebar, markCurrent, refreshSidebar, rerenderSidebar, setNewMenu, toggleSidebar } from "./sidebar";
 import { initSites, refreshSites } from "./sites";
+import { initTheme, isThemeChoice, setThemeChoice, themeChoice } from "./theme";
 import { initUpdate } from "./update";
 import { formatDate, formatNumber, initLanguage, isLang, lang, LANGUAGES, onLanguageChange, plural, setLanguage, t } from "./i18n";
 import type { PdfViewHandle } from "./pdf";
-import type { AppError, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
+import type { AppError, HighlightBrief, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const urlInput = $<HTMLInputElement>("url-input");
@@ -18,7 +20,6 @@ const pdfView = $("pdf-view");
 const shield = $("frame-shield");
 const dropHint = $("drop-hint");
 const pasteDialog = $<HTMLDialogElement>("paste-dialog");
-const sourceList = $<HTMLSelectElement>("source-list");
 const LAST_KEY = "deepdive.lastSource";
 
 let current: Source | null = null;
@@ -75,10 +76,15 @@ aiLanguage.addEventListener("change", async () => {
 function initSettings() {
   const dialog = $<HTMLDialogElement>("settings-dialog");
   const select = $<HTMLSelectElement>("settings-language");
+  const theme = $<HTMLSelectElement>("settings-theme");
   select.replaceChildren(...LANGUAGES.map((l) => new Option(`${l.flag} ${l.name}`, l.code)));
   $("settings-open").addEventListener("click", () => {
     select.value = lang();
+    theme.value = themeChoice();
     dialog.showModal();
+  });
+  theme.addEventListener("change", () => {
+    if (isThemeChoice(theme.value)) setThemeChoice(theme.value);
   });
   $("settings-close").addEventListener("click", () => dialog.close());
   select.addEventListener("change", () => {
@@ -89,7 +95,7 @@ function initSettings() {
 onLanguageChange(() => {
   renderAiLanguage(current);
   if (current) renderStatus(current);
-  void refreshList().catch(() => {});
+  rerenderSidebar();
 });
 
 // ---------- meldingen en status ----------
@@ -296,10 +302,14 @@ void listen<LoginClosed>("site-login-closed", ({ payload }) => {
 });
 
 async function refreshList() {
-  const sources = await invoke<SourceSummary[]>("list_sources");
-  sourceList.replaceChildren(new Option(sources.length ? t("app.previouslyOpened", { n: sources.length }) : t("app.noSources"), ""));
-  for (const s of sources) sourceList.add(new Option(s.title, s.id));
-  sourceList.value = current && sources.some((s) => s.id === current!.id) ? current.id : "";
+  await refreshSidebar(current?.id ?? null);
+}
+
+/** From a search hit in the sidebar: open the source, then jump to the highlighted paragraphs. */
+async function openHighlight(sourceId: string, highlight: HighlightBrief) {
+  if (current?.id !== sourceId) await openById(sourceId);
+  if (current?.id !== sourceId || highlight.from == null) return;
+  jumpToParagraphs([[highlight.from, highlight.to ?? highlight.from]]);
 }
 
 // ---------- tonen ----------
@@ -321,6 +331,7 @@ async function show(source: Source) {
   hideViews();
   current = source;
   remember(source.id);
+  markCurrent(source.id);
   document.title = `${source.title} – Deepdive`;
   $("empty").hidden = true;
   urlInput.value = source.url ?? "";
@@ -549,13 +560,31 @@ $<HTMLInputElement>("pdf-input").addEventListener("change", (e) => {
   input.value = "";
   if (file) void openPdfFile(file);
 });
-sourceList.addEventListener("change", async () => {
-  if (!sourceList.value) return;
-  try {
-    await show(await invoke<Source>("get_source", { id: sourceList.value }));
-  } catch (err) {
-    showError(err);
+$("new-url").addEventListener("click", () => focusUrl());
+
+function focusUrl() {
+  urlInput.focus();
+  urlInput.select();
+}
+
+// Shortcuts. Keys typed inside the copy of a page stay there: the iframe keeps them.
+document.addEventListener("keydown", (e) => {
+  if (!e.metaKey && !e.ctrlKey) {
+    if (e.key === "Escape" && !$("new-menu").hidden) setNewMenu(false);
+    return;
   }
+  if (e.altKey || document.querySelector("dialog[open]")) return;
+  const key = e.key.toLowerCase();
+  const run = (action: () => void) => {
+    e.preventDefault();
+    action();
+  };
+  if (key === "k" && !e.shiftKey) run(focusSearch);
+  else if (key === "n" && !e.shiftKey) run(() => setNewMenu($("new-menu").hidden !== false));
+  else if (key === "l" && !e.shiftKey) run(focusUrl);
+  else if (key === "o" && !e.shiftKey) run(() => $("pdf-input").click());
+  else if (key === "v" && e.shiftKey) run(() => openPasteDialog());
+  else if (e.key === "\\") run(toggleSidebar);
 });
 
 // Plakken buiten een invoerveld opent het adres meteen.
@@ -631,8 +660,11 @@ function showPanel(which: "blueprint" | "answers") {
 $("tab-blueprint").addEventListener("click", () => showPanel("blueprint"));
 $("tab-answers").addEventListener("click", () => showPanel("answers"));
 
+initTheme();
+
 async function start() {
   await initLanguage();
+  initSidebar({ open: (id) => void openById(id), openHighlight: (id, h) => void openHighlight(id, h), error: (err) => showError(err) });
   initSettings();
   initUpdate((err) => showError(err));
   renderAiLanguage(null);

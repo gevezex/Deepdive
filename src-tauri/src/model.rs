@@ -141,6 +141,22 @@ pub struct SourceSummary {
     pub url: Option<String>,
     pub captured_at: String,
     pub word_count: u32,
+    pub site_name: Option<String>,
+    pub page_count: Option<u32>,
+    /// De markeringen kort, zodat de zijbalk ook daarin kan zoeken.
+    pub highlights: Vec<HighlightBrief>,
+}
+
+/// Een markering in de bronnenlijst: de tekst ingekort, met de alinea's om naartoe te springen.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HighlightBrief {
+    pub id: String,
+    pub color: crate::professor::highlights::Color,
+    pub text: String,
+    pub note: Option<String>,
+    pub from: Option<u32>,
+    pub to: Option<u32>,
 }
 
 pub fn word_count(blocks: &[Block]) -> u32 {

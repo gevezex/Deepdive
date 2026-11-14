@@ -7,33 +7,61 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <header class="toolbar">
-      <form id="url-form" class="url-form" autocomplete="off">
-        <input id="url-input" type="text" spellcheck="false" placeholder="Paste or drop a web address or PDF link" aria-label="Web address" data-i18n-placeholder="app.urlPlaceholder" data-i18n-aria-label="app.urlLabel" />
-        <button id="url-open" type="submit" class="primary" data-i18n="app.open">Open</button>
-      </form>
-      <label class="button" for="pdf-input" data-i18n="app.choosePdf">Choose PDF</label>
-      <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
-      <button id="paste-open" type="button" data-i18n="app.pasteText">Paste text</button>
-      <select id="source-list" aria-label="Previously opened sources" data-i18n-aria-label="app.sourceListLabel"></select>
-      <button id="sites-open" type="button" data-i18n="app.sites">Sites</button>
-      <button id="providers-open" type="button" data-i18n="app.providers">Providers</button>
-      <button id="settings-open" type="button" data-i18n="app.settings">Settings</button>
-      <button id="update-button" type="button" class="primary" hidden data-i18n="update.available">Update available</button>
-    </header>
-
-    <div id="error" class="error" role="alert" hidden>
-      <div class="error-text">
-        <strong id="error-message"></strong>
-        <details id="error-details" hidden><summary data-i18n="common.technicalDetails">Technical details</summary><code id="error-detail"></code></details>
+    <div id="shell" class="shell">
+    <aside id="sidebar" class="sidebar" aria-label="Articles" data-i18n-aria-label="side.label">
+      <div class="side-top" data-tauri-drag-region>
+        <button id="sidebar-hide" type="button" class="icon-btn" title="Hide sidebar (⌘\)" data-i18n-title="side.hide"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
       </div>
-      <button id="error-login" type="button" class="primary" hidden data-i18n="app.logIn">Log in</button>
-      <button id="error-paste" type="button" class="primary" hidden data-i18n="app.pasteText">Paste text</button>
-      <button id="error-close" type="button" aria-label="Close message" data-i18n="common.close" data-i18n-aria-label="app.closeMessage">Close</button>
-    </div>
+      <div class="new-wrap">
+        <button id="new-open" type="button" class="new-btn" aria-haspopup="menu" aria-expanded="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="side.new">New article</span><kbd>⌘N</kbd></button>
+        <div id="new-menu" class="pop-menu" role="menu" hidden>
+          <button id="new-url" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span data-i18n="side.openUrl">Open web address</span><kbd>⌘L</kbd></button>
+          <label class="menu-item" for="pdf-input" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span data-i18n="app.choosePdf">Choose PDF</span><kbd>⌘O</kbd></label>
+          <button id="paste-open" type="button" role="menuitem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg><span data-i18n="app.pasteText">Paste text</span><kbd>⇧⌘V</kbd></button>
+        </div>
+        <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden />
+      </div>
+      <div class="search">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg>
+        <input id="source-search" type="search" spellcheck="false" autocomplete="off" placeholder="Search articles and highlights" aria-label="Search articles and highlights" data-i18n-placeholder="side.search" data-i18n-aria-label="side.searchLabel" />
+        <kbd>⌘K</kbd>
+      </div>
+      <div id="source-filters" class="filters" role="group" aria-label="Filter" data-i18n-aria-label="side.filter">
+        <button type="button" class="chip" data-filter="all" aria-pressed="true" data-i18n="side.all">All</button>
+        <button type="button" class="chip" data-filter="web" aria-pressed="false" data-i18n="side.web">Web</button>
+        <button type="button" class="chip" data-filter="pdf" aria-pressed="false" data-i18n="side.pdf">PDF</button>
+        <button type="button" class="chip" data-filter="marked" aria-pressed="false" data-i18n="side.marked">With highlights</button>
+      </div>
+      <nav id="source-list" class="source-list" aria-label="Previously opened sources" data-i18n-aria-label="app.sourceListLabel"></nav>
+      <div class="side-foot">
+        <button id="sites-open" type="button" class="foot-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg><span data-i18n="app.sites">Sites</span></button>
+        <button id="providers-open" type="button" class="foot-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 18.5 12 15.6 7 18.5l1.4-5.7L4 9l5.8-.7z"/></svg><span data-i18n="app.providers">Providers</span></button>
+        <span class="spacer"></span>
+        <button id="settings-open" type="button" class="icon-btn" title="Settings" aria-label="Settings" data-i18n-title="app.settings" data-i18n-aria-label="app.settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg></button>
+      </div>
+    </aside>
 
     <main class="panels">
       <section class="source-panel" aria-label="Source" data-i18n-aria-label="app.source">
+        <header class="toolbar" data-tauri-drag-region>
+          <button id="sidebar-show" type="button" class="icon-btn" title="Show sidebar (⌘\)" data-i18n-title="side.show" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+          <form id="url-form" class="url-form" autocomplete="off">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg>
+            <input id="url-input" type="text" spellcheck="false" placeholder="Paste or drop a web address or PDF link" aria-label="Web address" data-i18n-placeholder="app.urlPlaceholder" data-i18n-aria-label="app.urlLabel" />
+            <button id="url-open" type="submit" class="url-go" title="Open" aria-label="Open" data-i18n-title="app.open" data-i18n-aria-label="app.open"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </form>
+          <button id="update-button" type="button" class="update-pill" hidden data-i18n="update.available">Update available</button>
+        </header>
+
+        <div id="error" class="error" role="alert" hidden>
+          <div class="error-text">
+            <strong id="error-message"></strong>
+            <details id="error-details" hidden><summary data-i18n="common.technicalDetails">Technical details</summary><code id="error-detail"></code></details>
+          </div>
+          <button id="error-login" type="button" class="primary" hidden data-i18n="app.logIn">Log in</button>
+          <button id="error-paste" type="button" class="primary" hidden data-i18n="app.pasteText">Paste text</button>
+          <button id="error-close" type="button" aria-label="Close message" data-i18n="common.close" data-i18n-aria-label="app.closeMessage">Close</button>
+        </div>
         <div id="source-notice" class="source-notice" role="status" hidden>
           <div class="source-notice-text"><strong id="source-notice-title"></strong> <span id="source-notice-text"></span></div>
           <div id="source-notice-actions" class="source-notice-actions"></div>
@@ -57,8 +85,8 @@
         </footer>
       </section>
       <aside class="professor" aria-label="Professor" data-i18n-aria-label="app.professor">
-        <div class="model-bar">
-          <label for="model-picker" data-i18n="app.model">Model</label>
+        <div class="model-bar" data-tauri-drag-region>
+          <label for="model-picker" class="sr-only" data-i18n="app.model">Model</label>
           <select id="model-picker"></select>
           <select id="ai-language" class="ai-language" title="Language of the blueprint and answers for this article" aria-label="Language of the blueprint and answers for this article" data-i18n-title="app.aiLanguageTitle" data-i18n-aria-label="app.aiLanguageTitle" disabled></select>
           <p id="chatgpt-plan-badge" class="chatgpt-badge" hidden><span data-i18n="providers.usingPlan">Using ChatGPT plan</span> <button id="chatgpt-plan-manage" type="button" class="link" data-i18n="providers.manageUsage">Manage usage</button></p>
@@ -71,6 +99,7 @@
         <div id="answers" class="professor-body answers" role="tabpanel" aria-labelledby="tab-answers" hidden></div>
       </aside>
     </main>
+    </div>
 
     <div id="sel-bar" class="sel-bar" role="toolbar" aria-label="Selection" data-i18n-aria-label="reading.selection" hidden>
       <form id="sel-ask-form" class="sel-ask" autocomplete="off">
@@ -115,6 +144,12 @@
       <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
       <label class="settings-row"><span data-i18n="settings.language">Language</span><select id="settings-language"></select></label>
       <p class="hint" data-i18n="settings.languageHint">Changes menus, buttons and messages. The language of the blueprint and answers can be set per article with the flag next to the model.</p>
+      <label class="settings-row"><span data-i18n="settings.appearance">Appearance</span><select id="settings-theme">
+        <option value="light" data-i18n="settings.themeLight">Light</option>
+        <option value="dark" data-i18n="settings.themeDark">Dark</option>
+        <option value="system" data-i18n="settings.themeSystem">Same as macOS</option>
+      </select></label>
+      <p class="hint" data-i18n="settings.appearanceHint">Dark mode changes the window around the article. Web pages and PDFs keep their own colours.</p>
       <div class="dialog-buttons"><button id="settings-close" type="button" data-i18n="common.close">Close</button></div>
     </dialog>
 

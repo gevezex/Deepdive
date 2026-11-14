@@ -52,6 +52,8 @@ async function raw(js) {
 }
 
 const HELPERS = `
+const openSource = async (id) => { const s = $("source-search"); s.value = ""; s.dispatchEvent(new Event("input")); const item = () => $("source-list").querySelector(\`[data-id="\${id}"]\`); for (let i = 0; i < 200 && !item(); i++) await wait(25); if (!item()) throw "bron niet in de zijbalk: " + id; item().click(); };
+const sourceCount = () => $("source-list").querySelectorAll(".src-item[data-id]").length;
 const $ = (id) => document.getElementById(id);
 const invoke = window.__TAURI_INTERNALS__.invoke;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,11 +61,11 @@ const setValue = (id, v) => { const e = $(id); e.value = v; e.dispatchEvent(new 
 const settled = async (id) => { for (let i = 0; i < 1800; i++) { await wait(50); const e = $(id); if (!e.hidden && !e.classList.contains("notice-busy") && e.textContent) return { tone: e.className, text: e.textContent }; } throw "geen uitslag in " + id; };
 const until = async (fn, what) => { for (let i = 0; i < 400; i++) { const v = fn(); if (v) return v; await wait(25); } throw "te lang gewacht op " + what; };
 const paste = async (title, text) => {
-  const before = $("source-list").options.length;
+  const before = sourceCount();
   $("paste-open").click();
   $("paste-title").value = title; $("paste-url").value = ""; $("paste-text").value = text;
   $("paste-form").requestSubmit();
-  await until(() => document.title.startsWith(title) && $("source-list").options.length !== before, "bron " + title);
+  await until(() => document.title.startsWith(title) && sourceCount() !== before, "bron " + title);
   await wait(300);
 };
 const steps = () => [...document.querySelectorAll(".bp-step")].map((s) => s.dataset.state).join();
@@ -299,7 +301,7 @@ async function main() {
   const reopened = await run(`return { origin: $("bp-origin").textContent, message: $("bp-message").textContent, blocks: document.querySelectorAll(".bp-block").length, points: document.querySelectorAll(".bp-point").length, again: !!$("bp-again") }`);
   check("na herstart staat alles er weer", reopened.blocks === 5 && reopened.points === 4 && reopened.message.includes("boodschap") && reopened.origin.includes("nep-blauwdruk"), JSON.stringify(reopened));
   check("opnieuw openen roept geen model aan", bp.calls.length === callsBefore, bp.calls.join());
-  check("per bron, model en promptversie één bestand", blueprintFiles(sourceId).length === 1 && /-p2\.json$/.test(blueprintFiles(sourceId)[0]), blueprintFiles(sourceId).join());
+  check("per bron, model en promptversie één bestand", blueprintFiles(sourceId).length === 1 && /-p\d+-[a-z]+\.json$/.test(blueprintFiles(sourceId)[0]), blueprintFiles(sourceId).join());
   await shot("8-heropend");
 
   // ---------- opnieuw maken, en afbreken ----------
@@ -347,9 +349,9 @@ async function main() {
   bp.holdCritique = true;
   await run(`$("bp-start").click(); await until(() => document.querySelector(".bp-rel"), "structuur");`);
   const fourth = await run(`return localStorage.getItem("deepdive.lastSource")`);
-  await run(`setValue("source-list", ${JSON.stringify(sourceId)}); await until(() => $("bp-origin"), "ander stuk");`);
+  await run(`await openSource(${JSON.stringify(sourceId)}); await until(() => $("bp-origin"), "ander stuk");`);
   check("een ander stuk toont zijn eigen blauwdruk", (await run(`return !$("bp-progress")`)) === true);
-  await run(`setValue("source-list", ${JSON.stringify(fourth)}); await until(() => $("bp-progress"), "terug bij lopende blauwdruk");`);
+  await run(`await openSource(${JSON.stringify(fourth)}); await until(() => $("bp-progress"), "terug bij lopende blauwdruk");`);
   check("terug: de lopende blauwdruk is er nog", (await run(`return document.querySelectorAll(".bp-block").length`)) === 5);
   bp.holdCritique = false;
   await run(`await until(() => $("bp-outcomes"), "klaar");`);
@@ -384,7 +386,7 @@ async function main() {
   rmSync(blueprintDir, { recursive: true });
   startApp();
   await waitForApp();
-  await run(`setValue("model-picker", ${JSON.stringify(value)}); await wait(200); setValue("source-list", ${JSON.stringify(fourth)}); await until(() => $("bp-warning"), "waarschuwing");`);
+  await run(`setValue("model-picker", ${JSON.stringify(value)}); await wait(200); await openSource(${JSON.stringify(fourth)}); await until(() => $("bp-warning"), "waarschuwing");`);
   const before2 = await run(`return { first: $("blueprint").firstElementChild.id, text: $("bp-warning").textContent }`);
   check("onvolledige bron: waarschuwing staat bovenaan, al vóór het maken", before2.first === "bp-warning" && before2.text.includes("waarschijnlijk onvolledig") && before2.text.includes("midden in een zin"), JSON.stringify(before2));
   await run(`$("bp-start").click(); await until(() => $("bp-outcomes"), "blauwdruk"); await wait(150);`);

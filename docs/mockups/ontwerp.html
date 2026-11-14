@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deepdive – ontwerp-mockups</title>
+<style>
+/* ---------- Pagina rond de mockups ---------- */
+:root { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e6e1; color: #222; }
+.page-head { max-width: 1320px; margin: 0 auto; padding: 28px 24px 8px; }
+.page-head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.page-head p { margin: 0; color: #666; font-size: 14px; max-width: 70em; line-height: 1.5; }
+.switch { display: inline-flex; gap: 4px; margin: 18px 0 4px; padding: 4px; border-radius: 12px; background: #d9d5ce; }
+.switch button { padding: 7px 14px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 13px; font-weight: 550; color: #555; cursor: pointer; }
+.switch button.on { background: #fff; color: #111; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; max-width: 1320px; margin: 0 auto; padding: 8px 24px 0; }
+.note { padding: 12px 14px; border-radius: 12px; background: #f6f4f0; font-size: 13px; line-height: 1.45; color: #444; }
+.note b { display: block; margin-bottom: 3px; color: #111; font-size: 13px; }
+.stage { max-width: 1320px; margin: 0 auto; padding: 18px 24px 48px; }
+
+/* ---------- Thema-tokens ---------- */
+.app {
+  --ui: -apple-system, "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
+  --read: "Iowan Old Style", "Charter", Georgia, serif;
+}
+.app[data-v="warm"] {
+  --bg: #f4efe6; --side: #ece5d8; --panel: #faf7f1; --card: #fffdf9; --sheet: #fffdf9;
+  --ink: #2a241d; --soft: #7b7062; --faint: #a59a8b; --line: #e3d9c8; --hover: rgba(122,74,30,.07);
+  --accent: #8a5223; --accent-ink: #fff; --accent-soft: #f1e3d2; --sel: #e6d6c2;
+  --field: #fffdf9; --shadow: 0 1px 2px rgba(60,40,15,.06), 0 4px 16px rgba(60,40,15,.06);
+}
+.app[data-v="strak"] {
+  --bg: #ffffff; --side: #f7f7f5; --panel: #fbfbfa; --card: #ffffff; --sheet: #ffffff;
+  --ink: #1d1d1f; --soft: #6e6e73; --faint: #a1a1a6; --line: #ececea; --hover: rgba(0,0,0,.045);
+  --accent: #9a5a26; --accent-ink: #fff; --accent-soft: #f6ece2; --sel: #ececea;
+  --field: #f2f2f0; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 20px rgba(0,0,0,.06);
+}
+.app[data-v="donker"] {
+  --bg: #1b1916; --side: #161412; --panel: #1f1d1a; --card: #26231f; --sheet: #211f1b;
+  --ink: #ede6da; --soft: #a69b8b; --faint: #6f665a; --line: #302c27; --hover: rgba(255,240,220,.06);
+  --accent: #d79a5c; --accent-ink: #1b1510; --accent-soft: #3a2c1e; --sel: #2e2a24;
+  --field: #2a2621; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+}
+
+/* ---------- App-raam ---------- */
+.fit { position: relative; }
+.app { display: grid; grid-template-columns: 272px minmax(0, 1fr) 380px; width: 1272px; height: 760px; transform-origin: 0 0; overflow: hidden;
+  border-radius: 12px; background: var(--bg); color: var(--ink); font-family: var(--ui); font-size: 13px;
+  box-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 24px 60px rgba(0,0,0,.18); }
+.app button, .app input, .app select { font: inherit; color: inherit; }
+.ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Zijbalk */
+.side { display: flex; flex-direction: column; min-height: 0; background: var(--side); border-right: 1px solid var(--line); }
+.side-top { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px 0 78px; position: relative; }
+.lights { position: absolute; left: 14px; top: 16px; display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.app[data-v="donker"] .lights i { filter: saturate(.8) brightness(.9); }
+.side-top .grow { flex: 1; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--soft); }
+.icon-btn:hover { background: var(--hover); color: var(--ink); }
+.new-btn { display: flex; align-items: center; gap: 8px; margin: 4px 12px 10px; padding: 8px 10px; border: 0; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.new-btn .kbd { margin-left: auto; opacity: .7; font-weight: 500; font-size: 11px; }
+.search { position: relative; margin: 0 12px 8px; }
+.search input { width: 100%; height: 32px; padding: 0 36px 0 30px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); outline: none; }
+.app[data-v="strak"] .search input { border-color: transparent; }
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.search .ico { position: absolute; left: 9px; top: 8px; color: var(--faint); }
+.search .kbd { position: absolute; right: 8px; top: 7px; padding: 1px 5px; border-radius: 5px; background: var(--hover); color: var(--faint); font-size: 11px; }
+.filters { display: flex; gap: 4px; margin: 0 12px 6px; }
+.chip { white-space: nowrap; padding: 3px 9px; border: 0; border-radius: 99px; background: none; color: var(--soft); font-size: 12px; font-weight: 500; }
+.chip.on { background: var(--hover); color: var(--ink); }
+.list { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 12px; }
+.group { margin: 12px 8px 4px; color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.item { display: flex; gap: 10px; padding: 8px; border-radius: 9px; cursor: default; }
+.item:hover { background: var(--hover); }
+.item.on { background: var(--sel); }
+.app[data-v="strak"] .item.on { background: #fff; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.04); }
+.fav { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-top: 1px; border-radius: 7px; background: var(--card); box-shadow: 0 0 0 1px var(--line); font-size: 11px; font-weight: 700; color: var(--soft); }
+.fav.pdf { background: #c8463a; color: #fff; box-shadow: none; font-size: 9px; letter-spacing: .02em; }
+.fav.txt { color: var(--soft); }
+.item-body { min-width: 0; flex: 1; }
+.item-title { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-weight: 550; line-height: 1.3; }
+.item-meta { display: flex; gap: 6px; align-items: center; margin-top: 3px; color: var(--faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+.item-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.pill { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 10.5px; }
+mark.hit { background: rgba(242,194,48,.45); color: inherit; border-radius: 2px; padding: 0 1px; }
+.side-foot { display: flex; gap: 2px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+.side-foot .lbl { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px; background: none; color: var(--soft); font-size: 12.5px; }
+.side-foot .lbl:hover { background: var(--hover); color: var(--ink); }
+
+/* Midden: leesvlak */
+.mid { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--sheet); }
+.bar { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.addr { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; background: var(--field); color: var(--soft); }
+.app[data-v="warm"] .addr, .app[data-v="donker"] .addr { box-shadow: inset 0 0 0 1px var(--line); }
+.addr .host { color: var(--ink); font-weight: 550; }
+.addr .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.addr .ok { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 1px 7px; border-radius: 99px; background: rgba(52,150,90,.12); color: #2f8a55; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.app[data-v="donker"] .addr .ok { color: #6fcf97; }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--field); }
+.app[data-v="warm"] .seg, .app[data-v="donker"] .seg { box-shadow: inset 0 0 0 1px var(--line); }
+.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 0; border-radius: 6px; background: none; color: var(--soft); font-size: 12px; font-weight: 550; }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.app[data-v="donker"] .seg button.on { background: #3a352e; }
+.read { flex: 1; min-height: 0; overflow: hidden; position: relative; padding: 36px 0 0; }
+.article { max-width: 620px; margin: 0 auto; padding: 0 32px; font-family: var(--read); font-size: 18px; line-height: 1.65; }
+.kicker { font-family: var(--ui); font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+.article h2 { margin: 8px 0 6px; font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
+.byline { margin-bottom: 22px; font-family: var(--ui); font-size: 13px; color: var(--soft); }
+.article p { margin: 0 0 16px; }
+.hl-y { background: rgba(242,194,48,.38); border-radius: 2px; }
+.hl-b { background: rgba(95,158,232,.28); border-radius: 2px; box-shadow: inset 0 -2px 0 rgba(95,158,232,.7); }
+.selected { background: rgba(138,82,35,.22); }
+.app[data-v="donker"] .selected { background: rgba(215,154,92,.3); }
+.selbar { position: absolute; left: 50%; transform: translateX(-50%); top: 312px; display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 12px; background: #1f1c18; color: #f3ede2; box-shadow: 0 10px 30px rgba(0,0,0,.28); font-family: var(--ui); font-size: 13px; white-space: nowrap; }
+.app[data-v="donker"] .selbar { background: #3a342d; box-shadow: 0 0 0 1px #4a443c, 0 10px 30px rgba(0,0,0,.5); }
+.selbar span.b { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; }
+.selbar span.b:hover { background: #3a352e; }
+.selbar .ask { width: 140px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,.08); color: #b8ae9f; }
+.selbar .sep { width: 1px; height: 18px; margin: 0 3px; background: #48423a; }
+.selbar .sw { width: 14px; height: 14px; border-radius: 50%; background: #f2c230; box-shadow: 0 0 0 2px #1f1c18, 0 0 0 3px #f3ede2; margin: 0 6px; }
+
+/* Rechts: professor */
+.prof { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+.prof-head { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.model { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 8px; color: var(--ink); font-weight: 550; }
+.model:hover { background: var(--hover); }
+.model .spark { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, #d97757, #b4532f); }
+.model .chev { color: var(--faint); }
+.flag { padding: 4px 7px; border-radius: 7px; color: var(--soft); font-size: 12px; font-weight: 600; }
+.flag:hover { background: var(--hover); }
+.prof-tabs { display: flex; gap: 18px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.prof-tabs span { padding: 11px 0 10px; color: var(--soft); font-weight: 550; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.prof-tabs span.on { color: var(--ink); border-bottom-color: var(--accent); }
+.prof-tabs .n { margin-left: 4px; padding: 0 6px; border-radius: 99px; background: var(--hover); font-size: 11px; }
+.prof-body { flex: 1; min-height: 0; overflow: hidden; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.thesis { padding: 14px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); }
+.app[data-v="strak"] .thesis { box-shadow: 0 0 0 1px var(--line); }
+.label { color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.thesis p { margin: 6px 0 0; font-family: var(--read); font-size: 15px; line-height: 1.5; }
+.block { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--line); }
+.block .num { flex: none; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.block b { display: block; font-weight: 600; line-height: 1.35; }
+.block small { display: block; margin-top: 2px; color: var(--soft); font-size: 12px; line-height: 1.4; }
+.block .tags { display: flex; gap: 5px; margin-top: 7px; }
+.tag { padding: 1px 7px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.tag.plus { background: rgba(93,127,76,.14); color: #4f7a3d; }
+.tag.min { background: rgba(176,86,47,.13); color: #a24c27; }
+.app[data-v="donker"] .tag.plus { color: #9cc98a; } .app[data-v="donker"] .tag.min { color: #e49a78; }
+.prof-input { margin: 0 14px 14px; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 1px var(--line), var(--shadow); color: var(--faint); }
+.prof-input .send { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); }
+.update { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; }
+
+/* Toevoegen-menu */
+.menu { position: absolute; left: 12px; top: 92px; z-index: 5; width: 248px; padding: 6px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 12px 32px rgba(0,0,0,.16); }
+.menu .mi { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; }
+.menu .mi:hover, .menu .mi.on { background: var(--hover); }
+.menu .mi small { margin-left: auto; color: var(--faint); }
+.menu .mi .ico { color: var(--soft); }
+.side { position: relative; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>Deepdive – nieuw ontwerp</h1>
+  <p>Drie stijlrichtingen voor dezelfde opbouw: links alle artikelen met zoeken, in het midden het artikel, rechts de professor. De knoppenrij bovenin is verdwenen: openen gaat via <b>Nieuw</b> (of plakken/slepen), Sites, Providers en Instellingen staan onderin de zijbalk.</p>
+  <div class="switch" id="switch">
+    <button data-v="warm" class="on">A · Warm modern</button>
+    <button data-v="strak">B · Licht &amp; strak</button>
+    <button data-v="donker">C · Donker</button>
+  </div>
+  <div class="switch" id="state" style="margin-left:8px">
+    <button data-s="normaal" class="on">Lijst</button>
+    <button data-s="zoeken">Zoeken</button>
+    <button data-s="nieuw">Nieuw-menu open</button>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note"><b>Letter</b>Interface in de systeemletter (SF Pro), het artikel en de these blijven in een serif. Dat leest prettig en voelt minder 'oud'.</div>
+  <div class="note"><b>Knoppen</b>Geen omlijnde knoppen meer: iconen, zachte vlakken bij hover, één opvallende knop (Nieuw). Tabs als onderstreepte tekst, model als pil.</div>
+  <div class="note"><b>Zijbalk</b>Gegroepeerd op Vandaag / Deze week / Eerder. Per artikel: site of PDF, leestijd en aantal markeringen. Zoeken op titel, site én je markeringen. ⌘K springt erheen, ⌘\ klapt de balk in.</div>
+  <div class="note"><b>Kleur</b>Bruin uit het nieuwe icoon blijft de accentkleur. A houdt het warme papier, B is neutraal wit, C is een donkere modus (kan ook naast A of B bestaan).</div>
+</div>
+
+<div class="stage">
+  <div class="fit" id="fit"><div class="app" id="app" data-v="warm">
+    <!-- Zijbalk -->
+    <aside class="side">
+      <div class="side-top">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <span class="grow"></span>
+        <button class="icon-btn" title="Zijbalk inklappen"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+      </div>
+      <button class="new-btn"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nieuw artikel<span class="kbd">⌘N</span></button>
+      <div class="search">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg>
+        <input id="q" placeholder="Zoek artikelen en markeringen" />
+        <span class="kbd" id="qk">⌘K</span>
+      </div>
+      <div class="filters">
+        <button class="chip on">Alles</button><button class="chip">Web</button><button class="chip">PDF</button><button class="chip">Met markeringen</button>
+      </div>
+
+      <div class="list" id="list-normaal">
+        <div class="group">Vandaag</div>
+        <div class="item on"><div class="fav">Æ</div><div class="item-body"><div class="item-title">Why we sleep less than our grandparents did</div><div class="item-meta">aeon.co<span class="dot"></span>14 min<span class="pill">● 5</span></div></div></div>
+        <div class="item"><div class="fav pdf">PDF</div><div class="item-body"><div class="item-title">Attention Is All You Need</div><div class="item-meta">arxiv.org<span class="dot"></span>15 p.<span class="pill">● 12</span></div></div></div>
+        <div class="group">Deze week</div>
+        <div class="item"><div class="fav">N</div><div class="item-body"><div class="item-title">Het einde van de dertigurige werkweek?</div><div class="item-meta">nrc.nl<span class="dot"></span>8 min</div></div></div>
+        <div class="item"><div class="fav">T</div><div class="item-body"><div class="item-title">The quiet decline of the public library</div><div class="item-meta">theatlantic.com<span class="dot"></span>11 min<span class="pill">● 2</span></div></div></div>
+        <div class="item"><div class="fav txt">¶</div><div class="item-body"><div class="item-title">Notities koffieproef (geplakte tekst)</div><div class="item-meta">tekst<span class="dot"></span>3 min</div></div></div>
+        <div class="group">Oktober</div>
+        <div class="item"><div class="fav">Q</div><div class="item-body"><div class="item-title">Primes are more regular than we thought</div><div class="item-meta">quantamagazine.org<span class="dot"></span>9 min</div></div></div>
+        <div class="item"><div class="fav pdf">PDF</div><div class="item-body"><div class="item-title">Camino de Santiago – reisverslag</div><div class="item-meta">bestand<span class="dot"></span>42 p.<span class="pill">● 7</span></div></div></div>
+        <div class="item"><div class="fav">V</div><div class="item-body"><div class="item-title">Waarom we vergeten wat we lezen</div><div class="item-meta">volkskrant.nl<span class="dot"></span>6 min</div></div></div>
+      </div>
+
+      <div class="list hidden" id="list-zoeken">
+        <div class="group">3 artikelen</div>
+        <div class="item on"><div class="fav">Æ</div><div class="item-body"><div class="item-title">Why we <mark class="hit">sleep</mark> less than our grandparents did</div><div class="item-meta">aeon.co<span class="dot"></span>14 min</div></div></div>
+        <div class="item"><div class="fav">V</div><div class="item-body"><div class="item-title">Waarom we vergeten wat we lezen</div><div class="item-meta">volkskrant.nl<span class="dot"></span>„…tijdens de <mark class="hit">slaap</mark>…"</div></div></div>
+        <div class="item"><div class="fav pdf">PDF</div><div class="item-body"><div class="item-title">Camino de Santiago – reisverslag</div><div class="item-meta">bestand<span class="dot"></span>„…weinig <mark class="hit">slaap</mark>…"</div></div></div>
+        <div class="group">2 markeringen</div>
+        <div class="item"><div class="fav" style="background:rgba(242,194,48,.5);box-shadow:none">●</div><div class="item-body"><div class="item-title" style="font-weight:450;font-style:italic">„Average <mark class="hit">sleep</mark> duration has barely moved since 1960."</div><div class="item-meta">Why we sleep less…</div></div></div>
+        <div class="item"><div class="fav" style="background:rgba(95,158,232,.45);box-shadow:none">●</div><div class="item-body"><div class="item-title" style="font-weight:450;font-style:italic">„…artificial light pushed <mark class="hit">sleep</mark> later, not shorter."</div><div class="item-meta">Why we sleep less… · met notitie</div></div></div>
+      </div>
+
+      <div class="menu hidden" id="menu">
+        <div class="mi on"><svg class="ico" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Webadres openen<small>⌘L</small></div>
+        <div class="mi"><svg class="ico" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>PDF kiezen…<small>⌘O</small></div>
+        <div class="mi"><svg class="ico" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 11h6M9 15h4"/></svg>Tekst plakken<small>⇧⌘V</small></div>
+      </div>
+
+      <div class="side-foot">
+        <button class="lbl"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg>Sites</button>
+        <button class="lbl"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 18.5 12 15.6 7 18.5l1.4-5.7L4 9l5.8-.7z"/></svg>Providers</button>
+        <span style="flex:1"></span>
+        <button class="icon-btn" title="Instellingen"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg></button>
+      </div>
+    </aside>
+
+    <!-- Leesvlak -->
+    <section class="mid">
+      <div class="bar">
+        <div class="addr">
+          <svg class="ico" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <span class="path"><span class="host">aeon.co</span>/essays/why-we-sleep-less-than-our-grandparents-did</span>
+          <span class="ok"><svg class="ico" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="m5 12 5 5 9-10"/></svg>Bewaard 14 nov</span>
+        </div>
+        <button class="icon-btn" title="Opnieuw ophalen"><svg class="ico" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+        <span class="update"><svg class="ico" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>Update 1.2</span>
+      </div>
+      <div class="read">
+        <div class="article">
+          <div class="kicker">Essay · Aeon</div>
+          <h2>Why we sleep less than our grandparents did</h2>
+          <div class="byline">Door Maria Lindqvist · 14 minuten lezen</div>
+          <p>Every few years a headline announces that we are in the grip of a sleep epidemic. The story is familiar: screens, stress and long commuting hours have eaten away at the night, and we are paying for it with our health.</p>
+          <p><span class="hl-y">Yet the best long-term data tell a quieter story.</span> <span class="selected">Average sleep duration has barely moved since 1960, and in some countries it has even risen slightly.</span> What changed is not how long we sleep, but when.</p>
+          <p><span class="hl-b">Artificial light pushed sleep later, not shorter</span>, and the alarm clock kept the morning where it was. The result feels like less sleep, because it is less sleep on the nights that matter most to us.</p>
+        </div>
+        <div class="selbar">
+          <span class="ask">Vraag iets…</span>
+          <span class="sep"></span>
+          <span class="b"><svg class="ico" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Uitleg</span>
+          <span class="b"><svg class="ico" viewBox="0 0 24 24"><path d="M20 4C10 4 5 10 5 19M5 19l5-5M9 9h7"/></svg>Eenvoudiger</span>
+          <span class="b">···</span>
+          <span class="sep"></span>
+          <span class="sw"></span>
+          <span class="b"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Professor -->
+    <aside class="prof">
+      <div class="prof-head">
+        <span class="model"><span class="spark"></span>Claude Sonnet 5.5<svg class="ico chev" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span style="flex:1"></span>
+        <span class="flag">EN ▾</span>
+      </div>
+      <div class="prof-tabs"><span class="on">Blauwdruk</span><span>Vragen<span class="n">3</span></span><span>Markeringen<span class="n">5</span></span></div>
+      <div class="prof-body">
+        <div class="thesis"><div class="label">These</div><p>We slapen niet korter dan vroeger, maar later; het gevoel van slaaptekort komt door de verschuiving, niet door de duur.</p></div>
+        <div class="block"><span class="num">1</span><div><b>De bekende alarmkreet</b><small>Media spreken van een slaapepidemie door schermen en stress.</small></div></div>
+        <div class="block"><span class="num">2</span><div><b>Wat de lange reeksen zeggen</b><small>Slaapduur sinds 1960 vrijwel gelijk, soms gestegen.</small><div class="tags"><span class="tag plus">+ sterk bewijs</span><span class="tag min">− alleen rijke landen</span></div></div></div>
+        <div class="block"><span class="num">3</span><div><b>Licht verschuift de nacht</b><small>Kunstlicht duwt het slapengaan op; de wekker blijft staan.</small></div></div>
+        <div class="block"><span class="num">4</span><div><b>Waarom het tóch zo voelt</b><small>Korter op werkdagen, inhalen in het weekend.</small></div></div>
+      </div>
+      <div class="prof-input">Vraag de professor iets over dit artikel…<span class="send"><svg class="ico" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg></span></div>
+    </aside>
+  </div></div>
+</div>
+
+<script>
+function fit(){ const w=document.querySelector('.stage').clientWidth-48; const k=Math.min(1,w/1272);
+  app.style.transform='scale('+k+')'; document.getElementById('fit').style.height=(760*k)+'px'; }
+addEventListener('resize',()=>fit());
+const app = document.getElementById('app');
+document.querySelectorAll('#switch button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#switch button').forEach(x => x.classList.toggle('on', x === b));
+  app.dataset.v = b.dataset.v;
+});
+const q = document.getElementById('q');
+document.querySelectorAll('#state button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#state button').forEach(x => x.classList.toggle('on', x === b));
+  const s = b.dataset.s;
+  document.getElementById('list-normaal').classList.toggle('hidden', s === 'zoeken');
+  document.getElementById('list-zoeken').classList.toggle('hidden', s !== 'zoeken');
+  document.getElementById('menu').classList.toggle('hidden', s !== 'nieuw');
+  q.value = s === 'zoeken' ? 'slaap' : '';
+  document.getElementById('qk').classList.toggle('hidden', s === 'zoeken');
+});
+fit();
+// Selectiebalk net onder de geselecteerde zin, in onschaalde coördinaten.
+(function(){ const read=document.querySelector('.read'), sel=document.querySelector('.selected'), bar=document.querySelector('.selbar');
+  const k=app.getBoundingClientRect().width/1272; const r=sel.getBoundingClientRect(), b=read.getBoundingClientRect();
+  bar.style.top=((r.bottom-b.top)/k+10)+'px'; })();
+</script>
+</body>
+</html>

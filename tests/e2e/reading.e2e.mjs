@@ -250,7 +250,7 @@ async function main() {
   check("markering weghalen", highlightsOf(sourceId).length === 1);
 
   // Na opnieuw openen: gesprekken en markeringen zijn er nog, en het script krijgt de markeringen.
-  await run(`window.__dd = []; $("source-list").value = ""; location.reload();`).catch(() => {});
+  await run(`window.__dd = []; location.reload();`).catch(() => {});
   await sleep(1500);
   await waitForApp();
   const reopened = await run(`await until(() => cards().length === 3, "gesprekken"); return { count: $("answers-count").textContent }`);
