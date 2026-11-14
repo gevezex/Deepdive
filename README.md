@@ -59,8 +59,11 @@ Gewoon TypeScript met Vite, zonder framework. De schermdelen zijn klein en pdf.j
 | `src/providers.ts`, `src/providerLogic.ts` | Het providerscherm en de modelkiezer. |
 | `src-tauri/src/blueprint/` | De blauwdruk: schema, prompts en controles (`schema.rs`, `prompts/`, `validate.rs`), de twee aanroepen (`mod.rs`), het lezen van een antwoord terwijl het binnenkomt (`stream.rs`), de opslag (`saved.rs`) en de opdrachten voor de interface (`commands.rs`). |
 | `src/blueprint.ts`, `src/blueprintLogic.ts` | Het paneel: knop, voortgang, de drie lagen en het eigen diagram. |
+| `src-tauri/src/engine/bridge.js` | Het enige script in de websitekopie: geeft de selectie door, tekent markeringen en springt naar alinea's. |
+| `src-tauri/src/professor/` | Selecteren en vragen: de prompt (`prompts/system.md`, de opdracht per actie in `mod.rs`), gesprekken per bron in `threads/` en markeringen in `highlights.json` (`highlights.rs`). |
+| `src/reading.ts`, `src/answers.ts`, `src/readingLogic.ts` | De selectiebalk met het ⋯-menu, markeren met notitie, en de antwoorden in het tabblad Vragen. |
 
-**Afscherming:** de kopie staat in een iframe met `sandbox=""` en een CSP zonder scripts en zonder netwerk. Het verborgen venster heeft geen capability, dus een pagina kan de commando's van de app niet aanroepen.
+**Afscherming:** de kopie staat in een iframe met `sandbox="allow-scripts"`, zonder `allow-same-origin`, en een CSP zonder netwerk. De scripts van de site zitten niet in de kopie. Bij het serveren zet de app er één eigen script in (`engine/bridge.js`). De CSP in de kop laat alleen dat script toe, op zijn sha-256-hash: geen ander inline script, geen handlers in attributen en geen script van een adres. De CSP die in de opgeslagen pagina staat, gaat bij het serveren weg, want die verbiedt alle scripts. Het script heeft een eigen, ondoorzichtige origin en praat alleen via `postMessage` met het hoofdvenster. Het hoofdvenster neemt alleen berichten van die iframe aan en gebruikt daaruit alleen tekst en getallen. Het verborgen venster heeft geen capability, dus een pagina kan de commando's van de app niet aanroepen.
 
 **Voorvertoning:** zodra er tekst staat, toont de app de pagina al terwijl de kopie op de achtergrond wordt gemaakt. Die voorvertoning krijgt dezelfde opschoning en sandbox, zonder scripts, maar laadt afbeeldingen, CSS en fonts nog rechtstreeks van de site. Ze staat alleen in het geheugen.
 
@@ -68,7 +71,11 @@ Gewoon TypeScript met Vite, zonder framework. De schermdelen zijn klein en pdf.j
 
 **Popups in de kopie:** zonder scripts is een laag niet weg te klikken. Daarom gebeurt er twee dingen. Bij het vastleggen haalt `capture.js` cookielagen en inschrijf-, nieuwsbrief- en app-lagen weg, en zet het scrollen weer aan als de pagina dat had uitgezet. Een laag die zonder sluitknop vraagt om in te loggen of te betalen blijft staan. Blijft er toch iets hinderen, dan is er de knop **Popup weghalen** onder de kopie. De keuze staat als `hideFloating` in `source.json`. Bij het serveren voegt de app dan een stijl toe die verbergt wat volgens de CSS van de kopie zweeft (`position: fixed`, dialogen, en `position: absolute` met een z-index vanaf 1000). Elementen met of rond een genummerde alinea blijven altijd staan. De kopie op schijf, de tekst en het oordeel over de volledigheid veranderen niet, en de afscherming blijft gelijk. De kopie laadt opnieuw en begint dan bovenaan. Opnieuw ophalen neemt de keuze mee naar de nieuwe kopie.
 
-**Springen in de kopie:** de afgeschermde iframe draait geen scripts en de app kan er niet in kijken. Daarom vraagt de iframe een nieuw adres op: `index.html?hl=31-40#dd-doel`. De server van de app zet dan een stijl in de pagina en markeert die alinea's, en de browser scrolt zelf naar het anker. Uit de query komen alleen getallen, en de kopie op schijf verandert niet. `sandbox=""` en de CSP blijven zoals ze zijn. De prijs is dat de kopie bij elke sprong opnieuw laadt. Een pdf staat niet in een iframe: daar komt een markering op de pagina, op de plek uit het blok.
+**Springen in de kopie:** het eigen script scrolt naar de alinea's en laat ze oplichten, zonder dat de pagina opnieuw laadt. Het laatste doel staat in `data-jump` op de iframe. Is het script er nog niet, bijvoorbeeld tijdens de voorvertoning, dan vraagt de iframe een nieuw adres op: `index.html?hl=31-40#dd-doel`. De server zet dan een stijl in de pagina en de browser scrolt zelf naar het anker. Uit de query komen alleen getallen. Een pdf staat niet in een iframe: daar komt een markering op de pagina, op de plek uit het blok.
+
+**Selecteren en vragen:** bij een selectie verschijnt een balk met een vraagveld, Leg uit, Eenvoudiger, ⋯ (Wat betekent dit woord?, Klopt dit nog?, Waar komt dit nog terug?, Tegenargument, Citaat kopiëren), Markeren en Notitie. Typ je terwijl er iets geselecteerd is, dan gaan de letters naar het vraagveld. De vraag gaat met de hele bron, de selectie en de alineanummers naar het model dat bij Model is gekozen (`model_for_action("ask")`). Het antwoord komt in het tabblad Vragen en wordt per bron bewaard, met vervolgvragen. "Klopt dit nog?" zoekt nog niet op het web: het model zegt wat het weet en dat het niet is nagezocht.
+
+**Markeren:** vier kleuren. Klik op een markering voor een andere kleur, een notitie, Leg uit of weghalen. De kopie verandert nooit, dus een plek ligt vast: bij een website als tekenpositie in de tekst van de pagina, bij een pdf als rechthoeken op de pagina.
 
 **Blauwdrukken:** per bron, model en promptversie één bestand in `sources/<id>/blueprints/`. De iframe kan die map niet opvragen. Opnieuw openen roept geen model aan. Een onvolledige blauwdruk vervangt nooit een volledige van hetzelfde model.
 
@@ -112,6 +119,14 @@ Bedient de echte app tegen de lokale nepserver: knop, stap voor stap tonen, spri
 
 ```bash
 node tests/e2e/blueprint.e2e.mjs
+```
+
+## De end-to-endtest van selecteren en markeren
+
+Bedient de echte app tegen de lokale nepserver. In de websitekopie kan de test niet zelf selecteren, omdat de iframe is afgeschermd. De test controleert daarom dat het eigen script daar draait, en speelt daarna zijn berichten na. In de pdf selecteert de test echt. Bouwen gaat zoals hierboven.
+
+```bash
+node tests/e2e/reading.e2e.mjs
 ```
 
 ## De end-to-endtest van de popups

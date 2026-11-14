@@ -617,6 +617,55 @@ pub fn highlight(bytes: Vec<u8>, ranges: &[(u32, u32)]) -> Vec<u8> {
     }
 }
 
+// ---------- het eigen script in de kopie ----------
+// De kopie draait de scripts van de site nooit. Wel zet de app bij het serveren één eigen script in de pagina, zodat de
+// lezer kan selecteren en markeren. De CSP laat alleen dat script toe, op zijn hash: geen ander inline script, geen
+// handlers in attributen en geen script van een adres. De iframe heeft geen allow-same-origin, dus het script kan niet
+// bij de app en praat alleen via postMessage.
+
+pub const BRIDGE_JS: &str = include_str!("engine/bridge.js");
+
+/// De CSP van een pagina uit de kopie: die van de kopie, plus alleen het eigen script.
+pub fn page_csp() -> &'static str {
+    static CSP_WITH_BRIDGE: OnceLock<String> = OnceLock::new();
+    CSP_WITH_BRIDGE.get_or_init(|| {
+        use base64::Engine;
+        let hash = base64::engine::general_purpose::STANDARD.encode(Sha256::digest(BRIDGE_JS.as_bytes()));
+        format!("{CSP}; script-src 'sha256-{hash}'")
+    })
+}
+
+/// Zet het eigen script in de pagina. De CSP in de pagina zelf gaat eruit: die verbiedt alle scripts, en de CSP in de
+/// kop van het antwoord (`page_csp`) neemt het over. De kopie op schijf verandert niet.
+pub fn with_bridge(bytes: Vec<u8>) -> Vec<u8> {
+    let Ok(html) = std::str::from_utf8(&bytes) else { return bytes };
+    let script = format!("<script>{BRIDGE_JS}</script>");
+    let head_seen = RefCell::new(false);
+    let out = rewrite_str(
+        html,
+        RewriteStrSettings {
+            element_content_handlers: vec![
+                element!("meta[http-equiv]", |el| {
+                    el.remove();
+                    Ok(())
+                }),
+                element!("head", |el| {
+                    *head_seen.borrow_mut() = true;
+                    el.append(&script, ContentType::Html);
+                    Ok(())
+                }),
+            ],
+            ..RewriteStrSettings::new()
+        },
+    );
+    match out {
+        Ok(out) if *head_seen.borrow() => out.into_bytes(),
+        Ok(out) => format!("{script}{out}").into_bytes(),
+        // Zonder script werkt selecteren niet, maar de kopie blijft leesbaar en even goed afgeschermd.
+        Err(_) => bytes,
+    }
+}
+
 // ---------- zwevende lagen verbergen ----------
 // De iframe draait zonder scripts, dus een laag is daar niet weg te klikken en wij kunnen er niet in kijken. Wat wél kan:
 // bij het serveren een stijl meegeven die alles verbergt wat volgens de CSS van de kopie zweeft. Lagen die alinea's van
@@ -829,6 +878,25 @@ mod tests {
         assert!(out.contains(".c"), "{out}");
     }
 
+    #[test]
+    fn bridge_is_the_only_script_allowed() {
+        let html = r#"<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'"></head><body><p data-dd-n="1">a</p></body></html>"#;
+        let out = String::from_utf8(with_bridge(html.as_bytes().to_vec())).unwrap();
+        assert!(!out.contains("http-equiv"), "de strengere CSP in de pagina gaat eruit: {out}");
+        assert!(out.contains(BRIDGE_JS), "{out}");
+        assert_eq!(out.matches("<script>").count(), 1);
+        assert!(out.contains(r#"<p data-dd-n="1">a</p>"#));
+        let csp = page_csp();
+        assert!(csp.starts_with(CSP));
+        let script_src = csp.split(';').find(|d| d.trim().starts_with("script-src")).unwrap();
+        assert!(script_src.trim().starts_with("script-src 'sha256-"), "{csp}");
+        assert!(!csp.contains("unsafe-eval") && !csp.contains("'unsafe-inline'; script") && !script_src.contains("unsafe"), "{csp}");
+        // Het script mag niets dat de afscherming zou ondermijnen.
+        for forbidden in ["fetch(", "XMLHttpRequest", "__TAURI", "ipc", "eval(", "new Function", "innerHTML", "location ="] {
+            assert!(!BRIDGE_JS.contains(forbidden), "{forbidden}");
+        }
+    }
+
     fn new_test_id() -> String {
         uuid::Uuid::new_v4().simple().to_string()
     }
@@ -837,7 +905,7 @@ mod tests {
     fn the_shield_stays_as_it_is() {
         assert_eq!(CSP, "default-src 'none'; img-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; style-src deepdive-snapshot: http://deepdive-snapshot.localhost 'unsafe-inline'; font-src deepdive-snapshot: http://deepdive-snapshot.localhost data:; form-action 'none'; base-uri 'none'; frame-src 'none'");
         let index = include_str!("../../index.html");
-        assert!(index.contains(r#"<iframe id="source-frame" title="Vaste kopie van de bron" sandbox="" referrerpolicy="no-referrer" hidden></iframe>"#));
+        assert!(index.contains(r#"<iframe id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>"#));
     }
 
     fn clean(html: &str) -> String {

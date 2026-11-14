@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { ask, initAnswers, setAnswersSource } from "./answers";
 import { initBlueprint, setBlueprintSource } from "./blueprint";
 import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
+import { frameLoading, initReading, jumpInFrame, pdfReady, setReadingSource } from "./reading";
 import { initSites, refreshSites } from "./sites";
 import type { PdfViewHandle } from "./pdf";
 import type { AppError, LoginClosed, PagePreview, ParagraphRange, RefetchOutcome, SiteSession, Source, SourceSummary } from "./types";
@@ -33,6 +35,13 @@ function remember(id: string) {
 }
 function remembered(): string | null {
   try { return localStorage.getItem(LAST_KEY); } catch { return null; }
+}
+
+/** De bron voor alles wat erbij hoort: blauwdruk, vragen en markeringen. */
+function setSource(source: Source | null) {
+  void setBlueprintSource(source);
+  void setAnswersSource(source);
+  void setReadingSource(source);
 }
 
 // ---------- meldingen en status ----------
@@ -139,7 +148,7 @@ function renderSourceNotice(source: Source) {
           const saved = await invoke<Source>("accept_incomplete", { id: source.id });
           if (current?.id === saved.id) {
             current = saved;
-            void setBlueprintSource(saved);
+            void setSource(saved);
           }
           clearNotice();
         } catch (err) {
@@ -250,6 +259,7 @@ async function refreshList() {
 
 function hideViews() {
   $("show-saved").hidden = true;
+  frameLoading();
   pdfHandle?.destroy();
   pdfHandle = null;
   frame.hidden = true;
@@ -269,7 +279,7 @@ async function show(source: Source) {
   urlInput.value = source.url ?? "";
   renderStatus(source);
   renderSourceNotice(source);
-  void setBlueprintSource(source);
+  void setSource(source);
 
   if (source.kind === "pdf") {
     pdfView.hidden = false;
@@ -281,13 +291,15 @@ async function show(source: Source) {
       const doc = await loadPdf(new Uint8Array(data));
       if (token !== opening) return void doc.loadingTask.destroy();
       pdfHandle = await renderPdf(pdfView, doc);
+      void pdfReady(pdfHandle, source);
       if (!source.textReady) {
         setBusy("De tekst wordt gelezen…");
         const text = await extractText(doc);
         const saved = await invoke<Source>("save_pdf_text", { id: source.id, title: text.title, pageCount: text.pageCount, blocks: text.blocks });
         if (token === opening) {
           current = saved;
-          void setBlueprintSource(saved);
+          void setSource(saved);
+          if (pdfHandle) void pdfReady(pdfHandle, saved);
           renderStatus(saved);
           document.title = `${saved.title} – Deepdive`;
         }
@@ -308,6 +320,7 @@ async function show(source: Source) {
 /** `reload`: een adres dat alleen in het anker verschilt, laadt de iframe niet opnieuw. Daarom krijgt het dan een eigen nummer. */
 function loadFrame(id: string, reload = false) {
   $("show-saved").hidden = true;
+  frameLoading();
   const query = [lastHighlight ? `hl=${lastHighlight}` : null, reload ? `v=${++frameLoads}` : null].filter(Boolean).join("&");
   frame.src = `${snapshotBase}/${id}/index.html${query ? `?${query}` : ""}${lastHighlight ? "#dd-doel" : ""}`;
 }
@@ -340,6 +353,8 @@ function jumpToParagraphs(ranges: ParagraphRange[]) {
     void pdfHandle?.highlight(regions);
     return;
   }
+  // Het eigen script in de kopie springt zonder herladen. Is het er (nog) niet, dan via een nieuw adres.
+  if (frame.src.includes(`/${current.id}/`) && jumpInFrame(ranges)) return;
   lastHighlight = highlightParam(ranges);
   loadFrame(current.id);
 }
@@ -360,7 +375,7 @@ function showPreview(preview: PagePreview, url: string) {
   hideViews();
   current = null;
   clearNotice();
-  void setBlueprintSource(null);
+  setSource(null);
   document.title = `${preview.title} – Deepdive`;
   urlInput.value = url;
   $("empty").hidden = true;
@@ -380,7 +395,7 @@ async function adoptSaved(source: Source) {
   document.title = `${source.title} – Deepdive`;
   renderStatus(source);
   renderSourceNotice(source);
-  void setBlueprintSource(source);
+  void setSource(source);
   $("show-saved").hidden = source.kind === "pdf";
   await refreshList();
 }
@@ -558,9 +573,22 @@ for (const type of ["mousemove", "mousedown", "wheel"]) {
 
 // ---------- start ----------
 
+// ---------- rechterpaneel ----------
+
+function showPanel(which: "blueprint" | "answers") {
+  for (const name of ["blueprint", "answers"] as const) {
+    $(name).hidden = name !== which;
+    $(`tab-${name}`).setAttribute("aria-selected", String(name === which));
+  }
+}
+$("tab-blueprint").addEventListener("click", () => showPanel("blueprint"));
+$("tab-answers").addEventListener("click", () => showPanel("answers"));
+
 async function start() {
   initSites();
   initBlueprint(jumpToParagraphs);
+  initAnswers(jumpToParagraphs, () => showPanel("answers"));
+  initReading({ frame, pdfView, pdf: () => pdfHandle, ask, error: (err) => showError(err) });
   await Promise.all([refreshList(), initProviders()]);
   const last = remembered();
   if (!last) return;

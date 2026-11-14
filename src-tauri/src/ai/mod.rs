@@ -149,8 +149,7 @@ pub struct Target {
     pub context_tokens: Option<u32>,
 }
 
-#[allow(dead_code)] // Assistant komt met de gesprekken in stap 4.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     User,

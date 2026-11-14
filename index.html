@@ -42,7 +42,7 @@
             <p>Plak of sleep een webadres of een pdf hierheen. Deepdive bewaart een vaste kopie op deze computer, zodat je die later ook zonder internet kunt lezen.</p>
           </div>
           <div id="busy" class="busy" role="status" hidden><div class="spinner"></div><p id="busy-text"></p></div>
-          <iframe id="source-frame" title="Vaste kopie van de bron" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
+          <iframe id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
           <div id="pdf-view" class="pdf-view" hidden></div>
           <div id="frame-shield" class="frame-shield" hidden></div>
         </div>
@@ -60,9 +60,37 @@
           <select id="model-picker"></select>
           <p id="chatgpt-plan-badge" class="chatgpt-badge" hidden>Using ChatGPT plan <button id="chatgpt-plan-manage" type="button" class="link">Manage usage</button></p>
         </div>
-        <div id="blueprint" class="professor-body"></div>
+        <div class="prof-tabs" role="tablist" aria-label="Paneel">
+          <button id="tab-blueprint" type="button" role="tab" aria-selected="true" aria-controls="blueprint">Blauwdruk</button>
+          <button id="tab-answers" type="button" role="tab" aria-selected="false" aria-controls="answers">Vragen <span id="answers-count" class="tab-count"></span></button>
+        </div>
+        <div id="blueprint" class="professor-body" role="tabpanel" aria-labelledby="tab-blueprint"></div>
+        <div id="answers" class="professor-body answers" role="tabpanel" aria-labelledby="tab-answers" hidden></div>
       </aside>
     </main>
+
+    <div id="sel-bar" class="sel-bar" role="toolbar" aria-label="Selectie" hidden>
+      <form id="sel-ask-form" class="sel-ask" autocomplete="off">
+        <input id="sel-ask" type="text" spellcheck="true" placeholder="Vraag…" aria-label="Eigen vraag over de selectie" />
+      </form>
+      <span class="sel-sep" aria-hidden="true"></span>
+      <button type="button" class="sel-btn" data-action="explain" title="Wat het hier betekent en waarom het hier staat"><span class="sel-icon" data-icon="bulb"></span>Leg uit</button>
+      <button type="button" class="sel-btn" data-action="simplify" title="Hetzelfde in gewone woorden"><span class="sel-icon" data-icon="feather"></span>Eenvoudiger</button>
+      <button id="sel-more" type="button" class="sel-btn sel-round" aria-haspopup="menu" aria-expanded="false" title="Meer acties"><span class="sel-icon" data-icon="dots"></span></button>
+      <span class="sel-sep" aria-hidden="true"></span>
+      <button id="sel-mark" type="button" class="sel-btn sel-round" title="Markeren"><span class="sel-icon" data-icon="marker"></span><span id="sel-mark-dot" class="sel-dot"></span></button>
+      <button id="sel-note" type="button" class="sel-btn sel-round" title="Markeren met notitie"><span class="sel-icon" data-icon="pencil"></span></button>
+    </div>
+    <div id="sel-menu" class="sel-menu" role="menu" hidden></div>
+    <div id="mark-menu" class="sel-bar mark-menu" role="toolbar" aria-label="Markering" hidden></div>
+    <div id="note-pop" class="note-pop" role="dialog" aria-label="Notitie" hidden>
+      <textarea id="note-text" rows="4" placeholder="In je eigen woorden…" aria-label="Notitie"></textarea>
+      <div class="note-actions">
+        <button id="note-cancel" type="button">Annuleren</button>
+        <button id="note-save" type="button" class="primary">Bewaren</button>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
 
     <div id="drop-hint" class="drop-hint" hidden><p>Laat los om te openen</p></div>
 

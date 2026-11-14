@@ -100,11 +100,11 @@ try {
   const before = hash(rest.id);
   const viewed = await show(rest.id);
   check("knop staat klaar", viewed.label === "Popup weghalen" && !viewed.hidden, JSON.stringify(viewed));
-  check("iframe is afgeschermd", viewed.sandbox === "");
+  check("iframe is afgeschermd", viewed.sandbox === "allow-scripts");
   const voor = await shot("popup-voor");
   const after = await run(`$("hide-floating").click();await wait(1500);return {label:$("hide-floating").textContent,src:$("source-frame").getAttribute("src"),sandbox:$("source-frame").getAttribute("sandbox")};`);
   check("knop wisselt", after.label === "Popup terugzetten", JSON.stringify(after));
-  check("iframe laadt opnieuw en blijft afgeschermd", after.src !== viewed.src && after.sandbox === "", JSON.stringify(after));
+  check("iframe laadt opnieuw en blijft afgeschermd", after.src !== viewed.src && after.sandbox === "allow-scripts", JSON.stringify(after));
   const na = await shot("popup-na");
   if (voor && na) check("de schermafdruk verandert", !readFileSync(voor).equals(readFileSync(na)));
   check("kopie op schijf is niet gewijzigd", hash(rest.id) === before);

@@ -290,7 +290,7 @@ async function main() {
   // Controle op de schermafdruk: de tekst "Geladen kopie" toont dat juist dit bestand in de iframe staat.
   await shot("5-vijandige-kopie");
   const copyHits = mock.log.filter((r) => r.path === "/beacon" && r.query.from?.startsWith("copy"));
-  check("vaste kopie: iframe is geladen en afgeschermd", frameLoaded.ok === true && frameLoaded.sandbox === "", JSON.stringify(frameLoaded));
+  check("vaste kopie: iframe is geladen en afgeschermd", frameLoaded.ok === true && frameLoaded.sandbox === "allow-scripts", JSON.stringify(frameLoaded));
   check("vaste kopie: geen script, geen netwerk, geen commando's", copyHits.length === 0, JSON.stringify(copyHits.map((h) => h.query)));
   check("vaste kopie: kan het hoofdvenster niet aanraken", !frameLoaded.title.includes("gehackt"), frameLoaded.title);
 

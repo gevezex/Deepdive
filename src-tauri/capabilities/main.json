@@ -36,6 +36,13 @@
     "allow-open-chatgpt-usage",
     "allow-generate-blueprint",
     "allow-cancel-blueprint",
-    "allow-saved-blueprints"
+    "allow-saved-blueprints",
+    "allow-ask-professor",
+    "allow-cancel-ask",
+    "allow-list-threads",
+    "allow-delete-thread",
+    "allow-list-highlights",
+    "allow-save-highlight",
+    "allow-delete-highlight"
   ]
 }

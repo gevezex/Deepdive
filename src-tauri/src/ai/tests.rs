@@ -518,7 +518,12 @@ mod isolation {
         assert!(csp.starts_with("default-src 'none'"));
         assert!(!csp.contains("script-src"), "geen scripts");
         assert!(!csp.contains("connect-src"), "geen netwerk");
-        assert!(INDEX.contains(r#"id="source-frame" title="Vaste kopie van de bron" sandbox="""#), "de iframe is volledig afgeschermd");
+        assert!(INDEX.contains(r#"id="source-frame" title="Vaste kopie van de bron" sandbox="allow-scripts""#), "de iframe mag alleen het eigen script draaien");
+        assert!(!INDEX.contains("allow-same-origin"), "het script in de kopie komt nooit bij de app");
+        // De pagina zelf: alleen het eigen script, op hash, en nog steeds geen netwerk.
+        let page = crate::snapshot::page_csp();
+        assert!(!page.contains("connect-src") && !page.contains("unsafe-eval") && !page.contains("'self'"), "{page}");
+        assert_eq!(page.matches("script-src").count(), 1);
     }
 
     #[test]

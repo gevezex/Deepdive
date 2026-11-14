@@ -3,6 +3,7 @@ import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { buildBlocks, type PdfItem } from "./pdfBlocks";
+import { mergeRects, type HighlightColor, type PageRect } from "./readingLogic";
 import type { Block } from "./types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -48,10 +49,29 @@ export interface PdfRegion {
   bbox: [number, number, number, number];
 }
 
+export interface PdfMark {
+  id: string;
+  color: HighlightColor;
+  note: boolean;
+  rects: PageRect[];
+}
+
 export interface PdfViewHandle {
   destroy(): void;
   /** Scrolt naar de eerste plek en markeert ze allemaal. De vorige markering verdwijnt. */
   highlight(regions: PdfRegion[]): Promise<void>;
+  /** De selectie in de tekstlaag, als deel van elke pagina. Leeg als er niets in de pdf is geselecteerd. */
+  selectionRects(range: Range): PageRect[];
+  /** De plek van elk blok op zijn pagina, als deel van de pagina. */
+  blockRects(blocks: Block[]): Promise<{ n: number; rect: PageRect }[]>;
+  /** Tekent de markeringen van de lezer. De vorige verdwijnen. */
+  setMarks(marks: PdfMark[]): void;
+  /** De markering onder dit punt op het scherm, als die er is. */
+  markAt(x: number, y: number): string | null;
+  /** De rechthoek op het scherm van een markering. */
+  markRect(id: string): DOMRect | null;
+  setActiveMark(id: string | null): void;
+  scrollToMark(id: string): void;
 }
 
 /** Bouwt de pagina's lazy op: alleen wat in beeld komt wordt getekend, wat ver weg is wordt weer vrijgegeven. */
@@ -149,7 +169,87 @@ export async function renderPdf(container: HTMLElement, doc: pdfjs.PDFDocumentPr
   });
   resize.observe(container);
 
+  let marks: PdfMark[] = [];
+  const pageOf = (n: number) => slots[n - 1]?.el ?? null;
+  const drawMarks = () => {
+    for (const el of container.querySelectorAll(".pdf-hl")) el.remove();
+    for (const mark of marks) {
+      for (const r of mark.rects) {
+        const page = pageOf(r.page);
+        if (!page) continue;
+        const el = document.createElement("div");
+        el.className = `pdf-hl pdf-hl-${mark.color}${mark.note ? " has-note" : ""}`;
+        el.dataset.mark = mark.id;
+        el.style.left = `${r.x * 100}%`;
+        el.style.top = `${r.y * 100}%`;
+        el.style.width = `${r.w * 100}%`;
+        el.style.height = `${r.h * 100}%`;
+        page.append(el);
+      }
+    }
+  };
+  const markEls = (id: string) => [...container.querySelectorAll<HTMLElement>(".pdf-hl")].filter((el) => el.dataset.mark === id);
+
   return {
+    selectionRects(range) {
+      if (!container.contains(range.commonAncestorContainer)) return [];
+      const out: PageRect[] = [];
+      for (const rect of range.getClientRects()) {
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const slot = slots.find((s) => {
+          const p = s.el.getBoundingClientRect();
+          return cx >= p.left && cx <= p.right && cy >= p.top && cy <= p.bottom;
+        });
+        if (!slot) continue;
+        const p = slot.el.getBoundingClientRect();
+        // De tekstlaag van pdf.js heeft een onzichtbaar blok aan het eind; dat hoort niet bij de selectie.
+        if (rect.height > p.height * 0.08) continue;
+        out.push({ page: slot.n, x: (rect.left - p.left) / p.width, y: (rect.top - p.top) / p.height, w: rect.width / p.width, h: rect.height / p.height });
+      }
+      return mergeRects(out);
+    },
+    async blockRects(blocks) {
+      const views = new Map<number, ReturnType<pdfjs.PDFPageProxy["getViewport"]>>();
+      const out: { n: number; rect: PageRect }[] = [];
+      for (const b of blocks) {
+        if (!b.page || !b.bbox) continue;
+        if (!views.has(b.page)) views.set(b.page, (await doc.getPage(b.page)).getViewport({ scale: 1 }));
+        const view = views.get(b.page)!;
+        const [x0, y0] = view.convertToViewportPoint(b.bbox[0], b.bbox[1]) as [number, number];
+        const [x1, y1] = view.convertToViewportPoint(b.bbox[2], b.bbox[3]) as [number, number];
+        out.push({ n: b.n, rect: { page: b.page, x: Math.min(x0, x1) / view.width, y: Math.min(y0, y1) / view.height, w: Math.abs(x1 - x0) / view.width, h: Math.abs(y1 - y0) / view.height } });
+      }
+      return out;
+    },
+    setMarks(next) {
+      marks = next;
+      drawMarks();
+    },
+    markAt(x, y) {
+      for (const el of container.querySelectorAll<HTMLElement>(".pdf-hl")) {
+        const r = el.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return el.dataset.mark ?? null;
+      }
+      return null;
+    },
+    markRect(id) {
+      const els = markEls(id);
+      if (!els.length) return null;
+      const first = els[0].getBoundingClientRect();
+      const last = els[els.length - 1].getBoundingClientRect();
+      return new DOMRect(Math.min(first.left, last.left), first.top, Math.max(first.right, last.right) - Math.min(first.left, last.left), last.bottom - first.top);
+    },
+    setActiveMark(id) {
+      for (const el of container.querySelectorAll<HTMLElement>(".pdf-hl")) el.classList.toggle("is-active", el.dataset.mark === id);
+    },
+    scrollToMark(id) {
+      const el = markEls(id)[0];
+      if (!el) return;
+      const page = el.parentElement as HTMLElement;
+      const top = page.offsetTop + (parseFloat(el.style.top) / 100) * page.offsetHeight;
+      container.scrollTo({ top: Math.max(0, top - container.clientHeight * 0.18), behavior: "smooth" });
+    },
     async highlight(regions) {
       for (const mark of container.querySelectorAll(".pdf-mark")) mark.remove();
       let first: HTMLElement | null = null;

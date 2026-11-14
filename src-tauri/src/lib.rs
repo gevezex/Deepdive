@@ -7,6 +7,7 @@ mod error;
 mod import;
 mod model;
 mod preview;
+mod professor;
 mod providers;
 mod sessions;
 mod snapshot;
@@ -114,14 +115,17 @@ fn serve_snapshot(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> Re
         _ => bytes,
     };
     // De lezer koos "Popup weghalen": de server zet een stijl in de pagina. De kopie op schijf blijft zoals ze is.
-    let bytes = if store::mime_for(&path).starts_with("text/html") && store.snapshot_hides_floating(request.uri().path()) {
+    let is_page = store::mime_for(&path).starts_with("text/html");
+    let bytes = if is_page && store.snapshot_hides_floating(request.uri().path()) {
         snapshot::hide_floating(bytes, path.parent().map(|dir| dir.join("assets")).as_deref())
     } else {
         bytes
     };
+    // Het eigen script voor selecteren en markeren. De CSP in de kop laat alleen dat script toe.
+    let (bytes, csp) = if is_page { (snapshot::with_bridge(bytes), snapshot::page_csp()) } else { (bytes, snapshot::CSP) };
     let mut res = Response::builder()
         .header(header::CONTENT_TYPE, store::mime_for(&path))
-        .header(header::CONTENT_SECURITY_POLICY, snapshot::CSP)
+        .header(header::CONTENT_SECURITY_POLICY, csp)
         .header("X-Content-Type-Options", "nosniff")
         .header(header::REFERRER_POLICY, "no-referrer");
     // Fonts vragen om CORS. Alleen de afgeschermde iframe (origin "null") krijgt ze, geen pagina van internet.
@@ -161,6 +165,7 @@ pub fn run() {
             app.manage(ProviderStore::open(root.clone(), Arc::new(CachedSecrets::new(Keychain::new(keychain_service))))?);
             app.manage(SiteSessions::open(root.clone()));
             app.manage(blueprint::commands::Jobs::default());
+            app.manage(professor::commands::Asks::default());
             app.manage(Store::new(root)?);
             app.manage(preview::Previews::default());
             sessions::finish_pending_wipes(app.handle().clone());
@@ -184,6 +189,13 @@ pub fn run() {
             blueprint::commands::generate_blueprint,
             blueprint::commands::cancel_blueprint,
             blueprint::commands::saved_blueprints,
+            professor::commands::ask_professor,
+            professor::commands::cancel_ask,
+            professor::commands::list_threads,
+            professor::commands::delete_thread,
+            professor::commands::list_highlights,
+            professor::commands::save_highlight,
+            professor::commands::delete_highlight,
             sessions::site_login_open,
             sessions::site_login_close,
             sessions::list_site_sessions,

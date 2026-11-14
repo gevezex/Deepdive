@@ -266,25 +266,27 @@ async function main() {
 
   // ---------- springen ----------
   const frameBefore = await run(`return { src: $("source-frame").getAttribute("src"), sandbox: $("source-frame").getAttribute("sandbox") }`);
-  check("de kopie staat in een iframe zonder rechten", frameBefore.sandbox === "" && !frameBefore.src.includes("hl="), JSON.stringify(frameBefore));
+  // Alleen scripts, zonder allow-same-origin: het eigen script in de kopie kan niet bij de app.
+  check("de kopie staat in een iframe zonder rechten", frameBefore.sandbox === "allow-scripts" && !frameBefore.src.includes("hl="), JSON.stringify(frameBefore));
   const before = readFileSync(await shot("5-voor-sprong"));
   await run(`document.querySelector('[data-block="b5"] .bp-block-head').click(); await wait(800);`);
-  const afterJump = await run(`return { src: $("source-frame").getAttribute("src"), sandbox: $("source-frame").getAttribute("sandbox"), selected: document.querySelector('[data-block="b5"]').classList.contains("is-selected") }`);
-  check("klik op een blok springt naar die alinea's", afterJump.src.endsWith("/index.html?hl=31-40#dd-doel"), afterJump.src);
+  const afterJump = await run(`return { jump: $("source-frame").dataset.jump, src: $("source-frame").getAttribute("src"), sandbox: $("source-frame").getAttribute("sandbox"), selected: document.querySelector('[data-block="b5"]').classList.contains("is-selected") }`);
+  // Het eigen script in de kopie springt, zonder de pagina opnieuw te laden.
+  check("klik op een blok springt naar die alinea's, zonder herladen", afterJump.src === frameBefore.src && afterJump.jump === "31-40", JSON.stringify(afterJump));
   check("het blok licht op in het paneel", afterJump.selected);
-  check("de afscherming is niet veranderd", afterJump.sandbox === "");
+  check("de afscherming is niet veranderd", afterJump.sandbox === "allow-scripts");
   const after = readFileSync(await shot("6-na-sprong"));
   check("links is het beeld veranderd", !before.equals(after));
   await run(`document.querySelector('[data-point="k1"] .bp-point-head').click(); await wait(600);`);
-  const pointJump = await run(`return { src: $("source-frame").getAttribute("src"), explanation: document.querySelector('[data-point="k1"] .bp-point-more')?.textContent ?? "" }`);
-  check("klik op een punt springt en klapt de uitleg uit", pointJump.src.includes("hl=31-32#") && pointJump.explanation.includes("over iets anders"), JSON.stringify(pointJump));
+  const pointJump = await run(`return { jump: $("source-frame").dataset.jump, src: $("source-frame").getAttribute("src"), explanation: document.querySelector('[data-point="k1"] .bp-point-more')?.textContent ?? "" }`);
+  check("klik op een punt springt en klapt de uitleg uit", pointJump.src === frameBefore.src && pointJump.jump === "31-32" && pointJump.explanation.includes("over iets anders"), JSON.stringify(pointJump));
   check("zekerheid staat bij het uitgeklapte punt", (await run(`return document.querySelector('[data-point="k1"] .bp-certainty').textContent`)) === "Zekerheid: gemiddeld");
   await shot("7-punt-open");
   await run(`document.querySelector('[data-point="k3"] .bp-point-head').click(); await wait(400);`);
-  const broad = await run(`return { src: $("source-frame").getAttribute("src"), text: document.querySelector('[data-point="k3"] .bp-point-more').textContent }`);
-  check("breed punt springt naar het begin en zegt dat", broad.src.includes("hl=1-1#") && broad.text.includes("groot deel van het stuk"), JSON.stringify(broad));
+  const broad = await run(`return { jump: $("source-frame").dataset.jump, text: document.querySelector('[data-point="k3"] .bp-point-more').textContent }`);
+  check("breed punt springt naar het begin en zegt dat", broad.jump === "1-1" && broad.text.includes("groot deel van het stuk"), JSON.stringify(broad));
   await run(`document.querySelector('[data-rel="r2"] .bp-rel-head').click(); await wait(300);`);
-  check("klik op een pijl springt ook", (await run(`return $("source-frame").getAttribute("src")`)).includes("hl=11-20#"));
+  check("klik op een pijl springt ook", (await run(`return $("source-frame").dataset.jump`)) === "11-20");
   const repairs = await run(`return $("bp-repairs")?.textContent ?? ""`);
   check("wat de controle markeerde is na te lezen", repairs.includes("te veel alinea's"), repairs);
 

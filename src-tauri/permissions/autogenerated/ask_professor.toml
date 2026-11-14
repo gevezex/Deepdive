@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ask-professor"
+description = "Enables the ask_professor command without any pre-configured scope."
+commands.allow = ["ask_professor"]
+
+[[permission]]
+identifier = "deny-ask-professor"
+description = "Denies the ask_professor command without any pre-configured scope."
+commands.deny = ["ask_professor"]

@@ -34,6 +34,13 @@ fn main() {
         "generate_blueprint",
         "cancel_blueprint",
         "saved_blueprints",
+        "ask_professor",
+        "cancel_ask",
+        "list_threads",
+        "delete_thread",
+        "list_highlights",
+        "save_highlight",
+        "delete_highlight",
     ])))
     .expect("tauri-build mislukte");
 }

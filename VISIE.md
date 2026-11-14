@@ -329,7 +329,7 @@ Aandachtspunten:
 2. **Providers en modellen**: providers aanmaken, sleutels veilig opslaan en lokale modellen koppelen.
    **2b. Onvolledige stukken en inloggen**: per bron een oordeel (volledig, waarschijnlijk onvolledig, onbekend) op meerdere signalen, een melding met "Inloggen" en "Toch gebruiken", zelf inloggen in een venster in de app, een scherm met sites waar je bent ingelogd en "Opnieuw ophalen" die de oude kopie bewaart. Komt vóór de blauwdruk, omdat een blauwdruk van een half artikel misleidend is.
 3. **Blauwdruk**: de knop, de samenvatting, het doel, de levensloop en de kritische laag in het rechterpaneel. Gebouwd. "Je bent hier" hoort bij stap 4. Ontwerp en metingen staan in [docs/blauwdruk-ontwerp.md](docs/blauwdruk-ontwerp.md).
-4. **Selecteren en vragen**: selecteren, kader, selectiemenu, markeren, antwoorden, "je bent hier" en terugverwijzen.
+4. **Selecteren en vragen**: selecteren, kader, selectiemenu, markeren, antwoorden, "je bent hier" en terugverwijzen. Gebouwd: selecteren in website en pdf, het selectiemenu met eigen vraag en zes acties, citaat kopiëren, markeren in vier kleuren met notitie, en antwoorden met vervolgvragen en klikbare ¶-verwijzingen. Nog niet: het kader, een menu dat zich aanpast aan de selectie, webzoeken bij "Klopt dit nog?" en "je bent hier".
 
 **Daarna:**
 

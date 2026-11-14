@@ -98,7 +98,26 @@ function pieces(text, size = 40) {
   return out;
 }
 
+/** De professor: een antwoord in stukjes, met vet, een lijstje en een verwijzing naar een alinea. */
+async function streamAsk(req, res, body, bp) {
+  bp.asks.push(body);
+  const gone = { closed: false };
+  res.on("close", () => (gone.closed = true));
+  res.writeHead(200, { "Content-Type": "text/event-stream" });
+  const turns = (JSON.parse(body).messages ?? []).filter((m) => m.role === "user").length;
+  const answer = turns > 1 ? "**Vervolgantwoord.** Dat staat in ¶12." : "**Dit is de kern van het antwoord.** Zie ook ¶4.\n\n- eerste punt\n- tweede punt";
+  for (const piece of pieces(answer, 6)) {
+    while (bp.holdAsk && !gone.closed) await sleep(30);
+    if (gone.closed) return;
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: piece }, finish_reason: null }] })}\n\n`);
+    await sleep(20);
+  }
+  res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
+  res.end();
+}
+
 async function streamBlueprint(req, res, body, bp) {
+  if (body.includes("<selectie-")) return streamAsk(req, res, body, bp);
   const critique = body.includes("OPDRACHT: maak laag 3");
   bp.calls.push(critique ? "critique" : "structure");
   const failure = critique ? bp.failCritique : bp.failStructure;
@@ -146,7 +165,7 @@ async function streamBlueprint(req, res, body, bp) {
 export function startMock(expectedKey) {
   const log = [];
   let extraPage = "";
-  const bp = { calls: [], aborted: [], holdAfterGoal: false, holdAfterBlock: false, holdCritique: false, failCritique: null, failStructure: null, badStructureOnce: false };
+  const bp = { asks: [], holdAsk: false, calls: [], aborted: [], holdAfterGoal: false, holdAfterBlock: false, holdCritique: false, failCritique: null, failStructure: null, badStructureOnce: false };
   const server = createServer((req, res) => {
     const chunks = [];
     req.on("data", (c) => chunks.push(c));
