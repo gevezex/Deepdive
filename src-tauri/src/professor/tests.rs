@@ -133,3 +133,24 @@ fn threads_and_highlights_are_saved_per_source() {
     assert!(highlights::upsert(&store, &crate::store::new_id(), Highlight { id: crate::store::new_id(), ..h }).is_err());
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn deleting_a_source_removes_all_its_versions_and_nothing_else() {
+    let (store, root) = temp_store();
+    let (old, new, other) = (crate::store::new_id(), crate::store::new_id(), crate::store::new_id());
+    let mut a = source(&old);
+    a.superseded_by = Some(new.clone());
+    let mut b = source(&new);
+    b.previous_id = Some(old.clone());
+    for s in [a, b, source(&other)] {
+        std::fs::create_dir_all(store.source_dir(&s.id).unwrap()).unwrap();
+        store.update(&s).unwrap();
+    }
+    store.remove_with_versions(&new).unwrap();
+    assert!(store.get(&old).is_err());
+    assert!(store.get(&new).is_err());
+    assert!(!store.source_dir(&new).unwrap().exists());
+    assert!(store.get(&other).is_ok());
+    assert!(store.remove_with_versions(&new).is_err());
+    let _ = std::fs::remove_dir_all(root);
+}

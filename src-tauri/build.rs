@@ -10,6 +10,7 @@ fn main() {
         "import_text",
         "list_sources",
         "get_source",
+        "delete_source",
         "refetch_source",
         "adopt_candidate",
         "discard_candidate",

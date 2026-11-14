@@ -78,9 +78,37 @@ impl Store {
         std::fs::rename(tmp, dir.join("source.json")).map_err(AppError::storage)
     }
 
-    /// Verwijdert een hele bronmap. Alleen voor een nieuwe kopie die de lezer niet wil.
+    /// Verwijdert een hele bronmap, met markeringen, vragen en blauwdrukken.
     pub fn remove(&self, id: &str) -> Result<(), AppError> {
         std::fs::remove_dir_all(self.source_dir(id)?).map_err(AppError::storage)
+    }
+
+    /// Verwijdert een bron met al haar versies: oudere kopieën en een klaarstaande nieuwe hangen eraan vast
+    /// via `previous_id` en `superseded_by`, en zouden anders onzichtbaar op schijf blijven staan.
+    pub fn remove_with_versions(&self, id: &str) -> Result<(), AppError> {
+        self.get(id)?;
+        let all = self.all();
+        let mut doomed = vec![id.to_string()];
+        loop {
+            let before = doomed.len();
+            for s in &all {
+                if doomed.contains(&s.id) {
+                    continue;
+                }
+                let linked = |other: &Option<String>| other.as_ref().is_some_and(|o| doomed.contains(o));
+                let points_here = all.iter().any(|d| doomed.contains(&d.id) && (d.previous_id.as_deref() == Some(&s.id) || d.superseded_by.as_deref() == Some(&s.id)));
+                if linked(&s.previous_id) || linked(&s.superseded_by) || points_here {
+                    doomed.push(s.id.clone());
+                }
+            }
+            if doomed.len() == before {
+                break;
+            }
+        }
+        for d in &doomed {
+            self.remove(d)?;
+        }
+        Ok(())
     }
 
     pub fn all(&self) -> Vec<Source> {

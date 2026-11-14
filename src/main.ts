@@ -483,6 +483,27 @@ function jumpToParagraphs(ranges: ParagraphRange[]) {
   loadFrame(current.id);
 }
 
+/** Het open artikel is verwijderd: terug naar het lege begin. */
+function closeSource() {
+  ++opening;
+  hideViews();
+  current = null;
+  try { localStorage.removeItem(LAST_KEY); } catch { /* alleen gemak */ }
+  markCurrent(null);
+  document.title = "Deepdive";
+  urlInput.value = "";
+  clearError();
+  clearNotice();
+  setBusy(null);
+  renderStatus(null);
+  setSource(null);
+  $("empty").hidden = false;
+}
+
+function sourceDeleted(id: string) {
+  if (current && (current.id === id || current.supersededBy === id || current.previousId === id)) closeSource();
+}
+
 // ---------- voorvertoning ----------
 
 function renderPreviewStatus(text: string) {
@@ -759,7 +780,7 @@ initTheme();
 
 async function start() {
   await initLanguage();
-  initSidebar({ open: (id) => void openById(id), openHighlight: (id, h) => void openHighlight(id, h), error: (err) => showError(err) });
+  initSidebar({ open: (id) => void openById(id), deleted: sourceDeleted, openHighlight: (id, h) => void openHighlight(id, h), error: (err) => showError(err) });
   initSettings();
   initUpdate((err) => showError(err));
   renderAiLanguage(null);

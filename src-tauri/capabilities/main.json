@@ -14,6 +14,7 @@
     "allow-import-text",
     "allow-list-sources",
     "allow-get-source",
+    "allow-delete-source",
     "allow-refetch-source",
     "allow-adopt-candidate",
     "allow-discard-candidate",

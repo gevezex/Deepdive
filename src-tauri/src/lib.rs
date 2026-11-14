@@ -115,6 +115,12 @@ async fn list_sources(store: State<'_, Store>) -> Result<Vec<SourceSummary>, App
     Ok(store.summaries())
 }
 
+/// Verwijdert een artikel voorgoed, met alle versies, markeringen, vragen en blauwdrukken.
+#[tauri::command]
+async fn delete_source(store: State<'_, Store>, id: String) -> Result<(), AppError> {
+    store.remove_with_versions(&id)
+}
+
 #[tauri::command]
 async fn get_source(store: State<'_, Store>, id: String) -> Result<Source, AppError> {
     store.get(&id)
@@ -212,6 +218,7 @@ pub fn run() {
             open_project_page,
             list_sources,
             get_source,
+            delete_source,
             refetch_source,
             adopt_candidate,
             discard_candidate,

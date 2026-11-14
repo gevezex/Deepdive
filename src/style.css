@@ -98,7 +98,7 @@ input, textarea { background: var(--field); }
 .icon-btn:hover { background: var(--hover); color: var(--ink); }
 
 /* ---------- opbouw ---------- */
-.shell { display: grid; grid-template-columns: 264px minmax(0, 1fr); height: 100%; }
+.shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 100%; }
 .shell.side-hidden { grid-template-columns: minmax(0, 1fr); }
 .panels { display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr); min-width: 0; min-height: 0; }
 
@@ -132,6 +132,15 @@ input, textarea { background: var(--field); }
 .src-item { display: flex; gap: 10px; width: 100%; padding: 8px; border-radius: 9px; background: none; border: 0; text-align: left; white-space: normal; }
 .src-item:hover { background: var(--hover); }
 .src-item[aria-current="true"] { background: var(--selected); }
+/* Prullenbak: verschijnt pas na even stilstaan op een artikel, zodat hij niet bij elke beweging oplicht. */
+.src-row { position: relative; }
+.src-row .src-item { padding-right: 40px; }
+.src-delete { position: absolute; top: 50%; right: 6px; display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 6px; transform: translateY(-50%); border: 0; border-radius: 7px; background: none; color: #c8463a; opacity: 0; pointer-events: none; transition: opacity 0.15s 0s; }
+.src-row:hover .src-delete { opacity: 1; pointer-events: auto; transition-delay: 0.6s; }
+.src-delete:focus-visible, .src-row.armed .src-delete { opacity: 1; pointer-events: auto; transition-delay: 0s; }
+.src-delete:hover { background: rgba(200, 70, 58, 0.12); }
+.src-delete[data-armed="yes"] { background: #c8463a; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.src-row.armed .src-item { background: rgba(200, 70, 58, 0.08); }
 .fav { display: flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; margin-top: 1px; border-radius: 7px; background: var(--card); box-shadow: 0 0 0 1px var(--line); color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .fav-pdf { background: #c8463a; box-shadow: none; color: #fff; font-size: 9px; letter-spacing: 0.02em; }
 .hl-dot { width: 12px; height: 12px; margin: 4px 8px 0; border-radius: 50%; box-shadow: none; }

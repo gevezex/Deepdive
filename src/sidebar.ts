@@ -7,6 +7,8 @@ import type { HighlightBrief, SourceSummary } from "./types";
 
 interface Options {
   open: (id: string) => void;
+  /** Called after a source is deleted, so the reader can be emptied if it was open. */
+  deleted: (id: string) => void;
   openHighlight: (sourceId: string, highlight: HighlightBrief) => void;
   error: (err: unknown) => void;
 }
@@ -60,7 +62,49 @@ function meta(source: SourceSummary): HTMLElement {
   return line;
 }
 
+const TRASH = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+
+/** Red trash can, shown after hovering a while. The first click arms it, the second deletes for good. */
+function deleteButton(source: SourceSummary, row: HTMLElement): HTMLElement {
+  const button = el("button", "src-delete");
+  button.type = "button";
+  const idle = () => {
+    button.innerHTML = TRASH;
+    button.title = t("side.delete");
+    button.setAttribute("aria-label", t("side.delete"));
+    delete button.dataset.armed;
+    row.classList.remove("armed");
+  };
+  idle();
+  row.addEventListener("mouseleave", idle);
+  button.addEventListener("blur", idle);
+  button.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (button.dataset.armed !== "yes") {
+      button.dataset.armed = "yes";
+      row.classList.add("armed");
+      button.textContent = t("side.confirmDelete");
+      button.title = t("side.confirmDeleteHint");
+      return;
+    }
+    button.disabled = true;
+    try {
+      await invoke("delete_source", { id: source.id });
+      sources = sources.filter((s) => s.id !== source.id);
+      render();
+      options.deleted(source.id);
+      void refreshSidebar().catch(options.error);
+    } catch (err) {
+      button.disabled = false;
+      idle();
+      options.error(err);
+    }
+  });
+  return button;
+}
+
 function sourceItem(source: SourceSummary): HTMLElement {
+  const row = el("div", "src-row");
   const item = el("button", "src-item");
   item.type = "button";
   item.dataset.id = source.id;
@@ -70,7 +114,8 @@ function sourceItem(source: SourceSummary): HTMLElement {
   body.append(el("span", "item-title", source.title), meta(source));
   item.append(badge(source), body);
   item.addEventListener("click", () => options.open(source.id));
-  return item;
+  row.append(item, deleteButton(source, row));
+  return row;
 }
 
 function highlighted(text: string, query: string): DocumentFragment {
