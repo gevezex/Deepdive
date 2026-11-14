@@ -1,11 +1,40 @@
 # Deepdive
 Read any article with ai aid
 
-Zie [VISIE.md](VISIE.md) voor het idee, de functies en het bouwplan. Gebouwd zijn stap 1 (bronnen openen), stap 2 (providers en modellen, met daarbij optioneel inloggen met ChatGPT) en stap 3 (de blauwdruk).
+Zie [VISIE.md](VISIE.md) voor het idee, de functies en het bouwplan. Gebouwd zijn stap 1 (bronnen openen), stap 2 (providers en modellen, met daarbij optioneel inloggen met ChatGPT), stap 3 (de blauwdruk) en stap 4 (selecteren, vragen en markeren).
 
 Deepdive is open source onder de [MIT-licentie](LICENSE).
 
-## Starten
+## Installeren op macOS
+
+**Nodig:** een Mac met Apple Silicon (M1 of nieuwer). Voor Intel-Macs en Windows is er nog geen versie.
+
+1. Download `Deepdive_1.0.0_aarch64.dmg` bij de [nieuwste release](https://github.com/gevezex/Deepdive/releases/latest).
+2. Open het bestand en sleep **Deepdive** naar de map **Programma's**.
+3. Open Deepdive vanuit Programma's.
+
+**De eerste keer openen.** Deepdive is niet ondertekend bij Apple. Daarom zegt macOS bij de eerste keer dat de app niet geopend kan worden, of dat Apple niet kan controleren of hij vrij is van malware. Dat is te verwachten. Zo open je hem toch:
+
+1. Klik in de melding op **OK** of **Gereed**, niet op "Verplaats naar prullenmand".
+2. Open **Systeeminstellingen → Privacy en beveiliging** en scrol naar **Beveiliging**.
+3. Daar staat dat Deepdive is geblokkeerd. Klik op **Open toch** (Engels: *Open Anyway*) en bevestig met je wachtwoord of Touch ID.
+4. Klik in de volgende melding nog een keer op **Open toch**.
+
+Daarna opent Deepdive gewoon, ook na een herstart. Na een nieuwe versie kan het nodig zijn dit nog een keer te doen.
+
+Lukt het zo niet, dan kan het ook in Terminal. Dit haalt alleen de markering "gedownload van internet" van de app af:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Deepdive.app
+```
+
+**Aan de slag.** Klik op **Providers** en voeg een AI-dienst toe: Anthropic, een OpenAI-compatibele dienst (ook lokaal, zoals Ollama of LM Studio) of je eigen ChatGPT-abonnement. Kies daarna bovenaan het rechterpaneel een model. Plak een webadres, kies een pdf of plak tekst. Selecteer een stuk tekst om de professor iets te vragen of om te markeren.
+
+**Waar je gegevens staan.** Alles blijft op je eigen computer. Kopieën, blauwdrukken, gesprekken en markeringen staan in `~/Library/Application Support/app.deepdive.reader`. API-sleutels en de ChatGPT-login staan in de sleutelhanger van macOS.
+
+**Verwijderen.** Sleep Deepdive uit Programma's naar de prullenmand. Wil je ook je gegevens kwijt, verwijder dan de map hierboven. De sleutels haal je eerst weg in de app, bij Providers.
+
+## Zelf bouwen
 
 Nodig: Node, Rust en de systeemvereisten van [Tauri 2](https://tauri.app/start/prerequisites/).
 
