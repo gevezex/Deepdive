@@ -4,7 +4,7 @@ import { ask, initAnswers, setAnswersSource } from "./answers";
 import { initBlueprint, setBlueprintSource } from "./blueprint";
 import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
-import { frameLoading, initReading, jumpInFrame, pdfReady, setReadingSource } from "./reading";
+import { frameLoading, initReading, jumpInFrame, pdfReady, setFrameFontScale, setReadingSource } from "./reading";
 import { focusSearch, initSidebar, markCurrent, refreshSidebar, rerenderSidebar, setNewMenu, toggleSidebar } from "./sidebar";
 import { initSites, refreshSites } from "./sites";
 import { initTheme, isThemeChoice, setThemeChoice, themeChoice } from "./theme";
@@ -78,9 +78,17 @@ function initSettings() {
   const select = $<HTMLSelectElement>("settings-language");
   const theme = $<HTMLSelectElement>("settings-theme");
   select.replaceChildren(...LANGUAGES.map((l) => new Option(`${l.flag} ${l.name}`, l.code)));
+  const textSize = $<HTMLSelectElement>("settings-text-size");
+  textSize.replaceChildren(...TEXT_SCALES.map((scale, i) => new Option(`${Math.round(scale * 100)}%`, String(i))));
+  textSize.addEventListener("change", () => setDefaultTextSize(Number(textSize.value)));
   $("settings-open").addEventListener("click", () => {
     select.value = lang();
     theme.value = themeChoice();
+    try {
+      textSize.value = localStorage.getItem(TEXT_SCALE_KEY) ?? "2";
+    } catch {
+      textSize.value = String(textScale);
+    }
     dialog.showModal();
   });
   theme.addEventListener("change", () => {
@@ -148,10 +156,57 @@ function renderStatus(source: Source | null) {
   $("status-text").title = source.finalUrl ?? source.url ?? "";
   $("status-warnings").textContent = source.warnings.join(" ");
   $("refresh").hidden = !source.url || source.kind === "text";
+  $("text-size").hidden = source.kind !== "text";
+  setFrameFontScale(source.kind === "text" ? TEXT_SCALES[textScale] : null);
   const hide = $("hide-floating");
   hide.hidden = source.kind !== "web";
   hide.textContent = t(source.hideFloating ? "app.showFloating" : "app.hideFloating");
 }
+
+// ---------- tekstgrootte ----------
+
+// Voor geplakte tekst en markdown. De standaard staat in Instellingen; de A-knoppen passen de grootte aan tot de app sluit.
+const TEXT_SCALES = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.8];
+const TEXT_SCALE_KEY = "dd.textScale";
+const defaultTextScale = (() => {
+  try {
+    const raw = localStorage.getItem(TEXT_SCALE_KEY);
+    const i = Number(raw);
+    return raw !== null && Number.isInteger(i) && i >= 0 && i < TEXT_SCALES.length ? i : 2;
+  } catch {
+    return 2;
+  }
+})();
+let textScale = defaultTextScale;
+
+function renderTextSize() {
+  $<HTMLButtonElement>("text-smaller").disabled = textScale === 0;
+  $<HTMLButtonElement>("text-larger").disabled = textScale === TEXT_SCALES.length - 1;
+}
+
+function applyTextSize(index: number) {
+  textScale = index;
+  renderTextSize();
+  if (current?.kind === "text") setFrameFontScale(TEXT_SCALES[index]);
+}
+
+function changeTextSize(step: number) {
+  const next = Math.min(TEXT_SCALES.length - 1, Math.max(0, textScale + step));
+  if (next !== textScale) applyTextSize(next);
+}
+
+/** De standaard uit Instellingen: geldt meteen en bij elke volgende start. */
+function setDefaultTextSize(index: number) {
+  try {
+    localStorage.setItem(TEXT_SCALE_KEY, String(index));
+  } catch {
+    // Zonder opslag geldt de keuze alleen tot de app sluit.
+  }
+  applyTextSize(index);
+}
+$("text-smaller").addEventListener("click", () => changeTextSize(-1));
+$("text-larger").addEventListener("click", () => changeTextSize(1));
+renderTextSize();
 
 // ---------- melding boven de kopie ----------
 
@@ -613,6 +668,8 @@ document.addEventListener("keydown", (e) => {
   else if (key === "o" && !e.shiftKey) run(() => $("pdf-input").click());
   else if (key === "v" && e.shiftKey) run(() => openPasteDialog());
   else if (e.key === "\\") run(toggleSidebar);
+  else if ((e.key === "=" || e.key === "+") && current?.kind === "text") run(() => changeTextSize(1));
+  else if (e.key === "-" && current?.kind === "text") run(() => changeTextSize(-1));
 });
 
 // Plakken buiten een invoerveld opent het adres meteen.

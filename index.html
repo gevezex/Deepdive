@@ -37,7 +37,7 @@
         <button id="sites-open" type="button" class="foot-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg><span data-i18n="app.sites">Sites</span></button>
         <button id="providers-open" type="button" class="foot-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3L20 9l-4.4 3.8L17 18.5 12 15.6 7 18.5l1.4-5.7L4 9l5.8-.7z"/></svg><span data-i18n="app.providers">Providers</span></button>
         <span class="spacer"></span>
-        <button id="settings-open" type="button" class="icon-btn" title="Settings" aria-label="Settings" data-i18n-title="app.settings" data-i18n-aria-label="app.settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg></button>
+        <button id="settings-open" type="button" class="icon-btn" title="Settings" aria-label="Settings" data-i18n-title="app.settings" data-i18n-aria-label="app.settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       </div>
     </aside>
 
@@ -50,6 +50,10 @@
             <input id="url-input" type="text" spellcheck="false" placeholder="Paste or drop a web address or PDF link" aria-label="Web address" data-i18n-placeholder="app.urlPlaceholder" data-i18n-aria-label="app.urlLabel" />
             <button id="url-open" type="submit" class="url-go" title="Open" aria-label="Open" data-i18n-title="app.open" data-i18n-aria-label="app.open"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           </form>
+          <div id="text-size" class="text-size" role="group" aria-label="Text size" data-i18n-aria-label="app.textSize" hidden>
+            <button id="text-smaller" type="button" class="icon-btn" title="Smaller text" aria-label="Smaller text" data-i18n-title="app.textSmaller" data-i18n-aria-label="app.textSmaller"><span class="aa aa-small">A</span></button>
+            <button id="text-larger" type="button" class="icon-btn" title="Larger text" aria-label="Larger text" data-i18n-title="app.textLarger" data-i18n-aria-label="app.textLarger"><span class="aa aa-large">A</span></button>
+          </div>
           <button id="update-button" type="button" class="update-pill" hidden data-i18n="update.available">Update available</button>
         </header>
 
@@ -150,6 +154,8 @@
         <option value="system" data-i18n="settings.themeSystem">Same as macOS</option>
       </select></label>
       <p class="hint" data-i18n="settings.appearanceHint">Dark mode changes the window around the article. Web pages and PDFs keep their own colours.</p>
+      <label class="settings-row"><span data-i18n="settings.textSize">Text size</span><select id="settings-text-size"></select></label>
+      <p class="hint" data-i18n="settings.textSizeHint">For pasted text and Markdown. The A buttons above the text change the size until the app closes.</p>
       <div class="dialog-buttons"><button id="settings-close" type="button" data-i18n="common.close">Close</button></div>
     </dialog>
 

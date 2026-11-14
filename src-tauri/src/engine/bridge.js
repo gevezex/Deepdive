@@ -277,6 +277,15 @@
     return true;
   }
 
+  // ---------- tekstgrootte (alleen geplakte tekst en markdown) ----------
+
+  let baseSize = 0;
+  function setScale(scale) {
+    if (!document.body) return;
+    if (!baseSize) baseSize = parseFloat(getComputedStyle(document.body).fontSize) || 18;
+    document.body.style.fontSize = `${Math.round(baseSize * scale * 10) / 10}px`;
+  }
+
   // ---------- berichten van het venster erboven ----------
 
   window.addEventListener("message", (e) => {
@@ -296,6 +305,9 @@
         lastKey = "";
         break;
       }
+      case "font-scale":
+        if (typeof msg.scale === "number" && msg.scale >= 0.5 && msg.scale <= 3) setScale(msg.scale);
+        break;
       case "jump":
         if (Array.isArray(msg.ranges) || typeof msg.mark === "string") jump(Array.isArray(msg.ranges) ? msg.ranges : [], msg.mark);
         break;

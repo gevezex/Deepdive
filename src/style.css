@@ -161,6 +161,13 @@ mark.hit { padding: 0 1px; border-radius: 2px; background: rgba(242, 194, 48, 0.
 .url-form input::placeholder { color: var(--ink-faint); }
 .url-go { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border-radius: 6px; background: none; border: 0; color: var(--ink-soft); }
 .url-go:hover { background: var(--accent); color: var(--accent-ink); }
+.text-size { display: inline-flex; flex: none; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; }
+.text-size[hidden] { display: none; }
+.text-size .icon-btn { border-radius: 6px; }
+.text-size .icon-btn:disabled { opacity: 0.35; background: none; }
+.aa { font-family: Georgia, "Iowan Old Style", serif; font-weight: 600; line-height: 1; }
+.aa-small { font-size: 12px; }
+.aa-large { font-size: 17px; }
 .update-pill { padding: 4px 11px; border-radius: 99px; background: var(--accent-soft); border: 0; color: var(--accent); font-size: 12px; font-weight: 600; }
 .update-pill:hover { background: var(--accent); color: var(--accent-ink); }
 

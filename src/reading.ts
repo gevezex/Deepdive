@@ -246,6 +246,13 @@ function postToFrame(msg: Record<string, unknown>) {
   opts.frame.contentWindow?.postMessage({ dd: 1, ...msg }, "*");
 }
 
+// Tekstgrootte van de kopie. `null` laat de kopie zoals hij is (websites houden hun eigen opmaak).
+let fontScale: number | null = null;
+export function setFrameFontScale(scale: number | null) {
+  fontScale = scale;
+  if (scale !== null && frameReady) postToFrame({ type: "font-scale", scale });
+}
+
 function fromFrame(rect: FrameRect | null | undefined) {
   if (!rect) return null;
   const f = opts.frame.getBoundingClientRect();
@@ -264,6 +271,7 @@ function onFrameMessage(e: MessageEvent) {
   switch (msg.type) {
     case "ready":
       frameReady = true;
+      if (fontScale !== null) postToFrame({ type: "font-scale", scale: fontScale });
       sendMarks();
       break;
     case "selection": {
