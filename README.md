@@ -1,5 +1,5 @@
 # Deepdive
-Read any article with AI aid
+Read articles and PDFs with an AI professor: a blueprint of the argument, answers in context, and highlights. macOS app, bring your own model, also local.
 
 ![Deepdive with an article on the left and a question about the whole text on the right](docs/screenshots/questions.png)
 
