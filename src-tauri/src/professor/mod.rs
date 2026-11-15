@@ -34,6 +34,8 @@ pub enum Action {
     FactCheck,
     Related,
     Counterpoint,
+    /// Een open vraag over de hele tekst, zonder selectie.
+    Document,
 }
 
 impl Action {
@@ -46,6 +48,7 @@ impl Action {
             Action::FactCheck => "Is this still correct? You cannot search the web. Say what you know up to your knowledge cutoff, what may have changed since and how sure you are. Say in the core sentence that this was not checked on the internet.",
             Action::Related => "Where else does the text take up this idea? Name the places with paragraph numbers and say in one sentence per place what happens there. If there is no other place, say so.",
             Action::Counterpoint => "Give the strongest objection to what is said here. Then say how the author could answer on the basis of the text, and whether that removes the objection.",
+            Action::Document => "Answer the reader's question about the text as a whole. The reader did not select a passage. Point to the paragraphs your answer rests on.",
         }
     }
 }
@@ -132,7 +135,11 @@ pub fn clean_question(question: &str) -> Result<String, AppError> {
 pub fn first_message(source: &Source, action: Action, selection: &Selection, question: Option<&str>, nonce: &str) -> String {
     let tag = format!("selection-{nonce}");
     let mut out = source_prompt(source, nonce);
-    out.push_str(&format!("\nThe reader selected this passage{}:\n<{tag}>\n{}\n</{tag}>\n\n", selection.place(), selection.text));
+    if action == Action::Document {
+        out.push('\n');
+    } else {
+        out.push_str(&format!("\nThe reader selected this passage{}:\n<{tag}>\n{}\n</{tag}>\n\n", selection.place(), selection.text));
+    }
     out.push_str(&format!("Task: {}\n", action.task()));
     if let Some(q) = question {
         out.push_str(&format!("\nThe reader's question: {q}\n"));

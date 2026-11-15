@@ -1,7 +1,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ask, initAnswers, setAnswersSource } from "./answers";
+import { ask, focusDocumentQuestion, initAnswers, setAnswersSource } from "./answers";
 import { initBlueprint, setBlueprintSource } from "./blueprint";
 import { highlightParam } from "./blueprintLogic";
 import { initProviders } from "./providers";
@@ -686,6 +686,12 @@ function focusUrl() {
 document.addEventListener("keydown", (e) => {
   if (!e.metaKey && !e.ctrlKey) {
     if (e.key === "Escape" && !$("new-menu").hidden) setNewMenu(false);
+    // "/" stelt een vraag over de hele tekst, behalve als je al ergens typt.
+    const typing = (e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable]");
+    if (e.key === "/" && !e.altKey && !typing && !document.querySelector("dialog[open]")) {
+      e.preventDefault();
+      focusDocumentQuestion();
+    }
     return;
   }
   if (e.altKey || document.querySelector("dialog[open]")) return;

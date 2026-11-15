@@ -42,6 +42,10 @@ interface Live {
 }
 
 const root = () => document.getElementById("answers") as HTMLElement;
+/** De kaarten. Het vraagveld voor de hele tekst staat erboven en blijft staan, zodat een half getypte vraag niet verdwijnt. */
+let list: HTMLElement;
+let askForm: HTMLFormElement;
+let askInput: HTMLInputElement;
 let source: Source | null = null;
 let threads: Thread[] = [];
 /** Lopende vragen: nieuwe gesprekken op hun eigen sleutel, vervolgvragen op het id van het gesprek. */
@@ -76,8 +80,29 @@ function toError(err: unknown): AppError {
 export function initAnswers(onJump: (ranges: ParagraphRange[]) => void, onShow: () => void) {
   jump = onJump;
   showTab = onShow;
+  askForm = el("form", "ans-ask");
+  askForm.autocomplete = "off";
+  askInput = el("input");
+  askInput.type = "text";
+  askForm.append(askInput);
+  askForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = askInput.value.trim();
+    if (!q) return;
+    askInput.value = "";
+    ask("document", { text: "", from: null, to: null }, q);
+  });
+  list = el("div", "ans-list");
+  root().replaceChildren(askForm, list);
   onLanguageChange(render);
   render();
+}
+
+/** Naar het vraagveld voor de hele tekst, bijvoorbeeld met de toets /. */
+export function focusDocumentQuestion() {
+  if (!source) return;
+  showTab();
+  askInput.focus();
 }
 
 export async function setAnswersSource(next: Source | null) {
@@ -172,8 +197,11 @@ function updateCount() {
 }
 
 function render() {
-  const r = root();
+  const r = list;
   updateCount();
+  askInput.placeholder = t("ans.askDocument");
+  askInput.setAttribute("aria-label", t("ans.askDocumentLabel"));
+  askForm.hidden = !source;
   if (!source) {
     r.replaceChildren(el("p", "bp-empty", t("ans.noSource")));
     return;
@@ -195,7 +223,7 @@ function render() {
 
 /** Tijdens het streamen alleen het antwoord vervangen: de rest van het paneel blijft staan, ook een half getypte vervolgvraag. */
 function renderLive(item: Live) {
-  const card = root().querySelector<HTMLElement>(`[data-live="${item.key}"]`);
+  const card = list.querySelector<HTMLElement>(`[data-live="${item.key}"]`);
   if (!card) return render();
   const slot = card.querySelector<HTMLElement>(".ans-live");
   slot?.replaceWith(liveAnswer(item));
@@ -242,13 +270,18 @@ function head(action: Action, selection: Selected, actions: HTMLElement[]): HTML
     top.append(button(where, "bp-range", () => jump([range]), t("ans.goTo", { where })));
   }
   top.append(el("span", "spacer"), ...actions);
+  const wrap = el("div");
+  // Een vraag over de hele tekst heeft geen citaat.
+  if (!selection.text) {
+    wrap.append(top);
+    return wrap;
+  }
   const quote = el("blockquote", "ans-quote", selection.text);
   if (selection.from != null) {
     const range: ParagraphRange = [selection.from, selection.to ?? selection.from];
     quote.addEventListener("click", () => jump([range]));
     quote.title = t("ans.goToPlace");
   }
-  const wrap = el("div");
   wrap.append(top, quote);
   return wrap;
 }

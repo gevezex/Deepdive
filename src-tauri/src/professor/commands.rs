@@ -84,8 +84,13 @@ pub async fn ask_professor(
         }
         None => {
             let action = action.ok_or_else(|| AppError::new("internal", crate::i18n::tr("No action was chosen.", "Er is geen actie gekozen.", "Hiçbir eylem seçilmedi.")))?;
-            let selection = selection.ok_or_else(|| AppError::new("empty_selection", crate::i18n::tr("Select a piece of text first.", "Selecteer eerst een stuk tekst.", "Önce bir metin parçası seçin.")))?.cleaned()?;
-            if action == Action::Ask && question.is_none() {
+            // Een vraag over de hele tekst heeft geen selectie; wat de interface toch meestuurt telt niet.
+            let selection = if action == Action::Document {
+                Selection { text: String::new(), from: None, to: None }
+            } else {
+                selection.ok_or_else(|| AppError::new("empty_selection", crate::i18n::tr("Select a piece of text first.", "Selecteer eerst een stuk tekst.", "Önce bir metin parçası seçin.")))?.cleaned()?
+            };
+            if matches!(action, Action::Ask | Action::Document) && question.is_none() {
                 return Err(AppError::new("empty_question", crate::i18n::tr("Type a question first.", "Typ eerst een vraag.", "Önce bir soru yazın.")));
             }
             let at = now();

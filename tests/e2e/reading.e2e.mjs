@@ -220,10 +220,18 @@ async function main() {
   await run(`$("sel-ask").value = "Wat bedoelt de auteur?"; $("sel-ask-form").requestSubmit(); await until(() => cards().length === 2 && cards()[0].querySelector(".ans-follow"), "eigen vraag");`);
   check("eigen vraag: staat in de kaart en in het verzoek", (await run(`return cards()[0].querySelector(".ans-question")?.textContent`)) === "Wat bedoelt de auteur?" && bp.asks.at(-1).includes("The reader's question: Wat bedoelt de auteur?"));
 
+  // Een vraag over de hele tekst, zonder selectie, via de toets /.
+  await run(`document.activeElement?.blur(); document.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true })); await wait(50);`);
+  check("/ gaat naar het vraagveld voor de hele tekst", (await run(`return document.activeElement === document.querySelector(".ans-ask input")`)) === true);
+  await run(`const f = document.querySelector(".ans-ask"); f.querySelector("input").value = "Waar gaat dit stuk over?"; f.requestSubmit(); await until(() => cards().length === 3 && cards()[0].querySelector(".ans-follow"), "vraag over de hele tekst");`);
+  const whole = await run(`const c = cards()[0]; return { head: c.querySelector(".ans-head").textContent, quote: !!c.querySelector(".ans-quote"), q: c.querySelector(".ans-question")?.textContent, field: document.querySelector(".ans-ask input").value }`);
+  const wholeAsk = bp.asks.at(-1) ?? "";
+  check("vraag over de hele tekst: kaart zonder citaat, verzoek zonder selectie", whole.head.includes("Over de hele tekst") && !whole.quote && whole.q === "Waar gaat dit stuk over?" && whole.field === "" && wholeAsk.includes("text as a whole") && !wholeAsk.includes("selected this passage"), JSON.stringify(whole));
+
   // Een actie uit het menu, en stoppen.
   bp.holdAsk = true;
-  await run(`select("Alinea 9 van het teststuk", 9, 1500); $("sel-more").click(); await wait(50); [...document.querySelectorAll("#sel-menu .sel-menu-item")].find((b) => b.textContent.includes("Tegenargument")).click(); await until(() => cards().length === 3, "kaart");`);
-  check("menu-actie gaat met eigen opdracht naar het model", bp.asks.at(-1)?.includes("sterkste bezwaar") ?? false);
+  await run(`select("Alinea 9 van het teststuk", 9, 1500); $("sel-more").click(); await wait(50); [...document.querySelectorAll("#sel-menu .sel-menu-item")].find((b) => b.textContent.includes("Tegenargument")).click(); await until(() => cards().length === 4, "kaart");`);
+  check("menu-actie gaat met eigen opdracht naar het model", bp.asks.at(-1)?.includes("strongest objection") ?? false);
   await sleep(300);
   await run(`[...cards()[0].querySelectorAll("button")].find((b) => b.textContent === "Stoppen").click(); await until(() => cards()[0].querySelector(".ans-follow"), "gestopt");`);
   bp.holdAsk = false;
@@ -253,8 +261,8 @@ async function main() {
   await run(`window.__dd = []; location.reload();`).catch(() => {});
   await sleep(1500);
   await waitForApp();
-  const reopened = await run(`await until(() => cards().length === 3, "gesprekken"); return { count: $("answers-count").textContent }`);
-  check("opnieuw openen: gesprekken staan er nog", reopened.count === "3", JSON.stringify(reopened));
+  const reopened = await run(`await until(() => cards().length === 4, "gesprekken"); return { count: $("answers-count").textContent }`);
+  check("opnieuw openen: gesprekken staan er nog", reopened.count === "4", JSON.stringify(reopened));
   await shot("4-na-opnieuw-openen");
 
   // ---------- pdf: echt selecteren in de tekstlaag ----------

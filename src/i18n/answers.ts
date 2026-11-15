@@ -4,7 +4,9 @@ import { defineMessages } from "./define";
 export default defineMessages({
   en: {
     "ans.noSource": "Open a source. Then select a piece of text to ask the professor something.",
-    "ans.empty": "Select a piece of text on the left. A bar appears with which you can ask the professor something, or highlight the text.",
+    "ans.empty": "Select a piece of text on the left. A bar appears with which you can ask the professor something, or highlight the text. Or ask a question about the whole text above.",
+    "ans.askDocument": "Ask something about the whole text…",
+    "ans.askDocumentLabel": "Question about the whole text",
     "ans.goTo": "Go to {where}",
     "ans.goToPlace": "Go to this place in the text",
     "ans.stopping": "Stopping…",
@@ -18,7 +20,9 @@ export default defineMessages({
   },
   nl: {
     "ans.noSource": "Open een bron. Selecteer dan een stuk tekst om de professor iets te vragen.",
-    "ans.empty": "Selecteer links een stuk tekst. Dan verschijnt er een balk waarmee je de professor iets vraagt, of de tekst markeert.",
+    "ans.empty": "Selecteer links een stuk tekst. Dan verschijnt er een balk waarmee je de professor iets vraagt, of de tekst markeert. Of stel hierboven een vraag over de hele tekst.",
+    "ans.askDocument": "Vraag iets over de hele tekst…",
+    "ans.askDocumentLabel": "Vraag over de hele tekst",
     "ans.goTo": "Naar {where}",
     "ans.goToPlace": "Naar deze plek in de tekst",
     "ans.stopping": "Stoppen…",
@@ -32,7 +36,9 @@ export default defineMessages({
   },
   tr: {
     "ans.noSource": "Bir kaynak aç. Sonra profesöre bir şey sormak için metnin bir bölümünü seç.",
-    "ans.empty": "Soldan metnin bir bölümünü seç. Profesöre bir şey sorabileceğin ya da metni işaretleyebileceğin bir çubuk belirir.",
+    "ans.empty": "Soldan metnin bir bölümünü seç. Profesöre bir şey sorabileceğin ya da metni işaretleyebileceğin bir çubuk belirir. Ya da yukarıda metnin tamamı hakkında bir soru sor.",
+    "ans.askDocument": "Metnin tamamı hakkında bir şey sor…",
+    "ans.askDocumentLabel": "Metnin tamamı hakkında soru",
     "ans.goTo": "{where} konumuna git",
     "ans.goToPlace": "Metinde bu yere git",
     "ans.stopping": "Durduruluyor…",

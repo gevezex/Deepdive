@@ -4,7 +4,7 @@ import type { ParagraphRange } from "./types";
 
 // ---------- acties ----------
 
-export type Action = "ask" | "explain" | "simplify" | "define" | "fact_check" | "related" | "counterpoint";
+export type Action = "ask" | "explain" | "simplify" | "define" | "fact_check" | "related" | "counterpoint" | "document";
 export type HighlightColor = "yellow" | "green" | "blue" | "pink";
 export const COLORS: HighlightColor[] = ["yellow", "green", "blue", "pink"];
 export function colorLabel(color: HighlightColor): string {

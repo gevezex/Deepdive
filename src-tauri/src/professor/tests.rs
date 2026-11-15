@@ -70,6 +70,21 @@ fn first_message_has_source_selection_and_task_in_that_order() {
 }
 
 #[test]
+fn a_question_about_the_whole_text_has_no_selection_block() {
+    let src = source(&crate::store::new_id());
+    let mut t = thread(&src.id);
+    t.action = Action::Document;
+    t.selection = Selection { text: String::new(), from: None, to: None };
+    t.turns[0].text = "Waar gaat dit over?".into();
+    let req = request(&src, &t, "abc");
+    let Part::Text(text) = &req.messages[0].parts[0] else { panic!() };
+    assert!(!text.contains("<selection-abc>") && !text.contains("selected this passage"), "{text}");
+    assert!(text.contains("text as a whole") && text.contains("The reader's question: Waar gaat dit over?"), "{text}");
+    let json = serde_json::to_string(&t).unwrap();
+    assert!(json.contains("\"action\":\"document\""), "{json}");
+}
+
+#[test]
 fn a_source_can_have_its_own_answer_language() {
     let mut src = source(&crate::store::new_id());
     src.ai_language = Some("tr".into());

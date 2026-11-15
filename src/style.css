@@ -449,6 +449,9 @@ button.bp-range:hover { background: var(--paper-deep); }
 .pdf-page .textLayer { z-index: 2; }
 
 /* Antwoorden. */
+.ans-ask { position: sticky; top: -14px; z-index: 1; display: flex; margin: -14px -14px 12px; padding: 14px 14px 10px; background: var(--panel); }
+.ans-ask[hidden] { display: none; }
+.ans-ask input { flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); font-size: 14px; }
 .ans-card { margin-bottom: 14px; padding: 10px 12px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
 .ans-head { display: flex; gap: 6px; align-items: baseline; margin-bottom: 6px; font-size: 13px; color: var(--ink-soft); }
 .ans-action { font-weight: 600; color: var(--accent); }
