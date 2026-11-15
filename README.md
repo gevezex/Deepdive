@@ -9,7 +9,7 @@ Deepdive is open source under the [MIT license](LICENSE).
 
 **Required:** a Mac with Apple Silicon (M1 or newer). There is no version for Intel Macs or Windows yet.
 
-1. Download `Deepdive_1.3.3_aarch64.dmg` from the [latest release](https://github.com/gevezex/Deepdive/releases/latest).
+1. Download `Deepdive_1.4.0_aarch64.dmg` from the [latest release](https://github.com/gevezex/Deepdive/releases/latest).
 2. Open the file and drag **Deepdive** to the **Applications** folder.
 3. Open Deepdive from Applications.
 
