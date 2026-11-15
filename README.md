@@ -1,6 +1,12 @@
 # Deepdive
 Read any article with AI aid
 
+![Deepdive with an article on the left and a question about the whole text on the right](docs/screenshots/questions.png)
+
+![The blueprint of the same article: its goal, message and how the argument unfolds](docs/screenshots/blueprint.png)
+
+The screenshots use made-up articles and answers. To make them again after a change, see `scripts/readme-screenshot.mjs`.
+
 See [VISIE.md](VISIE.md) (in Dutch) for the idea, the features and the build plan. Built so far: step 1 (opening sources), step 2 (providers and models, with optional sign-in with ChatGPT), step 3 (the blueprint) and step 4 (selecting, asking and highlighting).
 
 Deepdive is open source under the [MIT license](LICENSE).
