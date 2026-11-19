@@ -100,7 +100,15 @@ input, textarea { background: var(--field); }
 /* ---------- opbouw ---------- */
 .shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 100%; }
 .shell.side-hidden { grid-template-columns: minmax(0, 1fr); }
-.panels { display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr); min-width: 0; min-height: 0; }
+/* Het rechterpaneel: breedte door de gebruiker gekozen (--professor-w, split.ts), anders 30%. */
+.panels { display: grid; grid-template-columns: minmax(0, 1fr) 0 clamp(300px, var(--professor-w, 30%), calc(100% - 360px)); min-width: 0; min-height: 0; }
+.panel-split { position: relative; z-index: 6; width: 0; outline: none; }
+.panel-split::before { content: ""; position: absolute; inset: 0 -4px; cursor: col-resize; }
+.panel-split::after { content: ""; position: absolute; inset: 0 -1px; background: var(--accent); opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+.panel-split:hover::after, .panel-split:focus-visible::after, .is-resizing .panel-split::after { opacity: 0.6; transition-delay: 0.1s; }
+/* Tijdens het slepen mag een iframe de muis niet opslokken. */
+.is-resizing, .is-resizing * { cursor: col-resize !important; user-select: none; }
+.is-resizing iframe { pointer-events: none; }
 
 /* ---------- zijbalk ---------- */
 /* Niet ".sidebar": pdf.js brengt een eigen .sidebar-stijl mee (239px, afgerond) die bij een pdf de zijbalk smaller maakte. */
@@ -224,8 +232,8 @@ mark.hit { padding: 0 1px; border-radius: 2px; background: rgba(242, 194, 48, 0.
 .model-bar select:hover { background: var(--hover); }
 .professor-body { flex: 1; min-height: 0; padding: 14px 14px 40px; overflow: auto; color: var(--ink); font-size: 14px; line-height: 1.5; }
 
-.pdf-view { position: absolute; inset: 0; overflow: auto; padding: 16px; background: var(--pdf-bg); }
-.pdf-page { position: relative; margin: 0 auto 16px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); }
+.pdf-view { position: absolute; inset: 0; overflow: auto; padding: 11px; background: var(--pdf-bg); }
+.pdf-page { position: relative; margin: 0 auto 11px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); }
 .pdf-page canvas { display: block; width: 100%; height: 100%; }
 .pdf-mark { position: absolute; z-index: 3; margin: -2px; padding: 2px; box-sizing: content-box; background: rgba(255, 205, 86, 0.38); outline: 2px solid rgba(176, 120, 20, 0.55); mix-blend-mode: multiply; pointer-events: none; animation: dd-flash 1.6s ease-out 1; }
 @keyframes dd-flash { 0% { background: rgba(255, 186, 40, 0.75); } 100% { background: rgba(255, 205, 86, 0.38); } }

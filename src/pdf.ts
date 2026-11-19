@@ -77,7 +77,7 @@ export interface PdfViewHandle {
 /** Bouwt de pagina's lazy op: alleen wat in beeld komt wordt getekend, wat ver weg is wordt weer vrijgegeven. */
 export async function renderPdf(container: HTMLElement, doc: pdfjs.PDFDocumentProxy): Promise<PdfViewHandle> {
   container.replaceChildren();
-  const width = () => Math.max(300, Math.min(container.clientWidth - 32, 1100));
+  const width = () => Math.max(300, Math.min(container.clientWidth - 22, 1100));
   const first = await doc.getPage(1);
   const firstBase = first.getViewport({ scale: 1 });
 

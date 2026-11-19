@@ -8,6 +8,7 @@ import { initProviders } from "./providers";
 import { frameLoading, initReading, jumpInFrame, pdfReady, setFrameFontScale, setReadingSource } from "./reading";
 import { focusSearch, initSidebar, markCurrent, refreshSidebar, rerenderSidebar, setNewMenu, toggleSidebar } from "./sidebar";
 import { initSites, refreshSites } from "./sites";
+import { initSplit } from "./split";
 import { initTheme, isThemeChoice, setThemeChoice, themeChoice } from "./theme";
 import { initUpdate } from "./update";
 import { formatDate, formatNumber, initLanguage, isLang, lang, LANGUAGES, onLanguageChange, plural, setLanguage, t } from "./i18n";
@@ -783,6 +784,7 @@ $("tab-blueprint").addEventListener("click", () => showPanel("blueprint"));
 $("tab-answers").addEventListener("click", () => showPanel("answers"));
 
 initTheme();
+initSplit();
 
 async function start() {
   await initLanguage();
