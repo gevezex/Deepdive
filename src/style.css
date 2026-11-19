@@ -103,7 +103,8 @@ input, textarea { background: var(--field); }
 .panels { display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr); min-width: 0; min-height: 0; }
 
 /* ---------- zijbalk ---------- */
-.sidebar { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--side); border-right: 1px solid var(--line); }
+/* Niet ".sidebar": pdf.js brengt een eigen .sidebar-stijl mee (239px, afgerond) die bij een pdf de zijbalk smaller maakte. */
+.app-side { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--side); border-right: 1px solid var(--line); }
 /* Ruimte voor de verkeerslichten van macOS: het venster heeft geen eigen titelbalk. */
 .side-top { display: flex; flex: none; align-items: center; justify-content: flex-end; height: 46px; padding: 0 10px 0 80px; }
 .new-wrap { position: relative; margin: 2px 12px 10px; }
